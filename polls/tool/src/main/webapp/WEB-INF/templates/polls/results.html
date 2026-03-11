@@ -10,8 +10,7 @@
     <p class="fw-semibold" th:utext="${poll.text}">Poll question</p>
     <p th:text="${pollSizeMessage}">Poll size</p>
     <p>
-      <a class="btn btn-outline-primary"
-        th:href="@{/polls/export/xlsx/{id}(id=${poll.id})}"
+      <a th:href="@{/polls/export/xlsx/{id}(id=${poll.id})}"
         th:text="#{poll_export_link}">
         Download Spreadsheet [XLSX]
       </a>
