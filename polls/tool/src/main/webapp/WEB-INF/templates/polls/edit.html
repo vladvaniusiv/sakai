@@ -120,8 +120,11 @@
       </div>
 
       <div class="mt-4">
-        <h2 class="h5">Groups</h2>
-        <label class="form-label">Select groups allowed to vote</label>
+        <h2 class="h5" th:text="#{new_poll_groups_title}">Groups</h2>
+
+        <label class="form-label" th:text="#{new_poll_groups_label}">
+          Select groups allowed to vote
+        </label>
 
         <select class="form-select"
                 multiple
@@ -133,7 +136,8 @@
           </option>
         </select>
 
-        <small class="form-text text-muted">
+        <small class="form-text text-muted"
+              th:text="#{new_poll_groups_help}">
           If no groups are selected, the poll will be visible to all students.
         </small>
       </div>
