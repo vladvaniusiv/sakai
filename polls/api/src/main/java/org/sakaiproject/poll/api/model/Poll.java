@@ -30,6 +30,8 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Stack;
+import java.util.Set;
+import java.util.HashSet;
 
 import javax.persistence.Basic;
 import javax.persistence.CascadeType;
@@ -45,6 +47,9 @@ import javax.persistence.Table;
 import javax.persistence.Temporal;
 import javax.persistence.TemporalType;
 import javax.persistence.Transient;
+import javax.persistence.ElementCollection;
+import javax.persistence.CollectionTable;
+import javax.persistence.JoinColumn;
 
 import org.hibernate.annotations.GenericGenerator;
 
@@ -116,6 +121,14 @@ public class Poll implements PersistableEntity<String> {
 
     @Column(name = "POLL_IS_PUBLIC", nullable = false)
     private boolean isPublic = false;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+        name = "POLL_GROUPS",
+        joinColumns = @JoinColumn(name = "POLL_ID")
+    )
+    @Column(name = "GROUP_ID", nullable = false)
+    private Set<String> groupIds = new HashSet<>();
 
     public Poll() {
         this.text = "";

@@ -88,6 +88,16 @@ public class PollController {
         }
 
         List<Poll> polls = new ArrayList<>(pollsService.findAllPolls(siteId));
+
+        String userId = sessionManager.getCurrentSessionUserId();
+        boolean isInstructor = isSiteOwner() || isAllowedPollAdd();
+
+        // Apply group-based filtering only for students.
+        // Instructors always see all polls, regardless of group assignment.
+        if (!isInstructor) {
+            polls.removeIf(p -> !pollsService.userIsInPollGroup(p, userId));
+        }
+
         Locale effectiveLocale = normaliseLocale(locale != null ? locale : Locale.getDefault());
 
         DateTimeFormatter sortFormatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss")

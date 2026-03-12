@@ -119,6 +119,25 @@
         </div>
       </div>
 
+      <div class="mt-4">
+        <h2 class="h5">Groups</h2>
+        <label class="form-label">Select groups allowed to vote</label>
+
+        <select class="form-select"
+                multiple
+                th:field="*{selectedGroupIds}">
+          <option th:each="g : ${groups}"
+                  th:value="${g.id}"
+                  th:text="${g.title}"
+                  th:selected="${pollForm.selectedGroupIds != null and pollForm.selectedGroupIds.contains(g.id)}">
+          </option>
+        </select>
+
+        <small class="form-text text-muted">
+          If no groups are selected, the poll will be visible to all students.
+        </small>
+      </div>
+
       <div class="form-check form-switch mt-4" th:if="${showPublicAccess}">
         <input type="checkbox" th:field="*{public}" />
         <label class="form-check-label" th:for="*{public}" th:text="#{new_poll_access_public}">Public poll</label>

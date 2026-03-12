@@ -19,9 +19,11 @@ package org.sakaiproject.poll.tool.mvc;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TimeZone;
 
 import lombok.RequiredArgsConstructor;
@@ -30,10 +32,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.sakaiproject.authz.api.SecurityService;
 import org.sakaiproject.component.api.ServerConfigurationService;
+import org.sakaiproject.exception.IdUnusedException;
 import org.sakaiproject.poll.api.model.Option;
 import org.sakaiproject.poll.api.service.PollsService;
 import org.sakaiproject.poll.api.model.Poll;
 import org.sakaiproject.poll.tool.model.PollForm;
+import org.sakaiproject.site.api.Group;
 import org.sakaiproject.site.api.SiteService;
 import org.sakaiproject.time.api.UserTimeService;
 import org.sakaiproject.tool.api.SessionManager;
@@ -136,6 +140,18 @@ public class PollEditorController {
         model.addAttribute("isSiteOwner", isSiteOwner());
         model.addAttribute("showPublicAccess", serverConfigurationService.getBoolean("poll.allow.public.access", false));
         model.addAttribute("timezone", getUserZoneId());
+        
+        // Load all groups from the current site to populate the group selector.
+        // If the site cannot be resolved, fall back to an empty list.
+        String siteId = toolManager.getCurrentPlacement().getContext();
+        Collection<Group> groups;
+        try {
+            groups = siteService.getSite(siteId).getGroups();
+        } catch (IdUnusedException e) {
+            log.warn("Site not found for id {} when loading groups for poll editor", siteId, e);
+            groups = List.of();
+        }
+        model.addAttribute("groups", groups);
         return "polls/edit";
     }
 
@@ -211,6 +227,9 @@ public class PollEditorController {
         }
 
         Poll poll = preparePollEntity(pollForm);
+        // Store the selected group IDs in the poll entity.
+        // If no groups are selected, the poll becomes visible to all students.
+        poll.setGroupIds(pollForm.getSelectedGroupIds());
         if (poll == null) {
             redirectAttributes.addFlashAttribute("alert", messageSource.getMessage("poll_missing", null, locale));
             return "redirect:/votePolls";
@@ -301,6 +320,8 @@ public class PollEditorController {
         if (form.getCloseDate() != null) {
             poll.setVoteClose(form.getCloseDate().atZone(zoneId).toInstant());
         }
+        // Persist selected group IDs (duplicated here because preparePollEntity also sets them).
+        poll.setGroupIds(form.getSelectedGroupIds());
 
         return poll;
     }
@@ -331,6 +352,7 @@ public class PollEditorController {
         form.setDisplayResult(poll.getDisplayResult());
         form.setOpenDate(truncateToMinutes(toLocalDateTime(poll.getVoteOpen(), zoneId)));
         form.setCloseDate(truncateToMinutes(toLocalDateTime(poll.getVoteClose(), zoneId)));
+        form.setSelectedGroupIds(poll.getGroupIds());
         return form;
     }
 

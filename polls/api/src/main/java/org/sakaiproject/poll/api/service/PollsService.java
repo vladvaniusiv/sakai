@@ -130,6 +130,15 @@ public interface PollsService {
     boolean isAllowedViewResults(Poll poll, String userId);
 
     /**
+     * Check if a user can view a poll based on group restrictions.
+     *
+     * @param poll the poll
+     * @param userId the internal user id
+     * @return true if the user can view the poll
+     */
+    boolean userCanViewPoll(Poll poll, String userId);
+
+    /**
      * Save an individual option
      *
      * @param poll
@@ -362,4 +371,14 @@ public interface PollsService {
      * @return count of users with vote permission in the site
      */
     int getNumberUsersCanVote(String siteId);
+
+    /**
+     * Check whether a user belongs to at least one of the groups assigned to a poll.
+     * If the poll has no groups assigned, it is considered visible to all users.
+     *
+     * @param poll the poll to check
+     * @param userId the user ID to evaluate
+     * @return true if the user is allowed to view the poll based on group membership
+     */
+    boolean userIsInPollGroup(Poll poll, String userId);
 }

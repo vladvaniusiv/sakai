@@ -12,6 +12,7 @@ import java.util.Optional;
 import org.sakaiproject.poll.api.model.Option;
 import org.sakaiproject.poll.api.model.Poll;
 import org.sakaiproject.poll.api.repository.PollRepository;
+import org.sakaiproject.site.api.Group;
 import org.sakaiproject.springframework.data.SpringCrudRepositoryImpl;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -83,5 +84,31 @@ public class PollRepositoryImpl extends SpringCrudRepositoryImpl<Poll, String> i
     public Optional<Option> findOptionByOptionId(Long optionId) {
         if (optionId == null) return Optional.empty();
         return Optional.ofNullable(sessionFactory.getCurrentSession().get(Option.class, optionId));
+    }
+
+    @Override
+    public List<Poll> findBySiteIdAndGroupIdsIn(String siteId, List<String> groupIds) {
+
+        if (siteId == null || groupIds == null || groupIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        CriteriaBuilder cb = sessionFactory.getCriteriaBuilder();
+        CriteriaQuery<Poll> query = cb.createQuery(Poll.class);
+        Root<Poll> root = query.from(Poll.class);
+
+        // poll.siteId = :siteId
+        Predicate sitePredicate = cb.equal(root.get("siteId"), siteId);
+
+        // poll.groupIds IN (:groupIds)
+        Predicate groupPredicate = root.join("groupIds").in(groupIds);
+
+        query.select(root)
+            .where(cb.and(sitePredicate, groupPredicate))
+            .orderBy(cb.desc(root.get("creationDate")));
+
+        return sessionFactory.getCurrentSession()
+                .createQuery(query)
+                .getResultList();
     }
 }

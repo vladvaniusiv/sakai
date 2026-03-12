@@ -55,4 +55,14 @@ public interface PollRepository extends SpringCrudRepository<Poll, String> {
      * @return Optional containing the poll if found, empty Optional if option ID is null or not found
      */
     Optional<Option> findOptionByOptionId(Long optionId);
+
+    /**
+     * Finds polls for a site that are assigned to any of the given group IDs.
+     * Useful for filtering polls visible to a student based on their group membership.
+     *
+     * @param siteId the site identifier
+     * @param groupIds the group IDs the user belongs to
+     * @return list of polls that match the site and intersect with the given groups
+     */
+    List<Poll> findBySiteIdAndGroupIdsIn(String siteId, List<String> groupIds);
 }

@@ -32,6 +32,7 @@ import org.sakaiproject.poll.tool.model.VoteForm;
 import org.sakaiproject.site.api.SiteService;
 import org.sakaiproject.tool.api.SessionManager;
 import org.sakaiproject.tool.api.ToolManager;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -55,6 +56,8 @@ public class VoteController {
     private final SiteService siteService;
     private final ToolManager toolManager;
     private final MessageSource messageSource;
+    @Autowired
+    private SessionManager sessionManager;
 
     @GetMapping("/voteQuestion")
     public String showVote(@RequestParam("pollId") String pollId,
@@ -70,6 +73,20 @@ public class VoteController {
         }
         if (poll.isEmpty()) {
             redirectAttributes.addFlashAttribute("alert", messageSource.getMessage("poll_missing", null, locale));
+            return "redirect:/votePolls";
+        }
+        String userId = sessionManager.getCurrentSessionUserId();
+        // Basic access check: instructors or allowed students.
+        if (!pollsService.userCanViewPoll(poll.get(), userId)) {
+            redirectAttributes.addFlashAttribute("alert", messageSource.getMessage("vote_noperm.voteCollection", null, locale));
+            return "redirect:/votePolls";
+        }
+        // If the poll has assigned groups and the user is not a member of any of them → deny access.
+        if (!poll.get().getGroupIds().isEmpty()
+                && !pollsService.userIsInPollGroup(poll.get(), userId)) {
+
+            redirectAttributes.addFlashAttribute("alert",
+                    messageSource.getMessage("vote_noperm.voteCollection", null, locale));
             return "redirect:/votePolls";
         }
         if (!pollsService.pollIsVotable(poll.get())) {
@@ -106,6 +123,11 @@ public class VoteController {
         }
         if (poll.isEmpty()) {
             redirectAttributes.addFlashAttribute("alert", messageSource.getMessage("poll_missing", null, locale));
+            return "redirect:/votePolls";
+        }
+        String userId = sessionManager.getCurrentSessionUserId();
+        if (!pollsService.userCanViewPoll(poll.get(), userId)) {
+            redirectAttributes.addFlashAttribute("alert", messageSource.getMessage("vote_noperm.voteCollection", null, locale));
             return "redirect:/votePolls";
         }
         try {

@@ -56,6 +56,7 @@ import org.sakaiproject.event.api.LearningResourceStoreService;
 import org.sakaiproject.event.api.NotificationService;
 import org.sakaiproject.event.api.UsageSession;
 import org.sakaiproject.event.api.UsageSessionService;
+import org.sakaiproject.exception.IdUnusedException;
 import org.sakaiproject.lti.api.LTIService;
 import org.sakaiproject.poll.api.entity.PollEntity;
 import org.sakaiproject.poll.api.model.VoteCollection;
@@ -66,6 +67,7 @@ import org.sakaiproject.poll.api.model.Vote;
 import org.sakaiproject.poll.api.repository.PollRepository;
 import org.sakaiproject.poll.api.repository.VoteRepository;
 import org.sakaiproject.poll.api.util.PollUtil;
+import org.sakaiproject.site.api.Group;
 import org.sakaiproject.site.api.Site;
 import org.sakaiproject.site.api.SiteService;
 import org.sakaiproject.tool.api.SessionManager;
@@ -152,6 +154,8 @@ public class PollsServiceImpl implements PollsService, EntityProducer, EntityTra
         if (polls == null) {
             polls = new ArrayList<>();
         }
+        polls.removeIf(p -> !userCanViewPoll(p, userId));
+
         return polls;
     }
 
@@ -227,7 +231,16 @@ public class PollsServiceImpl implements PollsService, EntityProducer, EntityTra
     }
 
     public List<Poll> findAllPolls(final String siteId) {
-        return new ArrayList<>(pollRepository.findBySiteIdOrderByCreationDateDesc(siteId));
+        List<Poll> polls = new ArrayList<>(pollRepository.findBySiteIdOrderByCreationDateDesc(siteId));
+
+        String userId = sessionManager.getCurrentSessionUserId();
+        boolean isInstructor = securityService.unlock(userId, PERMISSION_ADD, siteService.siteReference(siteId));
+
+        if (!isInstructor) {
+            polls.removeIf(p -> !userCanViewPoll(p, userId));
+        }
+
+        return polls;
     }
 
     public Optional<Poll> getPollById(final String pollId) throws SecurityException {
@@ -237,6 +250,9 @@ public class PollsServiceImpl implements PollsService, EntityProducer, EntityTra
             String userId = sessionManager.getCurrentSessionUserId();
             if (!securityService.unlock(userId, "site.visit", siteService.siteReference(poll.get().getSiteId()))) {
                 throw new SecurityException("user:" + userId + " can't read poll " + pollId);
+            }
+            if (!userCanViewPoll(poll.get(), userId)) {
+                throw new SecurityException("User cannot view this poll due to group restrictions");
             }
         }
         return poll;
@@ -733,6 +749,9 @@ public class PollsServiceImpl implements PollsService, EntityProducer, EntityTra
         if (poll == null) {
             throw new IllegalArgumentException("Invalid poll id ("+pollId+") when checking user can vote");
         }
+        if (!userCanViewPoll(poll, userId)) {
+            return false;
+        }
         String siteRef = "/site/" + poll.getSiteId();
         if (securityService.unlock(userId, PERMISSION_VOTE, siteRef)) {
             if (ignoreVoted) {
@@ -752,6 +771,10 @@ public class PollsServiceImpl implements PollsService, EntityProducer, EntityTra
     public boolean pollIsVotable(Poll poll) {
         // POLL-148 this could be null
         if (poll == null) {
+            return false;
+        }
+        String userId = sessionManager.getCurrentSessionUserId();
+        if (!userCanViewPoll(poll, userId)) {
             return false;
         }
 
@@ -1173,5 +1196,66 @@ public class PollsServiceImpl implements PollsService, EntityProducer, EntityTra
         List<String> siteGroupRefs = new ArrayList<>();
         siteGroupRefs.add(siteService.siteReference(siteId));
         return authzGroupService.getUsersIsAllowed(PERMISSION_VOTE, siteGroupRefs).size();
+    }
+
+    @Override
+    public boolean userCanViewPoll(Poll poll, String userId) {
+
+        // Instructors always see all polls
+        String siteRef = siteService.siteReference(poll.getSiteId());
+        if (securityService.unlock(userId, PERMISSION_ADD, siteRef)) {
+            return true;
+        }
+
+        // If no groups assigned → visible to all students
+        if (poll.getGroupIds() == null || poll.getGroupIds().isEmpty()) {
+            return true;
+        }
+
+        // Get user groups in this site
+        Set<String> userGroups;
+        try {
+            userGroups = siteService.getSite(poll.getSiteId())
+                    .getGroupsWithMember(userId)
+                    .stream()
+                    .map(Group::getId)
+                    .map(id -> id.contains("/group/") ? id.substring(id.lastIndexOf("/") + 1) : id)
+                    .collect(Collectors.toSet());
+        } catch (IdUnusedException e) {
+            return false; // Site not found → user cannot view
+        }
+
+        // Check intersection
+        return !Collections.disjoint(poll.getGroupIds(), userGroups);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean userIsInPollGroup(Poll poll, String userId) {
+
+        // Poll without groups → visible to all users        
+        if (poll.getGroupIds() == null || poll.getGroupIds().isEmpty()) {
+            return true;
+        }
+
+        String siteId = poll.getSiteId();
+
+        // Get user's groups in this site
+        Set<String> userGroupIds;
+        try {
+            userGroupIds = siteService.getSite(siteId)
+                    .getGroupsWithMember(userId)
+                    .stream()
+                    .map(Group::getId)
+                    // Normalize group reference to match stored groupIds
+                    .map(id -> id.contains("/group/") ? id.substring(id.lastIndexOf("/") + 1) : id)
+                    .collect(Collectors.toSet());
+        } catch (IdUnusedException e) {
+            log.warn("Site {} not found when checking group membership for user {}", siteId, userId);
+            return false;
+        }
+
+        // True if the user belongs to at least one of the poll's groups
+        return !Collections.disjoint(poll.getGroupIds(), userGroupIds);
     }
 }
