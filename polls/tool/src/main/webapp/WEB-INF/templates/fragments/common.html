@@ -27,6 +27,9 @@
           <a th:href="@{/votePermissions}" th:text="#{action_set_permissions}" th:unless="${current}=='permissions'">Permissions</a>
         </span>
         </li>
+        <li>
+            <a th:href="@{/batch}" th:text="#{batch_menu}">Create polls in batch</a>
+        </li>
     </ul>
 </div>
 </body>

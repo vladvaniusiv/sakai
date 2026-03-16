@@ -1,0 +1,8 @@
+question,openDate,closeDate,min,max,public,groups,results,option1,option2,option3,option4
+"Which day do you prefer?","2025-05-01T09:00:00Z","2026-05-10T18:30:00Z",1,1,false,"ta1","afterClose","Monday","Tuesday","Wednesday","Friday"
+"What is your favorite color?","2025-06-01T14:00:00","2026-06-15T23:59:59",1,2,true,"","always","Red","Green","Blue"
+"Which fruit do you like the most?","06/15/2026 08:15:00","06/30/2026 20:00:00",1,1,false,"ta2","always","Apple","Banana",
+"Choose your preferred season","15/06/2026 07:00:00","30/06/2026 21:45:00",1,1,true,"ta3","always","Summer","Winter","Spring"
+"Do you like the movie ""Inception""?","2026-01-10","2026-02-10T12:00:00Z",1,1,true,"","always","Yes","No"
+"Your feedback about our service, even if it's long","2026-03-01T00:00:00Z","2026-03-31T23:59:59Z",1,1,false,"ta1,ta2","always","Excellent","Good","Average"
+"Which option do you prefer, A or B?","2026-04-01 10:30:00","2026-04-30 17:00:00",1,1,true,"team1","always","Option A","Option B","Both"

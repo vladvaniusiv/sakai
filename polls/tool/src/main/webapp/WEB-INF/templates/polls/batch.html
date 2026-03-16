@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/common :: head}"></head>
+<body>
+    <div th:if="${created != null}">
+        <div class="alert alert-success">
+            <span th:text="'Created polls: ' + ${created}"></span><br/>
+            <span th:text="'Failed polls: ' + ${failed}"></span>
+        </div>
+    </div>
+
+  <div class="portletBody container-fluid">
+    <div th:replace="~{fragments/common :: menu('batch')}"></div>
+
+    <h1 class="h3 mb-3" th:text="#{batch_title}">Create polls in batch</h1>
+    <a th:href="@{/batch/template}" download>
+      <span th:text="#{batch.csv.template.download}">Download CSV template</span>
+    </a>
+    <p th:text="#{batch.csv.template.description}">
+        Download an example CSV file showing the correct format.
+    </p>
+    <form th:action="@{/batch/upload}" method="post" enctype="multipart/form-data">
+      <div class="mb-3">
+        <label class="form-label" th:text="#{batch_upload_label}">Upload CSV/XLS file</label>
+        <input type="file" name="file" class="form-control" required />
+      </div>
+
+      <button type="submit" class="btn btn-primary" th:text="#{batch_upload_button}">
+        Upload
+      </button>
+    </form>
+
+    <!-- Preview table -->
+    <div class="mt-4" th:if="${items != null}">
+      <h2 class="h5 mb-3" th:text="#{batch_preview_title}">Preview</h2>
+
+      <table class="table table-bordered table-striped">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th th:text="#{batch_col_question}">Question</th>
+            <th th:text="#{batch_col_dates}">Dates</th>
+            <th th:text="#{batch_col_minmax}">Min/Max</th>
+            <th th:text="#{batch_col_public}">Public</th>
+            <th th:text="#{batch_col_groups}">Groups</th>
+            <th th:text="#{batch_col_options}">Options</th>
+            <th th:text="#{batch_col_errors}">Errors</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr th:each="item : ${items}">
+            <td th:text="${item.rowNumber}">1</td>
+            <td th:text="${item.question}">Question text</td>
+            <td>
+              <span th:text="${item.openDateDisplay ?: '—'}">2025-01-01 00:00:00</span>
+              →
+              <span th:text="${item.closeDateDisplay ?: '—'}">2025-01-10 00:00:00</span>
+            </td>
+            <td>
+              <span th:text="${item.minOptions}">1</span> /
+              <span th:text="${item.maxOptions}">2</span>
+            </td>
+            <td th:text="${item.public}">false</td>
+            <td th:text="${item.groupIds}">[group1, group2]</td>
+            <td>
+              <ul>
+                <li th:each="opt : ${item.options}" th:text="${opt}">Option</li>
+              </ul>
+            </td>
+            <td>
+              <ul th:if="${item.errors.size() > 0}">
+                <li th:each="err : ${item.errors}" th:text="${err}">Error</li>
+              </ul>
+              <span th:if="${item.errors.size() == 0}" th:text="#{batch_no_errors}">No errors</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Create polls button (only if no errors) -->
+      <form th:if="${#lists.isEmpty(items.?[errors.size() > 0])}"
+            th:action="@{/batch/create}" method="post">
+        <button type="submit" class="btn btn-success" th:text="#{batch_create_button}">
+          Create polls
+        </button>
+      </form>
+
+    </div>
+  </div>
+</body>
+</html>
