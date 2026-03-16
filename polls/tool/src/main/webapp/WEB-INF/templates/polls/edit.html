@@ -126,7 +126,8 @@
           Select groups allowed to vote
         </label>
 
-        <select class="form-select"
+        <select id="groupSelect"
+                class="form-select"
                 multiple
                 th:field="*{selectedGroupIds}">
           <option th:each="g : ${groups}"
@@ -135,6 +136,22 @@
                   th:selected="${pollForm.selectedGroupIds != null and pollForm.selectedGroupIds.contains(g.id)}">
           </option>
         </select>
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                onclick="toggleGroups(true)"
+                th:text="#{new_poll_groups_select_all}">Select all</button>
+
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                onclick="toggleGroups(false)"
+                th:text="#{new_poll_groups_deselect_all}">Deselect all</button>
+
+        <script>
+        function toggleGroups(select) {
+            const sel = document.getElementById('groupSelect');
+            for (let i = 0; i < sel.options.length; i++) {
+                sel.options[i].selected = select;
+            }
+        }
+        </script>
 
         <small class="form-text text-muted"
               th:text="#{new_poll_groups_help}">
