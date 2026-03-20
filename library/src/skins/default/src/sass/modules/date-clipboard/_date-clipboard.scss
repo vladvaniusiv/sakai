@@ -1,0 +1,55 @@
+/* Container for the copy/paste buttons */
+.date-clipboard-container {
+  display: flex;
+  gap: 6px;
+}
+
+/* Buttons aligned to the right of the input */
+.date-clipboard-container.right {
+  display: inline-flex !important;
+  align-items: center;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+
+/* Buttons placed below the input (fallback for very narrow layouts) */
+.date-clipboard-container.below {
+  margin-top: 4px;
+  position: static;
+}
+
+/* Base styling for copy/paste buttons */
+.date-btn {
+  background: transparent;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--sakai-text-color-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  font-size: 1rem;
+  border-radius: 0.125rem;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.date-btn:hover {
+  background: var(--sakai-background-color-2);
+}
+
+/* Temporary highlight after pasting */
+input.pasted {
+  border: 1px solid #7ed957 !important;
+  transition: border 0.3s ease;
+}
+
+/* clear-date button positioned inside the input */
+/* Must be absolute because wrapping the input breaks Sakai's JS */
+.ui-datepicker-clear-date {
+  position: absolute !important;
+  top: 1.5px !important;
+  right: 38px !important;
+}
