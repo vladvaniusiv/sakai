@@ -1012,3 +1012,235 @@ function lti_frameResizeNow(new_height, element_id) {
 
     DE_BOUNCE_LTI_FRAME_RESIZE_HEIGHT = new_height;
 }
+
+(function () {
+
+  function fallbackCopy(text) {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+
+    try {
+      document.execCommand("copy");
+    } catch (err) {
+      console.warn("Fallback copy failed", err);
+    }
+
+    document.body.removeChild(textarea);
+  }
+
+  // Fallback paste method when navigator.clipboard is unavailable
+  function fallbackPaste(input) {
+    console.warn("Failed to paste text");
+    input.focus();
+  }
+
+  // Converts many date formats into ISO 8601 (YYYY-MM-DDTHH:mm)
+  // This is required because users may paste dates in different formats
+  function normalizeToISO(value) {
+    if (!value) return null;
+
+    value = value.trim();
+
+    // Already ISO
+    const isoRegex = /^\d{4}-\d{2}-\d{2}/;
+    if (isoRegex.test(value)) return value;
+
+    // Normalize comma separator: "18/03/2026, 08:19" → "18/03/2026 08:19"
+    value = value.replace(",", "").replace("  ", " ");
+
+    // EU formats: DD/MM/YYYY or DD-MM-YYYY
+    const euRegex = /^(\d{2})[\/\-](\d{2})[\/\-](\d{4})(?:\s+(\d{2}):(\d{2}))?$/;
+
+    // US formats: MM/DD/YYYY or MM-DD-YYYY
+    const usRegex = /^(\d{2})[\/\-](\d{2})[\/\-](\d{4})(?:\s+(\d{2}):(\d{2}))?$/;
+
+    let day, month, year, hour = "00", minute = "00";
+
+    // EU (DD/MM/YYYY)
+    if (euRegex.test(value)) {
+      const m = value.match(euRegex);
+      day = m[1];
+      month = m[2];
+      year = m[3];
+      if (m[4]) hour = m[4];
+      if (m[5]) minute = m[5];
+      return `${year}-${month}-${day}T${hour}:${minute}`;
+    }
+
+    // US (MM/DD/YYYY)
+    if (usRegex.test(value)) {
+      const m = value.match(usRegex);
+      month = m[1];
+      day = m[2];
+      year = m[3];
+      if (m[4]) hour = m[4];
+      if (m[5]) minute = m[5];
+      return `${year}-${month}-${day}T${hour}:${minute}`;
+    }
+
+    // Fallback: try native parser
+    const d = new Date(value);
+    if (!isNaN(d)) {
+      const pad = (n) => n.toString().padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    return null;
+  }
+
+  // Adds copy/paste controls to a date or datetime-local input
+  function setupClipboard(input) {
+
+    // Reset copy buttons (only those marked as copy)
+    function resetCopyButtons() {
+      document.querySelectorAll('.date-btn[data-role="copy"]').forEach(btn => {
+        btn.classList.remove("copy-active");
+        btn.innerHTML = `<i class="bi bi-copy" title="Copy"></i>`;
+      });
+    }
+
+    // Prevent attaching controls twice
+    if (input.dataset.clipboardReady) return;
+    input.dataset.clipboardReady = "true";
+
+    // Buttons must be siblings of the input.
+    // IMPORTANT: We cannot wrap the input in a new container because
+    // Sakai's "clear date" button relies on the original DOM structure.
+    const container = document.createElement("div");
+    container.className = "date-clipboard-container";
+
+    // Insert buttons immediately after the input
+    input.insertAdjacentElement("afterend", container);
+
+    // Copy button
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.className = "date-btn";
+    copyBtn.dataset.role = "copy";
+    copyBtn.innerHTML = `<i class="bi bi-copy" title="Copy"></i>`;
+
+    // Paste button
+    const pasteBtn = document.createElement("button");
+    pasteBtn.type = "button";
+    pasteBtn.className = "date-btn";
+    pasteBtn.dataset.role = "paste";
+    pasteBtn.innerHTML = `<i class="bi bi-clipboard-check" title="Paste"></i>`;
+
+    container.appendChild(copyBtn);
+    container.appendChild(pasteBtn);
+
+    // Determines whether buttons go to the right or below.
+    function adjustPosition() {
+      const inputWidth = input.offsetWidth;
+
+      // If the input is wide, reduce its width slightly to make room for buttons
+      if (inputWidth > 260) {
+        container.classList.add("right");
+        container.classList.remove("below");
+        return;
+      }
+
+      // If the input is narrow (like in assignments), keep its width and still place buttons to the right
+      container.classList.add("right");
+      container.classList.remove("below");
+    }
+
+    adjustPosition();
+    window.addEventListener("resize", adjustPosition);
+
+    // COPY logic with visual feedback
+    copyBtn.addEventListener("click", async () => {
+      const value = input.value;
+      if (!value) return;
+
+      let success = false;
+
+      if (navigator.clipboard && window.isSecureContext) {
+        try {
+          await navigator.clipboard.writeText(value);
+          success = true;
+        } catch (err) {
+          console.error("Failed to copy text", err);
+          fallbackCopy(value);
+        }
+      } else {
+        fallbackCopy(value);
+      }
+
+      if (!success) return;
+
+      // Reset ONLY other copy buttons (including previous clipboard icon)
+      resetCopyButtons();
+
+      // Mark this button as active
+      copyBtn.classList.add("copy-active");
+      copyBtn.innerHTML = `<i class="bi bi-clipboard-check"></i>`;
+
+      // After 1 second, change to clipboard icon
+      setTimeout(() => {
+        copyBtn.classList.remove("copy-active");
+        copyBtn.innerHTML = `<i class="bi bi-clipboard"></i>`;
+      }, 1000);
+    });
+
+    // PASTE logic with visual feedback
+    pasteBtn.addEventListener("click", async () => {
+      if (navigator.clipboard && window.isSecureContext) {
+        try {
+          // Reset copy buttons (but NOT paste icons)
+          resetCopyButtons();
+
+          const text = await navigator.clipboard.readText();
+          const normalized = normalizeToISO(text);
+
+          if (normalized) {
+            input.value = normalized;
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            input.dispatchEvent(new Event("change", { bubbles: true }));
+
+            // Paste highlight on input
+            input.classList.add("pasted");
+            setTimeout(() => input.classList.remove("pasted"), 1000);
+
+            // Temporary paste icon feedback
+            pasteBtn.innerHTML = `<i class="bi bi-clipboard-check-fill"></i>`;
+            setTimeout(() => {
+              pasteBtn.innerHTML = `<i class="bi bi-clipboard-check"></i>`;
+            }, 1000);
+          } else {
+            console.warn("Invalid date format");
+          }
+
+        } catch (err) {
+          console.error("Failed to paste text", err);
+          fallbackPaste(input);
+        }
+      } else {
+        fallbackPaste(input);
+      }
+    });
+  }
+
+  // Watches the DOM for dynamically added date inputs
+  function observeInputs() {
+    const observer = new MutationObserver(() => {
+      document.querySelectorAll('input[type="datetime-local"], input[type="date"]').forEach(setupClipboard);
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
+  // Initialize existing inputs and start observing for new ones
+  function init() {
+    document.querySelectorAll('input[type="datetime-local"], input[type="date"]').forEach(setupClipboard);
+    observeInputs();
+  }
+
+  document.addEventListener("DOMContentLoaded", init);
+
+})();
