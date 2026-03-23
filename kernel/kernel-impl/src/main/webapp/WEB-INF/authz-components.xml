@@ -18,7 +18,6 @@
 		<property name="functionManager" ref="org.sakaiproject.authz.api.FunctionManager"/>
 		<property name="groupProvider" ref="org.sakaiproject.authz.api.GroupProvider"/>
 		<property name="microsoftMessagingService" ref="org.sakaiproject.messaging.api.MicrosoftMessagingService"/>
-		<property name="roleProvider" ref="org.sakaiproject.authz.api.RoleProvider"/>
 		<property name="schedulingService" ref="org.sakaiproject.scheduling.api.SchedulingService"/>
 		<property name="securityService" ref="org.sakaiproject.authz.api.SecurityService"/>
 		<property name="serverConfigurationService" ref="org.sakaiproject.component.api.ServerConfigurationService"/>
