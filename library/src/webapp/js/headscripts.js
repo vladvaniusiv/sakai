@@ -1134,6 +1134,38 @@ function lti_frameResizeNow(new_height, element_id) {
     container.appendChild(copyBtn);
     container.appendChild(pasteBtn);
 
+	// Keep container visibility in sync with the input
+	function syncVisibility() {
+		const hidden =
+			input.offsetParent === null || // input not in layout
+			input.type === "hidden";
+
+		if (hidden) {
+			copyBtn.style.display = "none";
+			pasteBtn.style.display = "none";
+		} else {
+			copyBtn.style.display = "";
+			pasteBtn.style.display = "";
+		}
+	}
+
+	// Initial sync
+	syncVisibility();
+
+	// Observe visibility-related changes on the input
+	const visObserver = new MutationObserver(syncVisibility);
+	visObserver.observe(input, {
+	attributes: true,
+	attributeFilter: ["style", "class", "type", "hidden"]
+	});
+
+	// Also observe parent containers (Sakai hides via parent sometimes)
+	let parent = input.parentElement;
+	while (parent) {
+	visObserver.observe(parent, { attributes: true, attributeFilter: ["style", "class", "hidden"] });
+	parent = parent.parentElement;
+	}
+
     // Determines whether buttons go to the right or below.
     function adjustPosition() {
       const inputWidth = input.offsetWidth;
