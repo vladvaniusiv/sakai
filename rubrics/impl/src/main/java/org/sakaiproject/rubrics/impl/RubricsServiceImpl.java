@@ -132,7 +132,7 @@ import org.w3c.dom.ls.LSSerializer;
 public class RubricsServiceImpl implements RubricsService, EntityTransferrer {
 
     private static final Font BOLD_FONT = FontFactory.getFont(FontFactory.HELVETICA, 10, Font.BOLD);
-    private static final Font NORMAL_FONT = FontFactory.getFont(FontFactory.HELVETICA, 7, Font.NORMAL);
+    private static final Font NORMAL_FONT = FontFactory.getFont(FontFactory.HELVETICA, 8, Font.NORMAL);
 
     private static Predicate<ToolItemRubricAssociation> canEdit;
     private static Predicate<ToolItemRubricAssociation> canEvaluate;
@@ -1363,173 +1363,219 @@ public class RubricsServiceImpl implements RubricsService, EntityTransferrer {
             } catch (UserNotDefinedException ex) {
                 log.error("No user for id {} : {}", eval.getEvaluatedItemOwnerId(), ex.toString());
             }
-            itemName = getAssociatedName(eval, siteId).get();
+            itemName = getAssociatedName(eval, siteId).orElse("");
         }
 
-        // Create pdf document
-        Document document = new Document(PageSize.A4.rotate());
+        // Create landscape A4 PDF document with margins
+        Document document = new Document(PageSize.A4.rotate(), 20, 20, 20, 20);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         PdfWriter.getInstance(document, out);
         document.open();
 
-        PdfPTable table = new PdfPTable(1);
-        PdfPCell header = new PdfPCell();
+        // Build header block (rubric title, site, item, student, date, total points)
+        Paragraph header = new Paragraph();
+        header.setFont(BOLD_FONT);
 
-        Paragraph paragraph = new Paragraph(resourceLoader.getFormattedMessage("export_rubric_title", rubric.getTitle() + "\n"), BOLD_FONT);
-        paragraph.setAlignment(com.lowagie.text.Element.ALIGN_LEFT);
+        header.add(resourceLoader.getFormattedMessage("export_rubric_title", rubric.getTitle()));
+        header.add(Chunk.NEWLINE);
+
         try {
             String siteTitle = siteService.getSite(rubric.getOwnerId()).getTitle();
-            paragraph.add(resourceLoader.getFormattedMessage("export_rubric_site", siteTitle));
-            paragraph.add(Chunk.NEWLINE);
+            header.add(resourceLoader.getFormattedMessage("export_rubric_site", siteTitle));
+            header.add(Chunk.NEWLINE);
         } catch (IdUnusedException ex) {
             log.error("No site for id {}", rubric.getOwnerId());
         }
-        if (StringUtils.isNotBlank(itemName)){
-            paragraph.add(resourceLoader.getFormattedMessage("export_rubric_association", itemName));
-            paragraph.add(Chunk.NEWLINE);
+
+        if (StringUtils.isNotBlank(itemName)) {
+            // Add associated item name if present
+            header.add(resourceLoader.getFormattedMessage("export_rubric_association", itemName));
+            header.add(Chunk.NEWLINE);
         }
         if (StringUtils.isNotBlank(studentName)) {
-            paragraph.add(resourceLoader.getFormattedMessage("export_rubric_student", studentName));
-            paragraph.add(Chunk.NEWLINE);
+            // Add evaluated student name if present
+            header.add(resourceLoader.getFormattedMessage("export_rubric_student", studentName));
+            header.add(Chunk.NEWLINE);
         }
-        String exportDate = resourceLoader.getFormattedMessage("export_rubric_date", DateFormat.getDateInstance(DateFormat.LONG, resourceLoader.getLocale()).format(new Date()) + "\n");
-        paragraph.add(exportDate);
-        header.setBackgroundColor(Color.LIGHT_GRAY);
+        String exportDate = resourceLoader.getFormattedMessage("export_rubric_date", DateFormat.getDateInstance(DateFormat.LONG, resourceLoader.getLocale()).format(new Date()));
+        header.add(exportDate);
+        header.add(Chunk.NEWLINE);
 
-        if (optEvaluation.isPresent()) {
-            paragraph.add(resourceLoader.getFormattedMessage("export_total_points", points));
-            paragraph.add(Chunk.NEWLINE);
+        // Show total points only when evaluation is visible
+        if (showEvaluated) {
+            header.add(resourceLoader.getFormattedMessage("export_total_points", points));
+            header.add(Chunk.NEWLINE);
         }
-        paragraph.add(Chunk.NEWLINE);
-        header.addElement(paragraph);
-        table.addCell(header);
-        table.completeRow();
-        document.add(table);
+
+        // Extra spacing after header
+        header.add(Chunk.NEWLINE);
+        document.add(header);
+
+        // Compute maximum number of ratings across all criteria
+        int maxRatings = rubric.getCriteria().stream()
+                .mapToInt(c -> c.getRatings().size())
+                .max()
+                .orElse(0);
+
+        // 1 column for criterion + N columns for ratings
+        int totalColumns = 1 + maxRatings;
+
+        // Main rubric table
+        PdfPTable table = new PdfPTable(totalColumns);
+        table.setWidthPercentage(100);
+
+        // Header row: "Criterion" column
+        PdfPCell criterionHeader = new PdfPCell(
+                new Paragraph(resourceLoader.getString("export_header_criterion"), BOLD_FONT));
+        criterionHeader.setBackgroundColor(Color.LIGHT_GRAY);
+        table.addCell(criterionHeader);
+
+        // Header row: "Rating 1..N" columns
+        for (int i = 1; i <= maxRatings; i++) {
+            PdfPCell ratingHeader = new PdfPCell(
+                    new Paragraph(resourceLoader.getFormattedMessage("export_header_rating", i), BOLD_FONT));
+            ratingHeader.setBackgroundColor(Color.LIGHT_GRAY);
+            table.addCell(ratingHeader);
+        }
+
+        // Common italic font for "Comments" label
+        Font italicFont = new Font(BOLD_FONT);
+        italicFont.setStyle(Font.ITALIC);
 
         for (Criterion cri : rubric.getCriteria()) {
+
+            boolean isGroup = cri.getRatings().isEmpty();
+
+            // CRITERION GROUP (row that spans all columns)
+            if (isGroup) {
+
+                PdfPCell groupCell = new PdfPCell();
+                groupCell.setBackgroundColor(Color.LIGHT_GRAY);
+                groupCell.setColspan(totalColumns);
+
+                Paragraph groupParagraph = new Paragraph();
+                groupParagraph.add(new Chunk(cri.getTitle(), BOLD_FONT));
+
+                if (StringUtils.isNotBlank(cri.getDescription())) {
+                    groupParagraph.add(Chunk.NEWLINE);
+                    Paragraph groupDesc = new Paragraph(
+                            formattedText.stripHtmlFromText(cri.getDescription(), true),
+                            NORMAL_FONT
+                    );
+                    groupParagraph.add(groupDesc);
+                }
+
+                groupCell.addElement(groupParagraph);
+                table.addCell(groupCell);
+
+                continue;
+            }
+
+            // NORMAL CRITERION (title + optional description)
             PdfPCell criterionCell = new PdfPCell();
-            Optional<Double> adjustedScoreCell = optEvaluation.isPresent() ? getAdjustedScore(cri, optEvaluation.get()) : Optional.empty();
-            Optional<String> criterionComment = optEvaluation.isPresent() ? getCriterionComment(cri, optEvaluation.get()) : Optional.empty();
-            PdfPTable criterionTable = new PdfPTable(cri.getRatings().size() + 1 + (criterionComment.isEmpty() ? 0 : 1) + (adjustedScoreCell.isEmpty() ? 0 : 1));
-            Paragraph criterionParagraph = new Paragraph();
-            criterionParagraph.setFont(BOLD_FONT);
-            boolean isCriterionGroup = cri.getRatings().isEmpty();
+            Paragraph critTitle = new Paragraph(cri.getTitle(), BOLD_FONT);
 
-            if (showEvaluated && !isCriterionGroup) {
-                Optional<Double> evaluatedPoints = this.getCriterionPoints(cri, optEvaluation.get());
-
-                //Get CriteriumOutcome as Optional for current criterium as an optional by matching associated criterion ids
-                Optional<CriterionOutcome> optCriterionOutcome = optEvaluation.get().getCriterionOutcomes().stream()
-                    .filter(outcome -> cri.getId().equals(outcome.getCriterionId())).findAny();
-
-                if (evaluatedPoints.isPresent()) {
-                    if (optCriterionOutcome.isPresent() && optCriterionOutcome.get().getPointsAdjusted()) {
-
-                        //Get points of the selected rating (not altered) by maching selected rating id's and getting points from matched rating
-                        Double selectedRatingOriginalPoints = optCriterionOutcome
-                                .flatMap(outcome -> cri.getRatings().stream()
-                                        .filter(rating -> rating.getId().equals(outcome.getSelectedRatingId())).findAny())
-                                .map(Rating::getPoints)
-                                .orElse(0D);
-
-                        //Instrucor adjusted the rating point value on evaluation
-                        //Chunk for the points we want to display as original
-                        Chunk originalPoints = new Chunk(selectedRatingOriginalPoints.toString());
-                        originalPoints.getFont().setStyle(Font.STRIKETHRU);
-                        //Construct Phrase containing both point values
-                        Phrase pointsPhrase = new Phrase();
-                        pointsPhrase.add(originalPoints);
-                        pointsPhrase.add(" ");
-                        pointsPhrase.add(evaluatedPoints.get().toString());
-                        //Split message from resourceloader where we want to inset the poit values a Phrase
-                        String message;
-                        if (rubric.getWeighted()) {
-                            message = resourceLoader.getFormattedMessage("export_rubrics_weight", cri.getTitle(), "{1}", cri.getWeight());
-                        } else {
-                            message = resourceLoader.getFormattedMessage("export_rubrics_points", cri.getTitle());
-                        }
-                        //Map strings to phrases, insert the point value phrase and add all to the criterions Paragraph
-                        criterionParagraph.add(new Phrase(StringUtils.substringBefore(message, "{1}")));
-                        criterionParagraph.add(pointsPhrase);
-                        criterionParagraph.add(new Phrase(StringUtils.substringAfter(message, "{1}")));
-                    } else {
-                        if (rubric.getWeighted()) {
-                            criterionParagraph.add(resourceLoader.getFormattedMessage("export_rubrics_weight", cri.getTitle(), evaluatedPoints.get().toString(), cri.getWeight()));
-                        } else {
-                            criterionParagraph.add(resourceLoader.getFormattedMessage("export_rubrics_points", cri.getTitle(), evaluatedPoints.get().toString()));
-                        }
-                    }
-                }
-            } else {
-                //A rubric that is not graded (PDF export from within rubrics tool) or a criterion group
-                //Just display title of criterion without points
-                if (rubric.getWeighted() && !isCriterionGroup) {
-                    criterionParagraph.add(String.format("%s (%s%%)", cri.getTitle(), cri.getWeight()));
-                } else {
-                    criterionParagraph.add(cri.getTitle());
-                }
-                if (isCriterionGroup) {
-                    criterionCell.setBackgroundColor(Color.LIGHT_GRAY);
-                }
-            }
-            criterionParagraph.setFont(BOLD_FONT);
             if (StringUtils.isNotBlank(cri.getDescription())) {
-                criterionParagraph.add(Chunk.NEWLINE);
-                criterionParagraph.add(new Paragraph(formattedText.stripHtmlFromText(cri.getDescription(), true), NORMAL_FONT));
+                Paragraph desc = new Paragraph(
+                        formattedText.stripHtmlFromText(cri.getDescription(), true), NORMAL_FONT);
+                critTitle.add(Chunk.NEWLINE);
+                critTitle.add(desc);
             }
-            criterionCell.addElement(criterionParagraph);
 
-            criterionTable.addCell(criterionCell);
+            criterionCell.addElement(critTitle);
+            table.addCell(criterionCell);
+
+            int ratingCount = cri.getRatings().size();
+
+            // --- RATINGS ROW ---
             for (Rating rating : cri.getRatings()) {
-                Paragraph ratingsParagraph = new Paragraph("", BOLD_FONT);
-                String weightString = "";
-                if(rubric.getWeighted()){
-                    weightString = "(" + BigDecimal.valueOf(rating.getPoints() * (cri.getWeight()/100.0D)).setScale(2, RoundingMode.HALF_UP) + ") ";
-                }
-                String ratingPoints = resourceLoader.getFormattedMessage("export_rubrics_points", rating.getTitle(), weightString + rating.getPoints());
-                ratingsParagraph.add(ratingPoints);
-                ratingsParagraph.add(Chunk.NEWLINE);
-                Paragraph ratingsDesc = new Paragraph("", NORMAL_FONT);
+                PdfPCell ratingCell = new PdfPCell();
 
-                if (StringUtils.isNotEmpty(rating.getDescription())) {
-                    ratingsDesc.add(rating.getDescription() + "\n");
-                }
-                ratingsParagraph.add(ratingsDesc);
+                Paragraph ratingText = new Paragraph(
+                        resourceLoader.getFormattedMessage("export_rubrics_points",
+                                rating.getTitle(), rating.getPoints()),
+                        BOLD_FONT
+                );
 
-                PdfPCell newCell = new PdfPCell();
-                if (optEvaluation.isPresent()) {
-                    for (CriterionOutcome outcome : optEvaluation.get().getCriterionOutcomes()) {
-                        if (cri.getId().equals(outcome.getCriterionId()) && rating.getId().equals(outcome.getSelectedRatingId())) {
-                            newCell.setBackgroundColor(Color.LIGHT_GRAY);
-                        }
-                    }
+                if (StringUtils.isNotBlank(rating.getDescription())) {
+                    Paragraph desc = new Paragraph(rating.getDescription(), NORMAL_FONT);
+                    ratingText.add(Chunk.NEWLINE);
+                    ratingText.add(desc);
                 }
-                newCell.addElement(ratingsParagraph);
-                criterionTable.addCell(newCell);
-            }
-            if(adjustedScoreCell.isPresent()){
-                PdfPCell newCell = new PdfPCell();
-                newCell.setBackgroundColor(Color.GRAY);
-                Paragraph adjustedParagraph = new Paragraph(resourceLoader.getFormattedMessage("export_adjusted", adjustedScoreCell.get().toString()), BOLD_FONT);
-                newCell.addElement(adjustedParagraph);
-                criterionTable.addCell(newCell);
-            }
-            if(criterionComment.isPresent()){
-                PdfPCell newCell = new PdfPCell();
-                newCell.setBackgroundColor(Color.GRAY);
-                Paragraph commentHeader = new Paragraph(resourceLoader.getFormattedMessage("export_comments", ""), BOLD_FONT);
-                newCell.addElement(commentHeader);
-                Paragraph commentParagraph = new Paragraph(Jsoup.parse(criterionComment.get()).text(), NORMAL_FONT);
-                newCell.addElement(commentParagraph);
-                criterionTable.addCell(newCell);
+
+                ratingCell.addElement(ratingText);
+
+                // Highlight selected rating with soft gray background
+                if (isSelectedRating(cri, rating, optEvaluation)) {
+                    ratingCell.setBackgroundColor(new Color(235, 235, 235));
+                }
+
+                table.addCell(ratingCell);
             }
 
-            criterionTable.completeRow();
-            document.add(criterionTable);
+            // Fill remaining rating columns with empty gray cells
+            for (int i = ratingCount; i < maxRatings; i++) {
+                PdfPCell empty = new PdfPCell();
+                empty.setBackgroundColor(Color.LIGHT_GRAY);
+                table.addCell(empty);
+            }
+
+            // --- COMMENTS ROW ---
+            Optional<String> combinedComment = Optional.empty();
+
+            if (optEvaluation.isPresent()) {
+                combinedComment = optEvaluation.get().getCriterionOutcomes().stream()
+                        .filter(o -> o.getCriterionId().equals(cri.getId()))
+                        .map(CriterionOutcome::getComments)
+                        .filter(StringUtils::isNotBlank)
+                        .findFirst();
+            }
+
+            if (combinedComment.isPresent()) {
+                // "Comments" label in italic, first column
+                Paragraph commentsParagraph = new Paragraph(
+                        resourceLoader.getString("export_comments"), italicFont);
+
+                PdfPCell commentsLabel = new PdfPCell(commentsParagraph);
+                commentsLabel.setBackgroundColor(Color.LIGHT_GRAY);
+                table.addCell(commentsLabel);
+
+                // Single cell spanning all rating columns with the comment text
+                PdfPCell commentsField = new PdfPCell();
+                commentsField.setColspan(maxRatings);
+
+                Paragraph commentText = new Paragraph(
+                        Jsoup.parse(combinedComment.get()).text(),
+                        NORMAL_FONT
+                );
+                commentsField.addElement(commentText);
+
+                table.addCell(commentsField);
+            }
         }
 
+        // Add table to document
+        document.add(table);
         document.close();
         return out.toByteArray();
+    }
+
+    private Optional<String> getRatingComment(Criterion cri, Rating rating, Evaluation eval) {
+        return eval.getCriterionOutcomes().stream()
+                .filter(o -> o.getCriterionId().equals(cri.getId()))
+                .filter(o -> o.getSelectedRatingId() != null)
+                .filter(o -> o.getSelectedRatingId().equals(rating.getId()))
+                .map(CriterionOutcome::getComments)
+                .filter(StringUtils::isNotBlank)
+                .findFirst();
+    }
+
+    private boolean isSelectedRating(Criterion cri, Rating rating, Optional<Evaluation> optEvaluation) {
+        if (!optEvaluation.isPresent()) return false;
+
+        return optEvaluation.get().getCriterionOutcomes().stream()
+                .filter(o -> o.getCriterionId().equals(cri.getId()))
+                .anyMatch(o -> rating.getId().equals(o.getSelectedRatingId()));
     }
 
     private Optional<Double> getAdjustedScore(Criterion criterion, Evaluation evaluation){
