@@ -348,9 +348,9 @@ export class SakaiWidgetPanel extends SakaiShadowElement {
       }
 
       #grid {
-        column-width: var(--sakai-widget-panel-min-widget-width, 350px);
+        column-width: 350px;
         column-gap: var(--sakai-widget-panel-gutter-width, 1rem);
-        -webkit-column-width: var(--sakai-widget-panel-min-widget-width, 350px);
+        -webkit-column-width: 350px;
         -webkit-column-gap: var(--sakai-widget-panel-gutter-width, 1rem);
       }
 
@@ -361,9 +361,9 @@ export class SakaiWidgetPanel extends SakaiShadowElement {
         margin-bottom: var(--sakai-widget-panel-gutter-width, 1rem);
       }
       @supports (font: -apple-system-body) {
-        .widget-col {
-          display: inline-block;
-        }
+      .widget-col {
+        display: inline-block; /* Safari needs inline-block */
+      }
     }
     `
   ];
