@@ -348,9 +348,9 @@ export class SakaiWidgetPanel extends SakaiShadowElement {
       }
 
       #grid {
-        column-width: 350px;
+        column-width: var(--sakai-widget-panel-min-widget-width, 320px);
         column-gap: var(--sakai-widget-panel-gutter-width, 1rem);
-        -webkit-column-width: 350px;
+        -webkit-column-width: var(--sakai-widget-panel-min-widget-width, 320px);
         -webkit-column-gap: var(--sakai-widget-panel-gutter-width, 1rem);
       }
 
