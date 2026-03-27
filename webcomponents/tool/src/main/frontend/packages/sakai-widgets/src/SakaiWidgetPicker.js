@@ -1,4 +1,4 @@
-import { html } from "lit";
+import { html, css } from "lit";
 import { SakaiDashboardWidget } from "./SakaiDashboardWidget.js";
 import { sakaiWidgets } from "./SakaiWidgets.js";
 
@@ -64,6 +64,23 @@ export class SakaiWidgetPicker extends SakaiDashboardWidget {
 
     super.firstUpdated();
 
+    // Función para actualizar el atributo
+    const updateTheme = () => {
+      const isDark = document.documentElement.classList.contains("sakaiUserTheme-dark");
+      this.setAttribute("dark-mode", isDark ? "true" : "false");
+    };
+
+    // Ejecutar al cargar
+    updateTheme();
+
+    // Observar cambios en el atributo class del <html>
+    const observer = new MutationObserver(updateTheme);
+
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: [ "class" ]
+    });
+
     const container = this.shadowRoot.getElementById("container");
     // The picker is temporary and easy to miss in the grid, so we add a strong border to signal "selection mode".
     container?.classList.add("border", "border-2", "border-primary", "shadow-sm");
@@ -97,5 +114,15 @@ export class SakaiWidgetPicker extends SakaiDashboardWidget {
     `;
   }
 
-  static styles = [ SakaiDashboardWidget.styles ];
+  static styles = [
+    SakaiDashboardWidget.styles,
+    css`
+      :host([dark-mode="true"]) .btn.btn-outline-primary {
+        --bs-btn-color: var(--sakai-text-color-1);
+        --bs-btn-border-color: var(--sakai-text-color-1);
+        --bs-btn-hover-bg: var(--sakai-text-color-1);
+        --bs-btn-hover-color: var(--sakai-background-color-1);
+      }
+    `
+  ];
 }
