@@ -1,4 +1,4 @@
-import { html, css } from "lit";
+import { html } from "lit";
 import { SakaiDashboardWidget } from "./SakaiDashboardWidget.js";
 import { sakaiWidgets } from "./SakaiWidgets.js";
 
@@ -61,32 +61,7 @@ export class SakaiWidgetPicker extends SakaiDashboardWidget {
   }
 
   firstUpdated() {
-
     super.firstUpdated();
-
-    // Función para actualizar el atributo
-    const updateTheme = () => {
-      const isDark = document.documentElement.classList.contains("sakaiUserTheme-dark");
-      this.setAttribute("dark-mode", isDark ? "true" : "false");
-    };
-
-    // Ejecutar al cargar
-    updateTheme();
-
-    // Observar cambios en el atributo class del <html>
-    const observer = new MutationObserver(updateTheme);
-
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: [ "class" ]
-    });
-
-    const container = this.shadowRoot.getElementById("container");
-    // The picker is temporary and easy to miss in the grid, so we add a strong border to signal "selection mode".
-    container?.classList.add("border", "border-2", "border-primary", "shadow-sm");
-
-    const titleBar = this.shadowRoot.getElementById("title-bar");
-    titleBar?.classList.add("bg-primary-subtle", "border-bottom", "border-primary");
   }
 
   shouldUpdate(changed) {
@@ -98,12 +73,13 @@ export class SakaiWidgetPicker extends SakaiDashboardWidget {
     return html`
       ${this.available.length ? html`
         <div class="alert alert-primary py-2 mb-2 fw-semibold" role="status">${this._i18n.pick_instruction}</div>
-        <div class="d-grid gap-2">
+        <div class="d-grid gap-2 mb-2">
           ${this.available.map(w => html`
             <button type="button"
-                class="btn btn-outline-primary text-start fs-5"
+                class="btn btn-primary text-start"
                 id="${w}"
                 @click=${this.widgetPicked}>
+              <span class="bi bi-plus"></span>
               ${this.lookupWidgetName(w)}
             </button>
           `)}
@@ -113,16 +89,4 @@ export class SakaiWidgetPicker extends SakaiDashboardWidget {
       `}
     `;
   }
-
-  static styles = [
-    SakaiDashboardWidget.styles,
-    css`
-      :host([dark-mode="true"]) .btn.btn-outline-primary {
-        --bs-btn-color: var(--sakai-text-color-1);
-        --bs-btn-border-color: var(--sakai-text-color-1);
-        --bs-btn-hover-bg: var(--sakai-text-color-1);
-        --bs-btn-hover-color: var(--sakai-background-color-1);
-      }
-    `
-  ];
 }
