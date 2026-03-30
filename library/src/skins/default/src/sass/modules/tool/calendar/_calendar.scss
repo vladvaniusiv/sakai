@@ -53,6 +53,23 @@
 		border-bottom: 1px solid $page-header-border-color;
 	}
 	
+	@media (max-width: 978px) {
+		/* Stack the toolbar vertically on small screens */
+		#calendarDiv .fc-toolbar {
+			display: block;
+		}
+
+		/* Each toolbar chunk takes full width and centers its content */
+		#calendarDiv .fc-toolbar-chunk {
+			margin-bottom: 0.5rem;
+			text-align: center;
+		}
+
+		.fc-toolbar-chunk .fc-toolbar-title {
+			font-size: 1.5em;
+		}
+	}
+
 	.sakai-table-viewFilter {
 		input[type="submit"] {
 			margin-top: 0;

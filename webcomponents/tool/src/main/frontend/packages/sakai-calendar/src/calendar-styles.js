@@ -22,7 +22,7 @@ export const calendarStyles = css`
   }
 
   .calendar__navigation-heading {
-    font-size: 22px;
+    font-size: 20px;
   }
 
   .calendar__navigation__year, .calendar__navigation__month {
@@ -32,8 +32,7 @@ export const calendarStyles = css`
   .calendar__next-button, .calendar__previous-button {
     min-width: 25px;
     min-height: 25px;
-    font-size: 20px;
-    font-weight: bold;
+    font-size: 15px;
     background: var(--sakai-background-color);
     color: var(--link-color);
     cursor: pointer;
