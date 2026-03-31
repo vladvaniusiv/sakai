@@ -1,38 +1,37 @@
 package org.sakaiproject.videotraining.impl.service;
 
-import static org.sakaiproject.videotraining.api.VideoTrainingConstants.PERMISSION_ANALYTICS;
-import static org.sakaiproject.videotraining.api.VideoTrainingConstants.PERMISSION_CAPTIONS_MANAGE;
-import static org.sakaiproject.videotraining.api.VideoTrainingConstants.PERMISSION_MANAGE;
-import static org.sakaiproject.videotraining.api.VideoTrainingConstants.PERMISSION_VIEW;
-
+import java.io.Serializable;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
-import java.io.Serializable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import org.apache.commons.lang3.StringUtils;
 import org.sakaiproject.authz.api.FunctionManager;
+import org.sakaiproject.authz.api.SecurityService;
+import org.sakaiproject.component.cover.ServerConfigurationService;
 import org.sakaiproject.content.api.ContentCollection;
 import org.sakaiproject.content.api.ContentHostingService;
 import org.sakaiproject.event.api.EventTrackingService;
 import org.sakaiproject.event.api.NotificationService;
-import org.sakaiproject.authz.api.SecurityService;
 import org.sakaiproject.memory.api.Cache;
 import org.sakaiproject.memory.api.MemoryService;
 import org.sakaiproject.memory.api.SimpleConfiguration;
 import org.sakaiproject.site.api.SiteService;
 import org.sakaiproject.tool.api.SessionManager;
 import org.sakaiproject.videotraining.api.VideoTrainingConstants;
-import org.sakaiproject.videotraining.api.model.VideoPublicationStatus;
+import static org.sakaiproject.videotraining.api.VideoTrainingConstants.PERMISSION_ANALYTICS;
+import static org.sakaiproject.videotraining.api.VideoTrainingConstants.PERMISSION_CAPTIONS_MANAGE;
+import static org.sakaiproject.videotraining.api.VideoTrainingConstants.PERMISSION_MANAGE;
+import static org.sakaiproject.videotraining.api.VideoTrainingConstants.PERMISSION_VIEW;
 import org.sakaiproject.videotraining.api.model.VideoProviderType;
-import org.sakaiproject.videotraining.api.model.VideoVisibilityScope;
+import org.sakaiproject.videotraining.api.model.VideoPublicationStatus;
 import org.sakaiproject.videotraining.api.model.VideoTrainingAnalyticsEvent;
 import org.sakaiproject.videotraining.api.model.VideoTrainingAnalyticsSummary;
 import org.sakaiproject.videotraining.api.model.VideoTrainingCaption;
@@ -40,12 +39,13 @@ import org.sakaiproject.videotraining.api.model.VideoTrainingCategory;
 import org.sakaiproject.videotraining.api.model.VideoTrainingCourseGroup;
 import org.sakaiproject.videotraining.api.model.VideoTrainingLessonLink;
 import org.sakaiproject.videotraining.api.model.VideoTrainingVideo;
+import org.sakaiproject.videotraining.api.model.VideoVisibilityScope;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingAnalyticsEventRepository;
-import org.sakaiproject.videotraining.api.repository.VideoTrainingCategoryRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingCaptionRepository;
+import org.sakaiproject.videotraining.api.repository.VideoTrainingCategoryRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingLessonLinkRepository;
-import org.sakaiproject.videotraining.api.repository.VideoTrainingVideoRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingVideoCategoryRepository;
+import org.sakaiproject.videotraining.api.repository.VideoTrainingVideoRepository;
 import org.sakaiproject.videotraining.api.service.VideoTrainingService;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,6 +57,7 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
     private static final long LIST_CACHE_TTL_MILLIS = 30_000L;
     private static final String COUNT_CACHE_NAME = "org.sakaiproject.videotraining.cache.list.count";
     private static final String FIRST_PAGE_CACHE_NAME = "org.sakaiproject.videotraining.cache.list.firstPageIds";
+    private static final String MODERATION_ENABLED_PROPERTY = "video.training.moderation.enabled";
 
     @Setter private VideoTrainingVideoRepository videoRepository;
     @Setter private VideoTrainingCaptionRepository captionRepository;
@@ -132,8 +133,16 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
             video.setVisibilityScope(VideoVisibilityScope.COURSE);
         }
 
-        if (video.getPublicationStatus() == null) {
-            video.setPublicationStatus(VideoPublicationStatus.PUBLISHED);
+        VideoPublicationStatus requestedStatus = normalizePublicationStatus(video.getPublicationStatus());
+        video.setPublicationStatus(requestedStatus);
+
+        if (existing == null) {
+            if (requestedStatus != VideoPublicationStatus.DRAFT) {
+                throw new IllegalArgumentException("New videos must start in DRAFT status");
+            }
+        } else {
+            VideoPublicationStatus currentStatus = normalizePublicationStatus(existing.getPublicationStatus());
+            validatePublicationStatusTransition(currentStatus, requestedStatus, video.getVisibilityScope());
         }
 
         if (video.getLessonOriginRestricted() == null) {
@@ -798,7 +807,7 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
         video.setProviderType(VideoProviderType.NATIVE);
         video.setSourceReference(StringUtils.trimToEmpty(resourceReference));
         video.setVisibilityScope(VideoVisibilityScope.LESSON);
-        video.setPublicationStatus(VideoPublicationStatus.PUBLISHED);
+        video.setPublicationStatus(VideoPublicationStatus.DRAFT);
         video.setLessonOriginRestricted(Boolean.TRUE);
         video.setRequiredViewPermission(VideoTrainingConstants.PERMISSION_VIEW);
         video.setFileSizeBytes(fileSizeBytes);
@@ -832,7 +841,105 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
 
     private boolean isPublishedForEndUsers(VideoTrainingVideo video) {
         VideoPublicationStatus status = video.getPublicationStatus();
-        return status == null || status == VideoPublicationStatus.PUBLISHED;
+        return status == VideoPublicationStatus.PUBLISHED;
+    }
+
+    private VideoPublicationStatus normalizePublicationStatus(VideoPublicationStatus status) {
+        return status != null ? status : VideoPublicationStatus.DRAFT;
+    }
+
+    @Override
+    public VideoPublicationStatus[] getValidPublicationStatusTransitions(VideoPublicationStatus currentStatus,
+            VideoVisibilityScope visibilityScope) {
+        VideoPublicationStatus normalized = normalizePublicationStatus(currentStatus);
+        boolean moderationRequired = isModerationRequired(visibilityScope);
+        List<VideoPublicationStatus> validTargets = new ArrayList<>();
+
+        switch (normalized) {
+            case DRAFT:
+                if (moderationRequired) {
+                    validTargets.add(VideoPublicationStatus.DRAFT);
+                    validTargets.add(VideoPublicationStatus.PENDING_APPROVAL);
+                } else {
+                    validTargets.add(VideoPublicationStatus.DRAFT);
+                    validTargets.add(VideoPublicationStatus.PUBLISHED);
+                }
+                break;
+            case PENDING_APPROVAL:
+                validTargets.add(VideoPublicationStatus.PENDING_APPROVAL);
+                validTargets.add(VideoPublicationStatus.PUBLISHED);
+                validTargets.add(VideoPublicationStatus.DRAFT);
+                break;
+            case PUBLISHED:
+                validTargets.add(VideoPublicationStatus.PUBLISHED);
+                validTargets.add(VideoPublicationStatus.WITHDRAWN);
+                validTargets.add(VideoPublicationStatus.ARCHIVED);
+                break;
+            case WITHDRAWN:
+                if (moderationRequired) {
+                    validTargets.add(VideoPublicationStatus.WITHDRAWN);
+                    validTargets.add(VideoPublicationStatus.PENDING_APPROVAL);
+                } else {
+                    validTargets.add(VideoPublicationStatus.WITHDRAWN);
+                    validTargets.add(VideoPublicationStatus.PUBLISHED);
+                }
+                break;
+            case ARCHIVED:
+                validTargets.add(VideoPublicationStatus.ARCHIVED);
+                validTargets.add(VideoPublicationStatus.DRAFT);
+                break;
+            default:
+                break;
+        }
+
+        return validTargets.toArray(new VideoPublicationStatus[0]);
+    }
+
+    private void validatePublicationStatusTransition(VideoPublicationStatus currentStatus,
+            VideoPublicationStatus targetStatus,
+            VideoVisibilityScope visibilityScope) {
+        if (currentStatus == targetStatus) {
+            return;
+        }
+
+        boolean moderationRequired = isModerationRequired(visibilityScope);
+        boolean valid;
+
+        switch (currentStatus) {
+            case DRAFT:
+                valid = moderationRequired
+                        ? targetStatus == VideoPublicationStatus.PENDING_APPROVAL
+                        : targetStatus == VideoPublicationStatus.PUBLISHED;
+                break;
+            case PENDING_APPROVAL:
+                valid = targetStatus == VideoPublicationStatus.PUBLISHED
+                        || targetStatus == VideoPublicationStatus.DRAFT;
+                break;
+            case PUBLISHED:
+                valid = targetStatus == VideoPublicationStatus.WITHDRAWN
+                        || targetStatus == VideoPublicationStatus.ARCHIVED;
+                break;
+            case WITHDRAWN:
+                valid = moderationRequired
+                        ? targetStatus == VideoPublicationStatus.PENDING_APPROVAL
+                        : targetStatus == VideoPublicationStatus.PUBLISHED;
+                break;
+            case ARCHIVED:
+                valid = targetStatus == VideoPublicationStatus.DRAFT;
+                break;
+            default:
+                valid = false;
+        }
+
+        if (!valid) {
+            throw new IllegalArgumentException("Invalid publication status transition from "
+                    + currentStatus + " to " + targetStatus);
+        }
+    }
+
+    private boolean isModerationRequired(VideoVisibilityScope visibilityScope) {
+        return visibilityScope == VideoVisibilityScope.GLOBAL
+                && ServerConfigurationService.getBoolean(MODERATION_ENABLED_PROPERTY, false);
     }
 
     private boolean isCatalogVisibleScope(VideoTrainingVideo video) {

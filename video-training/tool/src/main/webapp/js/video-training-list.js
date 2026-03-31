@@ -8,6 +8,71 @@
     let dataTable = null;
     let suppressOrderReload = false;
 
+    function initializeTooltips(root) {
+        if (!window.bootstrap || !window.bootstrap.Tooltip) {
+            return;
+        }
+        const container = root || document;
+        container.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (element) {
+            if (element.dataset.vtTooltipBound === 'true') {
+                return;
+            }
+            window.bootstrap.Tooltip.getOrCreateInstance(element);
+            element.dataset.vtTooltipBound = 'true';
+        });
+    }
+
+    function appendCacheBust(url) {
+        if (!url) {
+            return url;
+        }
+        const separator = url.indexOf('?') >= 0 ? '&' : '?';
+        return url + separator + 'vtcb=' + Date.now();
+    }
+
+    function revealFallback(mediaElement) {
+        const wrapper = mediaElement.closest('.vt-video-thumb-wrap, .vt-table-thumb-wrap');
+        if (!wrapper) {
+            return;
+        }
+        mediaElement.classList.add('vt-is-hidden');
+        const fallback = wrapper.querySelector('.vt-video-thumb-placeholder, .vt-table-thumb-placeholder');
+        if (fallback) {
+            fallback.classList.remove('vt-is-hidden');
+        }
+    }
+
+    function bindThumbnailRetry(mediaElement) {
+        if (mediaElement.dataset.vtThumbBound === 'true') {
+            return;
+        }
+
+        mediaElement.addEventListener('error', function () {
+            const retries = Number(mediaElement.dataset.vtThumbRetries || '0');
+            if (retries < 1) {
+                mediaElement.dataset.vtThumbRetries = String(retries + 1);
+                if (mediaElement.tagName === 'VIDEO') {
+                    const currentSrc = mediaElement.getAttribute('src') || mediaElement.currentSrc;
+                    mediaElement.setAttribute('src', appendCacheBust(currentSrc));
+                    mediaElement.load();
+                } else {
+                    const currentSrc = mediaElement.getAttribute('src');
+                    mediaElement.setAttribute('src', appendCacheBust(currentSrc));
+                }
+                return;
+            }
+
+            revealFallback(mediaElement);
+        });
+
+        mediaElement.dataset.vtThumbBound = 'true';
+    }
+
+    function initializeThumbnailRetry(root) {
+        const container = root || document;
+        container.querySelectorAll('[data-thumb-retry="true"]').forEach(bindThumbnailRetry);
+    }
+
     const dtSortByToIndex = {
         title: 0,
         context: 1,
@@ -83,6 +148,9 @@
         });
     }
 
+    initializeTooltips(document);
+    initializeThumbnailRetry(document);
+
     if (!loadMoreLink) {
         return;
     }
@@ -123,6 +191,8 @@
                 if (incomingGrid) {
                     incomingGrid.querySelectorAll('.vt-video-card').forEach(function (card) {
                         grid.appendChild(card);
+                        initializeTooltips(card);
+                        initializeThumbnailRetry(card);
                     });
                 }
             }
@@ -135,12 +205,16 @@
                         suppressOrderReload = true;
                         incomingRows.forEach(function (row) {
                             dataTable.row.add(row);
+                            initializeTooltips(row);
+                            initializeThumbnailRetry(row);
                         });
                         dataTable.draw(false);
                         suppressOrderReload = false;
                     } else {
                         incomingRows.forEach(function (row) {
                             tableBody.appendChild(row);
+                            initializeTooltips(row);
+                            initializeThumbnailRetry(row);
                         });
                     }
                 }

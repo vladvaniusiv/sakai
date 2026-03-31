@@ -53,7 +53,7 @@ public class VideoTrainingVideo implements PersistableEntity<String> {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "PUBLICATION_STATUS", nullable = false, length = 16)
-    private VideoPublicationStatus publicationStatus = VideoPublicationStatus.PUBLISHED;
+    private VideoPublicationStatus publicationStatus = VideoPublicationStatus.DRAFT;
 
     @Column(name = "LESSON_ORIGIN_RESTRICTED", nullable = false)
     private Boolean lessonOriginRestricted = Boolean.FALSE;

@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
+import org.sakaiproject.videotraining.api.model.VideoPublicationStatus;
 import org.sakaiproject.videotraining.api.model.VideoTrainingAnalyticsEvent;
 import org.sakaiproject.videotraining.api.model.VideoTrainingAnalyticsSummary;
 import org.sakaiproject.videotraining.api.model.VideoTrainingCaption;
@@ -96,4 +97,14 @@ public interface VideoTrainingService {
 
     VideoTrainingVideo promoteLessonResource(String siteId, String lessonPageId, String lessonItemId,
             String resourceReference, String title, String description, Long fileSizeBytes);
+
+    /**
+     * Get the publication statuses that are valid transition targets from the given current status.
+     * Takes into account the visibility scope and moderation settings.
+     * @param currentStatus the current publication status (null treated as DRAFT)
+     * @param visibilityScope the visibility scope of the video
+     * @return array of valid target statuses, never null but may be empty if no transitions allowed
+     */
+    VideoPublicationStatus[] getValidPublicationStatusTransitions(VideoPublicationStatus currentStatus,
+            org.sakaiproject.videotraining.api.model.VideoVisibilityScope visibilityScope);
 }
