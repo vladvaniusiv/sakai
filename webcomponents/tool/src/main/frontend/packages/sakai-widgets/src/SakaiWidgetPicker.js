@@ -23,8 +23,8 @@ export class SakaiWidgetPicker extends SakaiDashboardWidget {
     this.draggable = false;
     this.hasOptions = false;
 
-    this.loadTranslations(this.widgetId);
     this.loadTranslations("toolnames").then(r => this.toolnames = r);
+    this.loadTranslations(this.widgetId);
   }
 
   set all(value) {
@@ -85,7 +85,7 @@ export class SakaiWidgetPicker extends SakaiDashboardWidget {
           `)}
         </div>
       ` : html`
-        <div class="alert alert-info py-2 mb-0">${this._i18n.all_displayed}</div>
+        <div class="alert alert-info py-2 mb-2">${this._i18n.all_displayed}</div>
       `}
     `;
   }
