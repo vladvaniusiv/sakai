@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/common :: head(#{video.training.analytics})}"></head>
+<body>
+<div class="portletBody container-fluid sakai-video-training">
+    <div th:replace="~{fragments/common :: menu('analytics', ${canManage}, ${canAnalytics})}"></div>
+    <div th:replace="~{fragments/common :: messages(${success}, ${error})}"></div>
+
+    <h1 class="h3" th:text="#{video.training.analytics}">Analytics</h1>
+
+    <div class="table-responsive" th:if="${!#lists.isEmpty(analytics)}">
+    <table class="table table-striped table-hover align-middle">
+        <thead class="table-light">
+        <tr>
+            <th scope="col">Video ID</th>
+            <th scope="col" th:text="#{video.training.analytics.views}">Views</th>
+            <th scope="col" th:text="#{video.training.analytics.unique}">Unique viewers</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="summary : ${analytics}">
+            <td th:text="${summary.videoId}">video</td>
+            <td th:text="${summary.viewCount}">0</td>
+            <td th:text="${summary.uniqueViewerCount}">0</td>
+        </tr>
+        </tbody>
+    </table>
+    </div>
+
+    <div class="sak-banner-info" role="status" th:if="${#lists.isEmpty(analytics)}" th:text="#{video.training.analytics.empty}">No analytics data available yet.</div>
+
+    <a class="btn btn-outline-secondary" th:href="@{/videos}" th:text="#{video.training.back}">Back</a>
+</div>
+<div th:replace="~{fragments/common :: jQuery}"></div>
+</body>
+</html>

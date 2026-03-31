@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/common :: head(${isEdit} ? #{video.training.edit} : #{video.training.add})}"></head>
+<body>
+<div class="portletBody container-fluid sakai-video-training">
+    <div th:replace="~{fragments/common :: menu('add', ${canManage}, ${canAnalytics})}"></div>
+    <div th:replace="~{fragments/common :: messages(${success}, ${error})}"></div>
+
+    <h1 class="h3 vt-form-title" th:text="${isEdit} ? #{video.training.edit} : #{video.training.add}">Add video</h1>
+    <form method="post" enctype="multipart/form-data" class="vt-video-form" th:action="${isEdit} ? @{/videos/{id}(id=${video.id})} : @{/videos}">
+        <div class="vt-form-section">
+            <label class="form-label" for="title" th:text="#{video.training.form.title}">Title</label>
+            <input class="form-control" id="title" name="title" type="text" th:value="${video.title}" required>
+        </div>
+        <div class="vt-form-section">
+            <label class="form-label" for="description" th:text="#{video.training.form.description}">Description</label>
+            <textarea class="form-control" id="description" name="description" rows="4" th:text="${video.description}"></textarea>
+        </div>
+        <div class="vt-form-section">
+            <label class="form-label" th:text="#{video.training.form.sourceMode}">Source mode</label>
+            <div class="vt-source-mode-options">
+                <div class="form-check">
+                    <input class="form-check-input" id="sourceModeExternal" name="sourceMode" type="radio" value="external" th:checked="${sourceMode == 'external'}">
+                    <label class="form-check-label" for="sourceModeExternal" th:text="#{video.training.form.sourceMode.external}">External</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" id="sourceModeUpload" name="sourceMode" type="radio" value="upload" th:checked="${sourceMode == 'upload'}">
+                    <label class="form-check-label" for="sourceModeUpload" th:text="#{video.training.form.sourceMode.upload}">Upload</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" id="sourceModeResources" name="sourceMode" type="radio" value="resources" th:checked="${sourceMode == 'resources'}">
+                    <label class="form-check-label" for="sourceModeResources" th:text="#{video.training.form.sourceMode.resources}">Select from Resources</label>
+                </div>
+            </div>
+        </div>
+        <input id="providerType" name="providerType" type="hidden" th:value="${video.providerType != null ? video.providerType : 'NATIVE'}">
+
+        <div class="vt-form-section" id="externalSourceSection">
+            <label class="form-label" for="sourceReference" th:text="#{video.training.form.source}">Source</label>
+            <input class="form-control" id="sourceReference" name="sourceReference" type="text" th:value="${video.providerType != null && video.providerType.name() == 'EXTERNAL' ? video.sourceReference : ''}">
+            <div class="form-text" th:text="#{video.training.form.sourceHint}">Paste an external URL or a resource reference.</div>
+        </div>
+
+        <div class="vt-form-section" id="uploadSourceSection">
+            <label class="form-label" for="nativeFile" th:text="#{video.training.form.nativeFile}">Native video file</label>
+            <input class="form-control" id="nativeFile" name="nativeFile" type="file" accept="video/*">
+            <div class="form-text" th:text="#{video.training.form.sourceMode.upload.help}">Upload a file from your device.</div>
+        </div>
+
+        <div class="vt-form-section" id="resourcesSourceSection">
+            <label class="form-label" for="existingResourceReference" th:text="#{video.training.form.existingVideo}">Existing video in Resources</label>
+            <select class="form-select" id="existingResourceReference" name="existingResourceReference">
+                <option value="" th:text="#{video.training.form.existingVideo.none}">Select a video</option>
+                <option th:each="resource : ${existingVideoResources}"
+                        th:value="${resource.reference}"
+                        th:selected="${resource.reference == video.sourceReference}"
+                        th:text="${resource.displayName + ' (' + resource.contentType + ')'}">Video option</option>
+            </select>
+            <div class="form-text" th:text="#{video.training.form.existingVideo.help}">Used when source mode is select from Resources.</div>
+        </div>
+        <div class="vt-form-grid">
+            <div class="vt-form-section">
+                <label class="form-label" for="visibilityScope" th:text="#{video.training.form.visibilityScope}">Visibility scope</label>
+                <select class="form-select" id="visibilityScope" name="visibilityScope">
+                    <option th:each="scope : ${visibilityScopes}"
+                            th:value="${scope.name()}"
+                            th:selected="${video.visibilityScope == scope || (video.visibilityScope == null && scope.name() == 'COURSE')}"
+                            th:text="${scope.name()}">COURSE</option>
+                </select>
+            </div>
+            <div class="vt-form-section">
+                <label class="form-label" for="publicationStatus" th:text="#{video.training.form.publicationStatus}">Publication status</label>
+                <select class="form-select" id="publicationStatus" name="publicationStatus">
+                    <option th:each="status : ${publicationStatuses}"
+                            th:value="${status.name()}"
+                            th:selected="${video.publicationStatus == status || (video.publicationStatus == null && status.name() == 'PUBLISHED')}"
+                            th:text="${status.name()}">PUBLISHED</option>
+                </select>
+            </div>
+            <div class="vt-form-section">
+                <label class="form-label" th:text="#{video.training.form.lessonOriginRestricted}">Lesson origin restriction</label>
+                <div class="form-check mt-2">
+                    <input class="form-check-input" id="lessonOriginRestricted" name="lessonOriginRestricted" type="checkbox" value="true" th:checked="${video.lessonOriginRestricted}">
+                    <label class="form-check-label" for="lessonOriginRestricted" th:text="#{video.training.form.lessonOriginRestricted.help}">Exclude from site catalog and API student visibility.</label>
+                </div>
+            </div>
+            <div class="vt-form-section">
+                <label class="form-label" for="releaseDate" th:text="#{video.training.form.releaseDate}">Release date</label>
+                <input class="form-control" id="releaseDate" name="releaseDate" type="datetime-local" th:value="${releaseDateInput}">
+            </div>
+            <div class="vt-form-section">
+                <label class="form-label" for="retractDate" th:text="#{video.training.form.retractDate}">Retract date</label>
+                <input class="form-control" id="retractDate" name="retractDate" type="datetime-local" th:value="${retractDateInput}">
+            </div>
+        </div>
+        <div class="vt-form-actions">
+            <button class="btn btn-primary" type="submit" th:text="#{video.training.form.submit}">Save</button>
+            <a class="btn btn-outline-secondary" th:href="@{/videos}" th:text="#{video.training.back}">Back</a>
+        </div>
+    </form>
+</div>
+<script th:src="@{/js/video-training-edit.js}"></script>
+<div th:replace="~{fragments/common :: jQuery}"></div>
+</body>
+</html>

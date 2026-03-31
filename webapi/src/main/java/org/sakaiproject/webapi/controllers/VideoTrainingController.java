@@ -1,0 +1,699 @@
+package org.sakaiproject.webapi.controllers;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+import javax.annotation.Resource;
+
+import org.apache.commons.lang3.StringUtils;
+import org.sakaiproject.tool.api.Session;
+import org.sakaiproject.videotraining.api.model.VideoPublicationStatus;
+import org.sakaiproject.videotraining.api.model.VideoVisibilityScope;
+import org.sakaiproject.videotraining.api.model.VideoTrainingAnalyticsSummary;
+import org.sakaiproject.videotraining.api.model.VideoTrainingCategory;
+import org.sakaiproject.videotraining.api.model.VideoTrainingCourseGroup;
+import org.sakaiproject.videotraining.api.model.VideoTrainingLessonLink;
+import org.sakaiproject.videotraining.api.model.VideoTrainingVideo;
+import org.sakaiproject.videotraining.api.service.VideoTrainingService;
+import org.sakaiproject.webapi.beans.VideoTrainingAnalyticsRestBean;
+import org.sakaiproject.webapi.beans.VideoTrainingRestBean;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
+
+@RestController
+public class VideoTrainingController extends AbstractSakaiApiController {
+
+    @Resource(name = "org.sakaiproject.videotraining.api.service.VideoTrainingService")
+    private VideoTrainingService videoTrainingService;
+
+        private static final int DEFAULT_PAGE_SIZE = 24;
+        private static final int MAX_PAGE_SIZE = 100;
+
+    @GetMapping(value = {"/sites/{siteId}/video-training", "/api/v1/sites/{siteId}/video-training"}, produces = MediaType.APPLICATION_JSON_VALUE)
+        public Map<String, Object> getSiteVideos(@PathVariable("siteId") String siteId,
+            @RequestParam(name = "q", required = false) String q,
+            @RequestParam(name = "page", required = false, defaultValue = "1") int page,
+            @RequestParam(name = "size", required = false, defaultValue = "24") int size) {
+
+        Session session = checkSakaiSession();
+        checkSite(siteId);
+
+        String userId = session.getUserId();
+        boolean canManage = videoTrainingService.canManageLibrary(siteId, userId);
+        boolean canManageCaptions = canManage;
+        boolean canAnalytics = videoTrainingService.canViewAnalytics(siteId, userId);
+        String query = q == null ? "" : q.trim();
+        int safeSize = normalizePageSize(size);
+        int safePage = Math.max(page, 1);
+        Instant now = Instant.now();
+
+        List<VideoTrainingVideo> videos;
+        Long totalCount = null;
+        int totalPages = 1;
+        boolean hasPrev = false;
+        boolean hasNext = false;
+        totalCount = canManage
+                ? videoTrainingService.countSiteLibrary(siteId, query)
+                : videoTrainingService.countVisibleVideosForUser(siteId, userId, now, query);
+
+        safePage = normalizePage(safePage, safeSize, totalCount);
+
+        videos = canManage
+                ? videoTrainingService.getSiteLibraryPage(siteId, query, safePage, safeSize)
+                : videoTrainingService.getVisibleVideosForUserPage(siteId, userId, now, query, safePage, safeSize);
+
+        totalPages = totalCount == 0 ? 1 : (int) Math.max(1, Math.ceil((double) totalCount / safeSize));
+        hasPrev = safePage > 1;
+        hasNext = safePage < totalPages;
+
+        List<VideoTrainingRestBean> beans = videos.stream()
+            .map(video -> toRestBean(video, userId, canManage, canManageCaptions, canAnalytics))
+            .collect(Collectors.toList());
+
+        Map<String, Object> pagination = new HashMap<>();
+        pagination.put("page", safePage);
+        pagination.put("size", safeSize);
+        pagination.put("totalCount", totalCount);
+        pagination.put("totalPages", totalPages);
+        pagination.put("hasPrev", hasPrev);
+        pagination.put("hasNext", hasNext);
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("videos", beans);
+        response.put("query", query);
+        response.put("pagination", pagination);
+        return response;
+    }
+
+    @GetMapping(value = "/api/v1/courses/{courseId}/videos", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Map<String, Object> getCourseVideos(@PathVariable("courseId") String courseId,
+            @RequestParam(name = "q", required = false) String q,
+            @RequestParam(name = "page", required = false, defaultValue = "1") int page,
+            @RequestParam(name = "size", required = false, defaultValue = "24") int size) {
+
+        return getSiteVideos(courseId, q, page, size);
+    }
+
+    @GetMapping(value = "/api/v1/videos/grouped-by-course", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Map<String, Object> getVideosGroupedByCourse(@RequestParam(name = "siteIds") List<String> siteIds,
+            @RequestParam(name = "size", required = false, defaultValue = "10") int size) {
+
+        Session session = checkSakaiSession();
+        List<VideoTrainingCourseGroup> groups = videoTrainingService.getCourseGroupsForSites(siteIds, session.getUserId(), Instant.now(), size);
+
+        List<Map<String, Object>> payload = new ArrayList<>();
+        for (VideoTrainingCourseGroup group : groups) {
+            Map<String, Object> groupPayload = new HashMap<>();
+            groupPayload.put("siteId", group.getSiteId());
+            groupPayload.put("siteTitle", group.getSiteTitle());
+            groupPayload.put("totalVideos", group.getTotalVideos());
+            groupPayload.put("videos", group.getVideos().stream()
+                    .map(video -> toRestBean(video, session.getUserId(), videoTrainingService.canManageLibrary(group.getSiteId(), session.getUserId()),
+                            videoTrainingService.canManageLibrary(group.getSiteId(), session.getUserId()),
+                            videoTrainingService.canViewAnalytics(group.getSiteId(), session.getUserId())))
+                    .collect(Collectors.toList()));
+            payload.add(groupPayload);
+        }
+
+        return Map.of("groups", payload);
+    }
+
+    @GetMapping(value = "/api/v1/videos", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Map<String, Object> getVideosCatalogV1(@RequestParam(name = "siteId") String siteId,
+            @RequestParam(name = "q", required = false) String q,
+            @RequestParam(name = "page", required = false, defaultValue = "1") int page,
+            @RequestParam(name = "size", required = false, defaultValue = "24") int size) {
+
+        return getSiteVideos(siteId, q, page, size);
+    }
+
+    @GetMapping(value = {"/sites/{siteId}/video-training/{videoId}", "/api/v1/sites/{siteId}/video-training/{videoId}"}, produces = MediaType.APPLICATION_JSON_VALUE)
+    public VideoTrainingRestBean getVideoDetails(@PathVariable("siteId") String siteId, @PathVariable("videoId") String videoId) {
+
+        Session session = checkSakaiSession();
+        checkSite(siteId);
+
+        Optional<VideoTrainingVideo> optionalVideo = videoTrainingService.getVideoById(videoId);
+        VideoTrainingVideo video = optionalVideo.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Video not found"));
+
+        if (!siteId.equals(video.getSiteId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Video does not belong to site " + siteId);
+        }
+
+        String userId = session.getUserId();
+        if (!videoTrainingService.canViewVideo(video, userId, Instant.now())
+                && !videoTrainingService.canManageLibrary(siteId, userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot access this video");
+        }
+
+        boolean canManage = videoTrainingService.canManageLibrary(siteId, userId);
+        boolean canManageCaptions = canManage;
+        boolean canAnalytics = videoTrainingService.canViewAnalytics(siteId, userId);
+
+        return toRestBean(video, userId, canManage, canManageCaptions, canAnalytics);
+    }
+
+    @GetMapping(value = "/api/v1/videos/{videoId}", produces = MediaType.APPLICATION_JSON_VALUE)
+    public VideoTrainingRestBean getVideoDetailsV1(@PathVariable("videoId") String videoId,
+            @RequestParam(name = "siteId") String siteId) {
+
+        return getVideoDetails(siteId, videoId);
+    }
+
+    @GetMapping(value = "/sites/{siteId}/video-training/analytics", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Map<String, List<VideoTrainingAnalyticsRestBean>> getAnalytics(@PathVariable("siteId") String siteId) {
+
+        Session session = checkSakaiSession();
+        checkSite(siteId);
+
+        String userId = session.getUserId();
+        if (!videoTrainingService.canViewAnalytics(siteId, userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot access analytics");
+        }
+
+        List<VideoTrainingAnalyticsSummary> summaries = videoTrainingService.getSiteAnalyticsSummary(siteId);
+        List<VideoTrainingAnalyticsRestBean> beans = summaries.stream().map(this::toAnalyticsRestBean).collect(Collectors.toList());
+        return Map.of("analytics", beans);
+    }
+
+    @PostMapping(value = {"/sites/{siteId}/video-training/{videoId}/metadata", "/api/v1/sites/{siteId}/video-training/{videoId}/metadata"},
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public VideoTrainingRestBean updateVideoMetadata(@PathVariable("siteId") String siteId,
+            @PathVariable("videoId") String videoId,
+            @RequestBody VideoTrainingUpdateRequest request) {
+
+        Session session = checkSakaiSession();
+        checkSite(siteId);
+
+        String userId = session.getUserId();
+        boolean canManage = videoTrainingService.canManageLibrary(siteId, userId);
+        if (!canManage) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot manage this site's video library");
+        }
+
+        VideoTrainingVideo video = videoTrainingService.getVideoById(videoId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Video not found"));
+
+        if (!siteId.equals(video.getSiteId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Video does not belong to site " + siteId);
+        }
+
+        applyUpdateRequest(video, request);
+
+        if (!isValidVisibilityWindow(video.getReleaseDate(), video.getRetractDate())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Retract date must be later than release date");
+        }
+
+        VideoTrainingVideo saved;
+        try {
+            saved = videoTrainingService.saveVideo(video);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid update payload", e);
+        }
+
+        boolean canAnalytics = videoTrainingService.canViewAnalytics(siteId, userId);
+        if (request != null && request.getCategoryIds() != null) {
+            videoTrainingService.setVideoCategoryIds(saved.getId(), request.getCategoryIds());
+        }
+        return toRestBean(saved, userId, true, true, canAnalytics);
+    }
+
+    @GetMapping(value = "/api/v1/sites/{siteId}/video-training/categories", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Map<String, Object> getCategories(@PathVariable("siteId") String siteId) {
+        Session session = checkSakaiSession();
+        checkSite(siteId);
+
+        if (!videoTrainingService.canManageLibrary(siteId, session.getUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot manage this site's video taxonomy");
+        }
+
+        List<VideoTrainingCategory> categories = videoTrainingService.getCategories(siteId);
+        return Map.of("categories", categories);
+    }
+
+    @PostMapping(value = "/api/v1/sites/{siteId}/video-training/categories",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public VideoTrainingCategory saveCategory(@PathVariable("siteId") String siteId,
+            @RequestBody VideoTrainingCategoryRequest request) {
+        Session session = checkSakaiSession();
+        checkSite(siteId);
+        if (!videoTrainingService.canManageLibrary(siteId, session.getUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot manage this site's video taxonomy");
+        }
+
+        VideoTrainingCategory category = request != null && StringUtils.isNotBlank(request.getId())
+                ? videoTrainingService.getCategoryById(request.getId()).orElse(new VideoTrainingCategory())
+                : new VideoTrainingCategory();
+        category.setSiteId(siteId);
+        category.setName(StringUtils.trimToEmpty(request != null ? request.getName() : null));
+        category.setParentCategoryId(StringUtils.trimToNull(request != null ? request.getParentCategoryId() : null));
+        category.setSortOrder(request != null && request.getSortOrder() != null ? request.getSortOrder() : 0);
+
+        try {
+            return videoTrainingService.saveCategory(category);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid category payload", e);
+        }
+    }
+
+    @PostMapping(value = "/api/v1/sites/{siteId}/video-training/categories/{categoryId}/delete")
+    public Map<String, Object> deleteCategory(@PathVariable("siteId") String siteId,
+            @PathVariable("categoryId") String categoryId) {
+        Session session = checkSakaiSession();
+        checkSite(siteId);
+        if (!videoTrainingService.canManageLibrary(siteId, session.getUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot manage this site's video taxonomy");
+        }
+
+        videoTrainingService.deleteCategory(categoryId);
+        return Map.of("deleted", true);
+    }
+
+    @GetMapping(value = "/api/v1/sites/{siteId}/video-training/quota", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Map<String, Object> getQuota(@PathVariable("siteId") String siteId) {
+        Session session = checkSakaiSession();
+        checkSite(siteId);
+        if (!videoTrainingService.canManageLibrary(siteId, session.getUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot manage this site's video quota");
+        }
+
+        Long maxBytes = videoTrainingService.getSiteStorageQuotaBytes(siteId);
+        long usedBytes = videoTrainingService.getSiteStorageUsageBytes(siteId);
+        return Map.of("siteId", siteId, "maxBytes", maxBytes, "usedBytes", usedBytes);
+    }
+
+    @PostMapping(value = "/api/v1/lessons/{siteId}/videos/{videoId}/links",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public VideoTrainingLessonLink saveLessonLink(@PathVariable("siteId") String siteId,
+            @PathVariable("videoId") String videoId,
+            @RequestBody LessonLinkRequest request) {
+        Session session = checkSakaiSession();
+        checkSite(siteId);
+        if (!videoTrainingService.canManageLibrary(siteId, session.getUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot manage lesson links");
+        }
+        if (request == null || StringUtils.isBlank(request.getLessonPageId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "lessonPageId is required");
+        }
+
+        VideoTrainingLessonLink link = new VideoTrainingLessonLink();
+        link.setSiteId(siteId);
+        link.setVideoId(videoId);
+        link.setLessonPageId(StringUtils.trimToEmpty(request.getLessonPageId()));
+        link.setLessonItemId(StringUtils.trimToNull(request.getLessonItemId()));
+        return videoTrainingService.saveLessonLink(link);
+    }
+
+    @PostMapping(value = "/api/v1/lessons/{siteId}/lesson-links/{lessonLinkId}/delete", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Map<String, Object> deleteLessonLink(@PathVariable("siteId") String siteId,
+            @PathVariable("lessonLinkId") String lessonLinkId) {
+        Session session = checkSakaiSession();
+        checkSite(siteId);
+        if (!videoTrainingService.canManageLibrary(siteId, session.getUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot manage lesson links");
+        }
+
+        videoTrainingService.deleteLessonLink(lessonLinkId);
+        return Map.of("deleted", true);
+    }
+
+    @PostMapping(value = "/api/v1/lessons/{siteId}/promote-resource",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE)
+    public VideoTrainingRestBean promoteLessonResource(@PathVariable("siteId") String siteId,
+            @RequestBody LessonPromoteRequest request) {
+        Session session = checkSakaiSession();
+        checkSite(siteId);
+        if (!videoTrainingService.canManageLibrary(siteId, session.getUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot promote lesson resources");
+        }
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Payload is required");
+        }
+
+        VideoTrainingVideo promoted = videoTrainingService.promoteLessonResource(siteId,
+                request.getLessonPageId(),
+                request.getLessonItemId(),
+                request.getResourceReference(),
+                request.getTitle(),
+                request.getDescription(),
+                request.getFileSizeBytes());
+
+        return toRestBean(promoted, session.getUserId(), true, true, videoTrainingService.canViewAnalytics(siteId, session.getUserId()));
+    }
+
+    @GetMapping(value = "/api/v1/video-training/health", produces = MediaType.APPLICATION_JSON_VALUE)
+    public Map<String, Object> health() {
+        Map<String, Object> health = new HashMap<>();
+        health.put("status", "UP");
+        health.put("service", "video-training");
+        health.put("timestamp", Instant.now().toEpochMilli());
+        return health;
+    }
+
+    private VideoTrainingRestBean toRestBean(VideoTrainingVideo video,
+            String userId,
+            boolean canManage,
+            boolean canManageCaptions,
+            boolean canAnalytics) {
+        VideoTrainingRestBean bean = new VideoTrainingRestBean();
+        bean.setId(video.getId());
+        bean.setTitle(video.getTitle());
+        bean.setDescription(video.getDescription());
+        bean.setProviderType(video.getProviderType() != null ? video.getProviderType().name() : "");
+        bean.setSourceReference(video.getSourceReference());
+        bean.setFileSizeBytes(video.getFileSizeBytes());
+        bean.setVisibilityScope(video.getVisibilityScope() != null ? video.getVisibilityScope().name() : "");
+        bean.setPublicationStatus(video.getPublicationStatus() != null ? video.getPublicationStatus().name() : "");
+        bean.setLessonOriginRestricted(Boolean.TRUE.equals(video.getLessonOriginRestricted()));
+        bean.setLessonLinkCount(videoTrainingService.getLessonLinksForVideo(video.getId()).size());
+        bean.setCategoryIds(videoTrainingService.getVideoCategoryIds(video.getId()));
+        bean.setRequiredViewPermission(video.getRequiredViewPermission());
+        bean.setCanView(videoTrainingService.canViewVideo(video, userId, Instant.now()) || canManage);
+        bean.setCanManage(canManage);
+        bean.setCanManageCaptions(canManageCaptions);
+        bean.setCanViewAnalytics(canAnalytics);
+        return bean;
+    }
+
+    private VideoTrainingAnalyticsRestBean toAnalyticsRestBean(VideoTrainingAnalyticsSummary summary) {
+        VideoTrainingAnalyticsRestBean bean = new VideoTrainingAnalyticsRestBean();
+        bean.setVideoId(summary.getVideoId());
+        bean.setViewCount(summary.getViewCount());
+        bean.setUniqueViewerCount(summary.getUniqueViewerCount());
+        return bean;
+    }
+
+    private int normalizePageSize(int requestedSize) {
+        if (requestedSize <= 0) {
+            return DEFAULT_PAGE_SIZE;
+        }
+        return Math.min(MAX_PAGE_SIZE, requestedSize);
+    }
+
+    private int normalizePage(int requestedPage, int pageSize, long totalCount) {
+        int safePage = Math.max(requestedPage, 1);
+        if (totalCount <= 0) {
+            return 1;
+        }
+
+        int totalPages = (int) Math.max(1, Math.ceil((double) totalCount / pageSize));
+        return Math.min(safePage, totalPages);
+    }
+
+    private void applyUpdateRequest(VideoTrainingVideo video, VideoTrainingUpdateRequest request) {
+        if (request == null) {
+            return;
+        }
+
+        if (request.getTitle() != null) {
+            String title = StringUtils.trimToEmpty(request.getTitle());
+            if (StringUtils.isBlank(title)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Title cannot be blank");
+            }
+            video.setTitle(title);
+        }
+
+        if (request.getDescription() != null) {
+            video.setDescription(StringUtils.trimToEmpty(request.getDescription()));
+        }
+
+        if (request.getVisibilityScope() != null) {
+            try {
+                video.setVisibilityScope(VideoVisibilityScope.valueOf(request.getVisibilityScope()));
+            } catch (IllegalArgumentException e) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid visibilityScope", e);
+            }
+        }
+
+        if (request.getPublicationStatus() != null) {
+            try {
+                video.setPublicationStatus(VideoPublicationStatus.valueOf(request.getPublicationStatus()));
+            } catch (IllegalArgumentException e) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid publicationStatus", e);
+            }
+        }
+
+        if (request.getLessonOriginRestricted() != null) {
+            video.setLessonOriginRestricted(request.getLessonOriginRestricted());
+        }
+
+        if (request.getFileSizeBytes() != null && request.getFileSizeBytes() >= 0L) {
+            video.setFileSizeBytes(request.getFileSizeBytes());
+        }
+
+        if (Boolean.TRUE.equals(request.getClearReleaseDate())) {
+            video.setReleaseDate(null);
+        } else if (request.getReleaseDateEpochMs() != null) {
+            video.setReleaseDate(Instant.ofEpochMilli(request.getReleaseDateEpochMs()));
+        }
+
+        if (Boolean.TRUE.equals(request.getClearRetractDate())) {
+            video.setRetractDate(null);
+        } else if (request.getRetractDateEpochMs() != null) {
+            video.setRetractDate(Instant.ofEpochMilli(request.getRetractDateEpochMs()));
+        }
+    }
+
+    private boolean isValidVisibilityWindow(Instant releaseDate, Instant retractDate) {
+        return releaseDate == null || retractDate == null || releaseDate.isBefore(retractDate);
+    }
+
+    public static class VideoTrainingUpdateRequest {
+
+        private String title;
+        private String description;
+        private String visibilityScope;
+        private String publicationStatus;
+        private Boolean lessonOriginRestricted;
+        private Long releaseDateEpochMs;
+        private Long retractDateEpochMs;
+        private Boolean clearReleaseDate;
+        private Boolean clearRetractDate;
+        private Long fileSizeBytes;
+        private List<String> categoryIds;
+
+        public String getTitle() {
+            return title;
+        }
+
+        public void setTitle(String title) {
+            this.title = title;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        public void setDescription(String description) {
+            this.description = description;
+        }
+
+        public String getVisibilityScope() {
+            return visibilityScope;
+        }
+
+        public void setVisibilityScope(String visibilityScope) {
+            this.visibilityScope = visibilityScope;
+        }
+
+        public String getPublicationStatus() {
+            return publicationStatus;
+        }
+
+        public void setPublicationStatus(String publicationStatus) {
+            this.publicationStatus = publicationStatus;
+        }
+
+        public Boolean getLessonOriginRestricted() {
+            return lessonOriginRestricted;
+        }
+
+        public void setLessonOriginRestricted(Boolean lessonOriginRestricted) {
+            this.lessonOriginRestricted = lessonOriginRestricted;
+        }
+
+        public Long getReleaseDateEpochMs() {
+            return releaseDateEpochMs;
+        }
+
+        public void setReleaseDateEpochMs(Long releaseDateEpochMs) {
+            this.releaseDateEpochMs = releaseDateEpochMs;
+        }
+
+        public Long getRetractDateEpochMs() {
+            return retractDateEpochMs;
+        }
+
+        public void setRetractDateEpochMs(Long retractDateEpochMs) {
+            this.retractDateEpochMs = retractDateEpochMs;
+        }
+
+        public Boolean getClearReleaseDate() {
+            return clearReleaseDate;
+        }
+
+        public void setClearReleaseDate(Boolean clearReleaseDate) {
+            this.clearReleaseDate = clearReleaseDate;
+        }
+
+        public Boolean getClearRetractDate() {
+            return clearRetractDate;
+        }
+
+        public void setClearRetractDate(Boolean clearRetractDate) {
+            this.clearRetractDate = clearRetractDate;
+        }
+
+        public Long getFileSizeBytes() {
+            return fileSizeBytes;
+        }
+
+        public void setFileSizeBytes(Long fileSizeBytes) {
+            this.fileSizeBytes = fileSizeBytes;
+        }
+
+        public List<String> getCategoryIds() {
+            return categoryIds;
+        }
+
+        public void setCategoryIds(List<String> categoryIds) {
+            this.categoryIds = categoryIds;
+        }
+    }
+
+    public static class VideoTrainingCategoryRequest {
+
+        private String id;
+        private String name;
+        private String parentCategoryId;
+        private Integer sortOrder;
+
+        public String getId() {
+            return id;
+        }
+
+        public void setId(String id) {
+            this.id = id;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String getParentCategoryId() {
+            return parentCategoryId;
+        }
+
+        public void setParentCategoryId(String parentCategoryId) {
+            this.parentCategoryId = parentCategoryId;
+        }
+
+        public Integer getSortOrder() {
+            return sortOrder;
+        }
+
+        public void setSortOrder(Integer sortOrder) {
+            this.sortOrder = sortOrder;
+        }
+    }
+
+    public static class LessonLinkRequest {
+
+        private String lessonPageId;
+        private String lessonItemId;
+
+        public String getLessonPageId() {
+            return lessonPageId;
+        }
+
+        public void setLessonPageId(String lessonPageId) {
+            this.lessonPageId = lessonPageId;
+        }
+
+        public String getLessonItemId() {
+            return lessonItemId;
+        }
+
+        public void setLessonItemId(String lessonItemId) {
+            this.lessonItemId = lessonItemId;
+        }
+    }
+
+    public static class LessonPromoteRequest {
+
+        private String lessonPageId;
+        private String lessonItemId;
+        private String resourceReference;
+        private String title;
+        private String description;
+        private Long fileSizeBytes;
+
+        public String getLessonPageId() {
+            return lessonPageId;
+        }
+
+        public void setLessonPageId(String lessonPageId) {
+            this.lessonPageId = lessonPageId;
+        }
+
+        public String getLessonItemId() {
+            return lessonItemId;
+        }
+
+        public void setLessonItemId(String lessonItemId) {
+            this.lessonItemId = lessonItemId;
+        }
+
+        public String getResourceReference() {
+            return resourceReference;
+        }
+
+        public void setResourceReference(String resourceReference) {
+            this.resourceReference = resourceReference;
+        }
+
+        public String getTitle() {
+            return title;
+        }
+
+        public void setTitle(String title) {
+            this.title = title;
+        }
+
+        public String getDescription() {
+            return description;
+        }
+
+        public void setDescription(String description) {
+            this.description = description;
+        }
+
+        public Long getFileSizeBytes() {
+            return fileSizeBytes;
+        }
+
+        public void setFileSizeBytes(Long fileSizeBytes) {
+            this.fileSizeBytes = fileSizeBytes;
+        }
+    }
+}
