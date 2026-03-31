@@ -238,9 +238,35 @@ public class VideoTrainingServiceImplTest {
         assertTrue(USER_ID.equals(saved.getOwnerId()));
         assertTrue(VideoTrainingConstants.PERMISSION_VIEW.equals(saved.getRequiredViewPermission()));
         assertTrue(VideoVisibilityScope.COURSE == saved.getVisibilityScope());
-        assertTrue(VideoPublicationStatus.PUBLISHED == saved.getPublicationStatus());
+        assertTrue(VideoPublicationStatus.DRAFT == saved.getPublicationStatus());
         assertFalse(Boolean.TRUE.equals(saved.getLessonOriginRestricted()));
         verify(videoRepository).save(video);
+    }
+
+    @Test
+    public void saveVideoShouldRejectCreateWithNonDraftStatus() {
+        VideoTrainingVideo video = baseVideo();
+        video.setId(null);
+        video.setPublicationStatus(VideoPublicationStatus.PUBLISHED);
+        when(securityService.unlock(USER_ID, VideoTrainingConstants.PERMISSION_MANAGE, SITE_REF)).thenReturn(true);
+
+        org.junit.Assert.assertThrows(IllegalArgumentException.class, () -> service.saveVideo(video));
+        verify(videoRepository, never()).save(video);
+    }
+
+    @Test
+    public void saveVideoShouldRejectInvalidTransitionFromPublishedToDraft() {
+        VideoTrainingVideo existing = baseVideo();
+        existing.setPublicationStatus(VideoPublicationStatus.PUBLISHED);
+
+        VideoTrainingVideo update = baseVideo();
+        update.setPublicationStatus(VideoPublicationStatus.DRAFT);
+
+        when(securityService.unlock(USER_ID, VideoTrainingConstants.PERMISSION_MANAGE, SITE_REF)).thenReturn(true);
+        when(videoRepository.findById(VIDEO_ID)).thenReturn(Optional.of(existing));
+
+        org.junit.Assert.assertThrows(IllegalArgumentException.class, () -> service.saveVideo(update));
+        verify(videoRepository, never()).save(update);
     }
 
     @Test
@@ -420,6 +446,7 @@ public class VideoTrainingServiceImplTest {
         video.setTitle("Video");
         video.setProviderType(VideoProviderType.NATIVE);
         video.setSourceReference("source");
+        video.setPublicationStatus(VideoPublicationStatus.PUBLISHED);
         video.setRequiredViewPermission(VideoTrainingConstants.PERMISSION_VIEW);
         return video;
     }

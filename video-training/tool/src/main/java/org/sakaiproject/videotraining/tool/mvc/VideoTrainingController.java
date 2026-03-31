@@ -17,8 +17,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.lang3.StringUtils;
-import org.sakaiproject.content.api.ContentEntity;
+import org.sakaiproject.component.cover.ServerConfigurationService;
 import org.sakaiproject.content.api.ContentCollectionEdit;
+import org.sakaiproject.content.api.ContentEntity;
 import org.sakaiproject.content.api.ContentHostingService;
 import org.sakaiproject.content.api.ContentResource;
 import org.sakaiproject.content.api.ContentResourceEdit;
@@ -26,18 +27,17 @@ import org.sakaiproject.entity.api.ResourceProperties;
 import org.sakaiproject.event.api.NotificationService;
 import org.sakaiproject.exception.IdUnusedException;
 import org.sakaiproject.exception.OverQuotaException;
-import org.sakaiproject.component.cover.ServerConfigurationService;
 import org.sakaiproject.site.api.SiteService;
 import org.sakaiproject.time.api.UserTimeService;
 import org.sakaiproject.tool.api.SessionManager;
 import org.sakaiproject.tool.api.ToolManager;
 import org.sakaiproject.util.Validator;
 import org.sakaiproject.videotraining.api.VideoTrainingConstants;
-import org.sakaiproject.videotraining.api.model.VideoPublicationStatus;
 import org.sakaiproject.videotraining.api.model.VideoProviderType;
-import org.sakaiproject.videotraining.api.model.VideoVisibilityScope;
+import org.sakaiproject.videotraining.api.model.VideoPublicationStatus;
 import org.sakaiproject.videotraining.api.model.VideoTrainingCaption;
 import org.sakaiproject.videotraining.api.model.VideoTrainingVideo;
+import org.sakaiproject.videotraining.api.model.VideoVisibilityScope;
 import org.sakaiproject.videotraining.api.service.VideoTrainingService;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.MessageSource;
@@ -68,6 +68,7 @@ public class VideoTrainingController {
     private static final String VIEW_MODE_SESSION_PREFIX = "video-training.list.view-mode.";
     private static final String DEFAULT_SORT_FIELD = "modifiedOn";
     private static final String DEFAULT_SORT_DIRECTION = "desc";
+    private static final String MODERATION_ENABLED_PROPERTY = "video.training.moderation.enabled";
     private static final int DEFAULT_PAGE_SIZE = 24;
     private static final int MAX_PAGE_SIZE = 100;
     private static final long MAX_NATIVE_UPLOAD_BYTES = 536_870_912L;
@@ -202,6 +203,7 @@ public class VideoTrainingController {
         model.addAttribute("hasMore", hasMore);
         model.addAttribute("siteId", siteId);
         model.addAttribute("siteRef", siteService.siteReference(siteId));
+        model.addAttribute("moderationEnabled", isModerationEnabled());
         model.addAttribute("title", messageSource.getMessage("video.training.title", null, locale));
         return "video-training/list";
     }
@@ -247,7 +249,7 @@ public class VideoTrainingController {
         model.addAttribute("sourceMode", SOURCE_MODE_UPLOAD);
         model.addAttribute("providerTypes", VideoProviderType.values());
         model.addAttribute("visibilityScopes", VideoVisibilityScope.values());
-        model.addAttribute("publicationStatuses", VideoPublicationStatus.values());
+        model.addAttribute("publicationStatuses", publicationStatusesForForm());
         return "video-training/edit";
     }
 
@@ -283,7 +285,10 @@ public class VideoTrainingController {
         model.addAttribute("sourceMode", determineSourceMode(video, existingResources));
         model.addAttribute("providerTypes", VideoProviderType.values());
         model.addAttribute("visibilityScopes", VideoVisibilityScope.values());
-        model.addAttribute("publicationStatuses", VideoPublicationStatus.values());
+        VideoVisibilityScope scope = video.getVisibilityScope() != null ? video.getVisibilityScope() : VideoVisibilityScope.COURSE;
+        VideoPublicationStatus[] validTransitions = videoTrainingService.getValidPublicationStatusTransitions(video.getPublicationStatus(), scope);
+        model.addAttribute("publicationStatuses", validTransitions);
+        model.addAttribute("currentPublicationStatus", video.getPublicationStatus());
         return "video-training/edit";
     }
 
@@ -553,6 +558,33 @@ public class VideoTrainingController {
             return "redirect:/videos/" + videoId + "/edit";
         }
 
+        VideoPublicationStatus currentStatus = existing.getPublicationStatus();
+        if (!StringUtils.equals(currentStatus != null ? currentStatus.name() : null, 
+                parsedPublicationStatus.name())) {
+            try {
+                VideoPublicationStatus[] validTransitions = videoTrainingService.getValidPublicationStatusTransitions(
+                        currentStatus, parsedVisibilityScope);
+                boolean transitionValid = false;
+                for (VideoPublicationStatus valid : validTransitions) {
+                    if (valid == parsedPublicationStatus) {
+                        transitionValid = true;
+                        break;
+                    }
+                }
+                if (!transitionValid) {
+                    cleanupManagedNativeResource(uploadedSourceReference);
+                    redirectAttributes.addFlashAttribute("error",
+                            messageSource.getMessage("video.training.invalidStatusTransition", null, locale));
+                    return "redirect:/videos/" + videoId + "/edit";
+                }
+            } catch (Exception ex) {
+                cleanupManagedNativeResource(uploadedSourceReference);
+                redirectAttributes.addFlashAttribute("error",
+                        messageSource.getMessage("video.training.invalidStatusTransition", null, locale));
+                return "redirect:/videos/" + videoId + "/edit";
+            }
+        }
+
         existing.setTitle(StringUtils.trimToEmpty(title));
         existing.setDescription(StringUtils.trimToEmpty(description));
         existing.setProviderType(parsedProviderType);
@@ -634,6 +666,38 @@ public class VideoTrainingController {
             "video.training.withdrawn", redirectAttributes, locale);
         }
 
+        @PostMapping("/videos/{videoId}/archive")
+        public String archiveVideo(@PathVariable String videoId,
+            RedirectAttributes redirectAttributes,
+            Locale locale) {
+        return updatePublicationStatus(videoId, VideoPublicationStatus.ARCHIVED,
+            "video.training.archived", redirectAttributes, locale);
+        }
+
+        @PostMapping("/videos/{videoId}/restore-draft")
+        public String restoreVideoToDraft(@PathVariable String videoId,
+            RedirectAttributes redirectAttributes,
+            Locale locale) {
+        return updatePublicationStatus(videoId, VideoPublicationStatus.DRAFT,
+            "video.training.restoredDraft", redirectAttributes, locale);
+        }
+
+        @PostMapping("/videos/{videoId}/submit-approval")
+        public String submitVideoForApproval(@PathVariable String videoId,
+            RedirectAttributes redirectAttributes,
+            Locale locale) {
+        return updatePublicationStatus(videoId, VideoPublicationStatus.PENDING_APPROVAL,
+            "video.training.pendingApprovalSubmitted", redirectAttributes, locale);
+        }
+
+        @PostMapping("/videos/{videoId}/reject-approval")
+        public String rejectVideoApproval(@PathVariable String videoId,
+            RedirectAttributes redirectAttributes,
+            Locale locale) {
+        return updatePublicationStatus(videoId, VideoPublicationStatus.DRAFT,
+            "video.training.pendingApprovalRejected", redirectAttributes, locale);
+        }
+
     @GetMapping("/videos/{videoId}")
     public String details(@PathVariable String videoId,
             RedirectAttributes redirectAttributes,
@@ -669,6 +733,7 @@ public class VideoTrainingController {
         model.addAttribute("externalEmbedUrl", externalEmbedUrl);
         model.addAttribute("nativePlaybackUrl", resolveNativePlaybackUrl(video));
         model.addAttribute("nativeContentType", resolveNativeContentType(video));
+        model.addAttribute("moderationEnabled", isModerationEnabled());
         model.addAttribute("isVisibleNow", videoTrainingService.canViewVideo(video, userId, Instant.now()));
         model.addAttribute("releaseDateDisplay", formatInstantForDisplay(video.getReleaseDate(), effectiveLocale));
         model.addAttribute("retractDateDisplay", formatInstantForDisplay(video.getRetractDate(), effectiveLocale));
@@ -832,7 +897,7 @@ public class VideoTrainingController {
     private VideoPublicationStatus parsePublicationStatus(String publicationStatus) {
         String value = StringUtils.trimToEmpty(publicationStatus);
         if (StringUtils.isBlank(value)) {
-            return VideoPublicationStatus.PUBLISHED;
+            return VideoPublicationStatus.DRAFT;
         }
         return VideoPublicationStatus.valueOf(value);
     }
@@ -860,10 +925,26 @@ public class VideoTrainingController {
                     messageSource.getMessage("video.training.accessDenied", null, locale));
         } catch (IllegalArgumentException ex) {
             redirectAttributes.addFlashAttribute("error",
-                    messageSource.getMessage("video.training.invalidInput", null, locale));
+                    messageSource.getMessage("video.training.invalidStatusTransition", null, locale));
         }
 
         return "redirect:/videos";
+    }
+
+    private VideoPublicationStatus[] publicationStatusesForForm() {
+        if (isModerationEnabled()) {
+            return VideoPublicationStatus.values();
+        }
+        return new VideoPublicationStatus[] {
+            VideoPublicationStatus.DRAFT,
+            VideoPublicationStatus.PUBLISHED,
+            VideoPublicationStatus.WITHDRAWN,
+            VideoPublicationStatus.ARCHIVED
+        };
+    }
+
+    private boolean isModerationEnabled() {
+        return ServerConfigurationService.getBoolean(MODERATION_ENABLED_PROPERTY, false);
     }
 
     private VideoProviderType providerTypeForSourceMode(String sourceMode) {

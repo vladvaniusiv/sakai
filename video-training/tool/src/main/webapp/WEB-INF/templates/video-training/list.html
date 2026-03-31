@@ -47,13 +47,99 @@
         </div>
     </div>
 
+    <div class="vt-status-legend sak-banner-info" th:if="${canManage}">
+        <h5 class="alert-heading" th:text="#{video.training.status.legend.title}">Publication Status</h5>
+        <div>
+            <strong th:text="#{video.training.status.DRAFT}">Draft</strong>
+            <p class="small text-muted mb-2">Editing in progress, not visible to students</p>
+        </div>
+        <div>
+            <strong th:text="#{video.training.status.PUBLISHED}">Published</strong>
+            <p class="small text-muted mb-2">Active and visible to students per scope settings</p>
+        </div>
+        <div>
+            <strong th:text="#{video.training.status.WITHDRAWN}">Withdrawn</strong>
+            <p class="small text-muted mb-2">Hidden from catalog; can be republished</p>
+        </div>
+        <div th:if="${moderationEnabled}">
+            <strong th:text="#{video.training.status.PENDING_APPROVAL}">Pending Approval</strong>
+            <p class="small text-muted mb-2">Awaiting admin approval to publish</p>
+        </div>
+        <div>
+            <strong th:text="#{video.training.status.ARCHIVED}">Archived</strong>
+            <p class="small text-muted mb-2">Preserved for records; can be restored to draft</p>
+        </div>
+    </div>
+
     <div id="vt-video-grid" class="vt-video-grid" th:if="${!#lists.isEmpty(videos) && isCardsView}">
         <article class="vt-video-card" th:each="video : ${videos}">
             <a class="vt-video-card-link" th:href="@{/videos/{id}(id=${video.id})}">
                 <div class="vt-video-thumb-wrap">
+                    <div class="vt-card-badges" th:if="${canManage}">
+                        <span class="vt-card-badge"
+                            th:if="${video.visibilityScope != null && video.visibilityScope.name() == 'GLOBAL'}"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="left"
+                            th:title="#{video.training.visibility.global}">
+                            <span class="bi bi-globe" aria-hidden="true"></span>
+                        </span>
+                        <span class="vt-card-badge"
+                            th:if="${video.visibilityScope == null || video.visibilityScope.name() != 'GLOBAL'}"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="left"
+                            th:title="#{video.training.visibility.course}">
+                            <span class="bi bi-book" aria-hidden="true"></span>
+                        </span>
+
+                        <span class="vt-card-badge"
+                            th:if="${video.publicationStatus == null || video.publicationStatus.name() == 'DRAFT'}"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="left"
+                            th:title="#{video.training.status.DRAFT}">
+                            <span class="bi bi-pencil-square" aria-hidden="true"></span>
+                        </span>
+                        <span class="vt-card-badge"
+                            th:if="${video.publicationStatus != null && video.publicationStatus.name() == 'PENDING_APPROVAL'}"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="left"
+                            th:title="#{video.training.status.PENDING_APPROVAL}">
+                            <span class="bi bi-hourglass-split" aria-hidden="true"></span>
+                        </span>
+                        <span class="vt-card-badge"
+                            th:if="${video.publicationStatus != null && video.publicationStatus.name() == 'PUBLISHED'}"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="left"
+                            th:title="#{video.training.status.PUBLISHED}">
+                            <span class="bi bi-check-circle" aria-hidden="true"></span>
+                        </span>
+                        <span class="vt-card-badge"
+                            th:if="${video.publicationStatus != null && video.publicationStatus.name() == 'WITHDRAWN'}"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="left"
+                            th:title="#{video.training.status.WITHDRAWN}">
+                            <span class="bi bi-eye-slash" aria-hidden="true"></span>
+                        </span>
+                        <span class="vt-card-badge"
+                            th:if="${video.publicationStatus != null && video.publicationStatus.name() == 'ARCHIVED'}"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="left"
+                            th:title="#{video.training.status.ARCHIVED}">
+                            <span class="bi bi-archive" aria-hidden="true"></span>
+                        </span>
+
+                        <span class="vt-card-badge"
+                            th:if="${video.lessonOriginRestricted}"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="left"
+                            th:title="#{video.training.lessonRestricted}">
+                            <span class="bi bi-file-text" aria-hidden="true"></span>
+                        </span>
+                    </div>
+
                     <video class="vt-video-thumb"
                         th:if="${thumbnailIsVideoById[video.id]}"
                         th:src="${thumbnailUrlById[video.id]}"
+                        data-thumb-retry="true"
                         muted
                         preload="metadata"
                         playsinline
@@ -61,9 +147,11 @@
                     <img class="vt-video-thumb"
                         th:if="${!thumbnailIsVideoById[video.id] && !#strings.isEmpty(thumbnailUrlById[video.id])}"
                         th:src="${thumbnailUrlById[video.id]}"
+                        data-thumb-retry="true"
                         alt="Video thumbnail"
                         th:attr="alt=${video.title}">
-                    <div class="vt-video-thumb vt-video-thumb-placeholder" th:if="${#strings.isEmpty(thumbnailUrlById[video.id])}">
+                    <div class="vt-video-thumb vt-video-thumb-placeholder"
+                        th:classappend="${!#strings.isEmpty(thumbnailUrlById[video.id])} ? ' vt-is-hidden' : ''">
                         <span class="vt-video-thumb-play" aria-hidden="true">&#9658;</span>
                     </div>
                 </div>
@@ -71,7 +159,7 @@
                 <p class="vt-video-card-meta" th:if="${isUserSite}" th:text="${siteNameBySiteId[video.siteId]}">Site name</p>
                 <p class="vt-video-card-meta" th:if="${!isUserSite && !#strings.isEmpty(retractDisplayById[video.id]) && retractDisplayById[video.id] != '-'}"><span th:text="#{video.training.form.retractDate}">Retract</span>: <span th:text="${retractDisplayById[video.id]}">date</span></p>
             </a>
-            <div class="vt-card-actions btn-group-sm" th:if="${canManage}">
+            <div class="vt-card-actions btn-group-sm" th:if="${canManage}" th:with="status=${video.publicationStatus != null ? video.publicationStatus.name() : 'DRAFT'}, moderationRequired=${moderationEnabled && video.visibilityScope != null && video.visibilityScope.name() == 'GLOBAL'}">
                 <a class="btn btn-sm" th:href="@{/videos/{id}/edit(id=${video.id})}" th:aria-label="#{video.training.edit}">
                     <span class="bi bi-pencil-fill" aria-hidden="true"></span>
                 </a>
@@ -81,11 +169,29 @@
                         <span class="visually-hidden" th:text="#{video.training.delete}">Delete</span>
                     </button>
                 </form>
-                <form class="vt-inline-form" method="post" th:if="${video.publicationStatus == null || video.publicationStatus.name() != 'PUBLISHED'}" th:action="@{/videos/{id}/publish(id=${video.id})}">
+                <form class="vt-inline-form" method="post" th:if="${status == 'DRAFT' && !moderationRequired}" th:action="@{/videos/{id}/publish(id=${video.id})}">
                     <button class="btn btn-sm" type="submit" th:text="#{video.training.publish}">Publish</button>
                 </form>
-                <form class="vt-inline-form" method="post" th:if="${video.publicationStatus != null && video.publicationStatus.name() == 'PUBLISHED'}" th:action="@{/videos/{id}/withdraw(id=${video.id})}">
+                <form class="vt-inline-form" method="post" th:if="${(status == 'DRAFT' || status == 'WITHDRAWN') && moderationRequired}" th:action="@{/videos/{id}/submit-approval(id=${video.id})}">
+                    <button class="btn btn-sm" type="submit" th:text="#{video.training.submitApproval}">Submit for approval</button>
+                </form>
+                <form class="vt-inline-form" method="post" th:if="${status == 'PENDING_APPROVAL'}" th:action="@{/videos/{id}/publish(id=${video.id})}">
+                    <button class="btn btn-sm" type="submit" th:text="#{video.training.approve}">Approve</button>
+                </form>
+                <form class="vt-inline-form" method="post" th:if="${status == 'PENDING_APPROVAL'}" th:action="@{/videos/{id}/reject-approval(id=${video.id})}">
+                    <button class="btn btn-sm" type="submit" th:text="#{video.training.rejectApproval}">Reject</button>
+                </form>
+                <form class="vt-inline-form" method="post" th:if="${status == 'WITHDRAWN' && !moderationRequired}" th:action="@{/videos/{id}/publish(id=${video.id})}">
+                    <button class="btn btn-sm" type="submit" th:text="#{video.training.publish}">Publish</button>
+                </form>
+                <form class="vt-inline-form" method="post" th:if="${status == 'PUBLISHED'}" th:action="@{/videos/{id}/withdraw(id=${video.id})}">
                     <button class="btn btn-sm" type="submit" th:text="#{video.training.withdraw}">Withdraw</button>
+                </form>
+                <form class="vt-inline-form" method="post" th:if="${status == 'PUBLISHED'}" th:action="@{/videos/{id}/archive(id=${video.id})}">
+                    <button class="btn btn-sm" type="submit" th:text="#{video.training.archive}">Archive</button>
+                </form>
+                <form class="vt-inline-form" method="post" th:if="${status == 'ARCHIVED'}" th:action="@{/videos/{id}/restore-draft(id=${video.id})}">
+                    <button class="btn btn-sm" type="submit" th:text="#{video.training.restoreDraft}">Restore to draft</button>
                 </form>
             </div>
         </article>
@@ -95,13 +201,12 @@
         <table id="vt-video-table"
             class="table table-striped table-hover align-middle vt-video-table"
             th:attr="data-sort-by=${sortBy},data-sort-dir=${sortDir},data-size=${size},data-batch-size=${batchSize},data-view-mode=${viewMode},data-query=${q}">
-        <thead class="table-light">
+        <thead>
         <tr>
             <th scope="col" th:text="#{video.training.form.title}">Title</th>
-            <th scope="col" th:text="${isUserSite} ? #{video.training.site} : #{video.training.form.provider}">Site / Provider type</th>
-            <th scope="col" th:text="#{video.training.form.visibilityScope}">Visibility scope</th>
-            <th scope="col" th:text="#{video.training.form.publicationStatus}">Publication status</th>
-            <th scope="col" th:text="#{video.training.form.lessonOriginRestricted.short}">Lesson restricted</th>
+            <th scope="col" th:if="${canManage}" th:text="#{video.training.form.visibilityScope}">Visibility scope</th>
+            <th scope="col" th:if="${canManage}" th:text="#{video.training.form.publicationStatus}">Publication status</th>
+            <th scope="col" th:if="${canManage}" th:text="#{video.training.form.lessonOriginRestricted.short}">Lesson restricted</th>
             <th scope="col" th:text="#{video.training.form.releaseDate}">Release date</th>
             <th scope="col" th:text="#{video.training.form.retractDate}">Retract date</th>
         </tr>
@@ -109,41 +214,76 @@
         <tbody id="vt-video-table-body">
         <tr th:each="video : ${videos}">
             <td>
-                <div>
-                    <a class="fw-bold" th:href="@{/videos/{id}(id=${video.id})}" th:text="${video.title}">Video title</a>
-                </div>
-                <div th:if="${video.providerType.name() == 'EXTERNAL'}">
-                    <span class="text-muted small" th:text="${video.sourceReference}">reference</span>
-                </div>
-                <div th:if="${canManage}" class="vt-actions-row btn-group-sm">
-                    <a class="btn btn-sm" th:href="@{/videos/{id}/edit(id=${video.id})}" th:aria-label="#{video.training.edit}">
-                        <span class="bi bi-pencil-fill" aria-hidden="true"></span>
-                    </a>
-                    <form class="vt-inline-form" method="post" th:action="@{/videos/{id}/delete(id=${video.id})}">
-                        <button class="btn btn-sm" type="submit" th:aria-label="#{video.training.delete}">
-                            <span class="bi bi-trash-fill" aria-hidden="true"></span>
-                            <span class="visually-hidden" th:text="#{video.training.delete}">Delete</span>
-                        </button>
-                    </form>
-                    <form class="vt-inline-form" method="post" th:if="${video.publicationStatus == null || video.publicationStatus.name() != 'PUBLISHED'}" th:action="@{/videos/{id}/publish(id=${video.id})}">
-                        <button class="btn btn-sm" type="submit" th:text="#{video.training.publish}">Publish</button>
-                    </form>
-                    <form class="vt-inline-form" method="post" th:if="${video.publicationStatus != null && video.publicationStatus.name() == 'PUBLISHED'}" th:action="@{/videos/{id}/withdraw(id=${video.id})}">
-                        <button class="btn btn-sm" type="submit" th:text="#{video.training.withdraw}">Withdraw</button>
-                    </form>
+                <div class="vt-title-cell">
+                    <div class="vt-table-thumb-wrap" aria-hidden="true">
+                        <video class="vt-table-thumb"
+                            th:if="${thumbnailIsVideoById[video.id]}"
+                            th:src="${thumbnailUrlById[video.id]}"
+                            data-thumb-retry="true"
+                            muted
+                            preload="metadata"
+                            playsinline></video>
+                        <img class="vt-table-thumb"
+                            th:if="${!thumbnailIsVideoById[video.id] && !#strings.isEmpty(thumbnailUrlById[video.id])}"
+                            th:src="${thumbnailUrlById[video.id]}"
+                            data-thumb-retry="true"
+                            th:attr="alt=${video.title}"
+                            alt="Video thumbnail">
+                        <div class="vt-table-thumb-placeholder"
+                            th:classappend="${!#strings.isEmpty(thumbnailUrlById[video.id])} ? ' vt-is-hidden' : ''">
+                            <span class="bi bi-play-btn" aria-hidden="true"></span>
+                        </div>
+                    </div>
+                    <div class="vt-title-content">
+                        <div>
+                            <a class="fw-bold" th:href="@{/videos/{id}(id=${video.id})}" th:text="${video.title}">Video title</a>
+                        </div>
+                        <div th:if="${video.providerType.name() == 'EXTERNAL'}">
+                            <span class="text-muted small" th:text="${video.sourceReference}">reference</span>
+                        </div>
+                        <div th:if="${canManage}" class="vt-actions-row btn-group-sm" th:with="status=${video.publicationStatus != null ? video.publicationStatus.name() : 'DRAFT'}, moderationRequired=${moderationEnabled && video.visibilityScope != null && video.visibilityScope.name() == 'GLOBAL'}">
+                            <a class="btn btn-sm" th:href="@{/videos/{id}/edit(id=${video.id})}" th:aria-label="#{video.training.edit}">
+                                <span class="bi bi-pencil-fill" aria-hidden="true"></span>
+                            </a>
+                            <form class="vt-inline-form" method="post" th:action="@{/videos/{id}/delete(id=${video.id})}">
+                                <button class="btn btn-sm" type="submit" th:aria-label="#{video.training.delete}">
+                                    <span class="bi bi-trash-fill" aria-hidden="true"></span>
+                                    <span class="visually-hidden" th:text="#{video.training.delete}">Delete</span>
+                                </button>
+                            </form>
+                            <form class="vt-inline-form" method="post" th:if="${status == 'DRAFT' && !moderationRequired}" th:action="@{/videos/{id}/publish(id=${video.id})}">
+                                <button class="btn btn-sm" type="submit" th:text="#{video.training.publish}">Publish</button>
+                            </form>
+                            <form class="vt-inline-form" method="post" th:if="${(status == 'DRAFT' || status == 'WITHDRAWN') && moderationRequired}" th:action="@{/videos/{id}/submit-approval(id=${video.id})}">
+                                <button class="btn btn-sm" type="submit" th:text="#{video.training.submitApproval}">Submit for approval</button>
+                            </form>
+                            <form class="vt-inline-form" method="post" th:if="${status == 'PENDING_APPROVAL'}" th:action="@{/videos/{id}/publish(id=${video.id})}">
+                                <button class="btn btn-sm" type="submit" th:text="#{video.training.approve}">Approve</button>
+                            </form>
+                            <form class="vt-inline-form" method="post" th:if="${status == 'PENDING_APPROVAL'}" th:action="@{/videos/{id}/reject-approval(id=${video.id})}">
+                                <button class="btn btn-sm" type="submit" th:text="#{video.training.rejectApproval}">Reject</button>
+                            </form>
+                            <form class="vt-inline-form" method="post" th:if="${status == 'WITHDRAWN' && !moderationRequired}" th:action="@{/videos/{id}/publish(id=${video.id})}">
+                                <button class="btn btn-sm" type="submit" th:text="#{video.training.publish}">Publish</button>
+                            </form>
+                            <form class="vt-inline-form" method="post" th:if="${status == 'PUBLISHED'}" th:action="@{/videos/{id}/withdraw(id=${video.id})}">
+                                <button class="btn btn-sm" type="submit" th:text="#{video.training.withdraw}">Withdraw</button>
+                            </form>
+                            <form class="vt-inline-form" method="post" th:if="${status == 'PUBLISHED'}" th:action="@{/videos/{id}/archive(id=${video.id})}">
+                                <button class="btn btn-sm" type="submit" th:text="#{video.training.archive}">Archive</button>
+                            </form>
+                            <form class="vt-inline-form" method="post" th:if="${status == 'ARCHIVED'}" th:action="@{/videos/{id}/restore-draft(id=${video.id})}">
+                                <button class="btn btn-sm" type="submit" th:text="#{video.training.restoreDraft}">Restore to draft</button>
+                            </form>
+                        </div>
+                    </div>
                 </div>
             </td>
-            <td th:text="${isUserSite ? siteNameBySiteId[video.siteId] : video.providerType}">NATIVE</td>
-            <td th:text="${video.visibilityScope != null ? video.visibilityScope : 'COURSE'}">COURSE</td>
-            <td>
-                <span class="badge"
-                    th:classappend="${video.publicationStatus != null ? video.publicationStatus.name() : 'PUBLISHED'} == 'PUBLISHED' ? ' text-bg-success' : ' text-bg-secondary'"
-                    th:text="${video.publicationStatus != null ? video.publicationStatus : 'PUBLISHED'}">PUBLISHED</span>
-            </td>
-            <td>
-                <span class="badge" th:classappend="${video.lessonOriginRestricted} ? ' text-bg-warning' : ' text-bg-light'"
-                    th:text="${video.lessonOriginRestricted} ? #{video.training.value.yes} : #{video.training.value.no}">No</span>
-            </td>
+            <td th:if="${canManage}" th:text="${video.visibilityScope != null ? video.visibilityScope : 'COURSE'}">COURSE</td>
+            <td th:if="${canManage}"
+                th:title="${video.publicationStatus != null && video.publicationStatus.name() == 'PENDING_APPROVAL'} ? #{video.training.status.PENDING_APPROVAL} : (${video.publicationStatus != null && video.publicationStatus.name() == 'PUBLISHED'} ? #{video.training.status.PUBLISHED} : (${video.publicationStatus != null && video.publicationStatus.name() == 'WITHDRAWN'} ? #{video.training.status.WITHDRAWN} : (${video.publicationStatus != null && video.publicationStatus.name() == 'ARCHIVED'} ? #{video.training.status.ARCHIVED} : #{video.training.status.DRAFT})))"
+                th:text="${video.publicationStatus != null ? video.publicationStatus : 'DRAFT'}">DRAFT</td>
+            <td th:if="${canManage}" th:text="${video.lessonOriginRestricted} ? #{video.training.value.yes} : #{video.training.value.no}">No</td>
             <td th:text="${releaseDisplayById[video.id]}">-</td>
             <td th:text="${retractDisplayById[video.id]}">-</td>
         </tr>
