@@ -511,6 +511,11 @@ public class SimplePageBean {
     		bltiEntity = (LessonEntity)e;
     	}
 
+    	private LessonEntity videoTrainingEntity = null;
+    	public void setVideoTrainingEntity(Object e) {
+    		videoTrainingEntity = (LessonEntity)e;
+    	}
+
     	private LessonEntity scormEntity = null;
     	public void setScormEntity(Object e) {
     		scormEntity = (LessonEntity)e;
@@ -3762,6 +3767,59 @@ public class SimplePageBean {
 		}
 	}
 
+	// called by video training picker. Create a new item that points to a video-training video
+	// or update an existing item, depending upon whether itemid is set
+	public String addVideoTraining() {
+		if (!itemOk(itemId)) {
+			return "permission-failed";
+		}
+		if (!canEditPage()) {
+			return "permission-failed";
+		}
+		if (!checkCsrf()) {
+			return "permission-failed";
+		}
+
+		if (selectedEntity == null || videoTrainingEntity == null) {
+			return "failure";
+		}
+
+		try {
+			LessonEntity selectedObject = videoTrainingEntity.getEntity(selectedEntity, this);
+			if (selectedObject == null) {
+				return "failure";
+			}
+
+			SimplePageItem i;
+			if (itemId != null && itemId != -1) {
+				i = findItem(itemId);
+
+				LessonEntity existing = videoTrainingEntity.getEntity(i.getSakaiId(), this);
+				String ref = null;
+				if (existing != null) {
+					ref = existing.getReference();
+				}
+
+				if ((existing == null) || !ref.equals(selectedEntity)) {
+					i.setSakaiId(selectedEntity);
+					i.setName(selectedObject.getTitle());
+					i.setDescription(selectedObject.getDescription());
+					setItemGroups(i, selectedGroups);
+					update(i);
+				}
+			} else {
+				i = appendItem(selectedEntity, selectedObject.getTitle(), SimplePageItem.VIDEO_TRAINING);
+				i.setDescription(selectedObject.getDescription());
+				saveItem(i);
+			}
+
+			return "success";
+		} catch (Exception ex) {
+			log.error(ex.getMessage(), ex);
+			return "failure";
+		}
+	}
+
     /// ShowPageProducers needs the item ID list anyway. So to avoid calling the underlying
     // code twice, we take that list and translate to titles, rather than calling
     // getItemGroups again
@@ -3931,6 +3989,7 @@ public class SimplePageBean {
 		   // fall through: groups controlled by LB
 	       // for the following items we don't have non-LB items so don't need itemunused
 	       case SimplePageItem.BLTI: // Groups always managed in lessons
+	       case SimplePageItem.VIDEO_TRAINING: // Groups always managed in lessons
 	       case SimplePageItem.TEXT:
 	       case SimplePageItem.RESOURCE_FOLDER:
 	       case SimplePageItem.CHECKLIST:
@@ -4169,6 +4228,7 @@ public class SimplePageBean {
 	   case SimplePageItem.CHECKLIST:
 	   case SimplePageItem.PAGE:
 	   case SimplePageItem.BLTI:
+	   case SimplePageItem.VIDEO_TRAINING:
 	   case SimplePageItem.COMMENTS:
 	   case SimplePageItem.TWITTER:
 	   case SimplePageItem.QUESTION:
@@ -5743,6 +5803,18 @@ public class SimplePageBean {
 			case SimplePageItem.BLTI:
 				if (bltiEntity != null) {
 					entity = bltiEntity.getEntity(item.getSakaiId());
+				}
+				if (entity == null || entity.notPublished()) {
+					return false;
+				} else {
+					// After checking that it exists reset to null so that groups are
+					// checked internal to Lessons
+					entity = null;
+				}
+				break;
+			case SimplePageItem.VIDEO_TRAINING:
+				if (videoTrainingEntity != null) {
+					entity = videoTrainingEntity.getEntity(item.getSakaiId());
 				}
 				if (entity == null || entity.notPublished()) {
 					return false;

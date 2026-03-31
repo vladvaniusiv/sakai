@@ -55,6 +55,7 @@ simplePageBean.addCommentsSection,
 simplePageBean.addForum,
 simplePageBean.addLayout,
 simplePageBean.addMultimedia,
+simplePageBean.addVideoTraining,
 simplePageBean.addOldPage,
 simplePageBean.addPageLayout,
 simplePageBean.addPages,
@@ -295,6 +296,16 @@ simplePageBean.addForumSummary,
         destroy-method="destroy">
     <property name="memoryService"><ref bean="org.sakaiproject.memory.api.MemoryService"/></property>
     <property name="messageLocator" ref="messageLocator"/>
+    <property name="siteService" ref="org.sakaiproject.site.api.SiteService"/>
+    <property name="toolManager" ref="org.sakaiproject.tool.api.ToolManager"/>
+  </bean>
+
+  <bean id="org.sakaiproject.lessonbuildertool.service.VideoTrainingEntity"
+	class="org.sakaiproject.lessonbuildertool.service.VideoTrainingEntity"
+	lazy-init="true"
+        init-method="init"
+        destroy-method="destroy">
+    <property name="memoryService"><ref bean="org.sakaiproject.memory.api.MemoryService"/></property>
     <property name="siteService" ref="org.sakaiproject.site.api.SiteService"/>
     <property name="toolManager" ref="org.sakaiproject.tool.api.ToolManager"/>
   </bean>

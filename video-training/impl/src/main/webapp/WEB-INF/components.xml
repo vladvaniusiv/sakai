@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns="http://www.springframework.org/schema/beans"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean id="org.sakaiproject.springframework.orm.hibernate.AdditionalHibernateMappings.videoTraining"
+          class="org.sakaiproject.springframework.orm.hibernate.impl.AdditionalHibernateMappingsImpl">
+        <property name="annotatedClasses">
+            <list>
+                <value>org.sakaiproject.videotraining.api.model.VideoTrainingVideo</value>
+                <value>org.sakaiproject.videotraining.api.model.VideoTrainingCaption</value>
+                <value>org.sakaiproject.videotraining.api.model.VideoTrainingAnalyticsEvent</value>
+                <value>org.sakaiproject.videotraining.api.model.VideoTrainingCategory</value>
+                <value>org.sakaiproject.videotraining.api.model.VideoTrainingVideoCategory</value>
+                <value>org.sakaiproject.videotraining.api.model.VideoTrainingLessonLink</value>
+            </list>
+        </property>
+    </bean>
+
+        <bean id="org.sakaiproject.videotraining.api.repository.VideoTrainingVideoRepository"
+                    class="org.sakaiproject.videotraining.impl.repository.VideoTrainingVideoRepositoryImpl">
+                <property name="sessionFactory" ref="org.sakaiproject.springframework.orm.hibernate.GlobalSessionFactory"/>
+        </bean>
+
+        <bean id="org.sakaiproject.videotraining.api.repository.VideoTrainingCaptionRepository"
+                    class="org.sakaiproject.videotraining.impl.repository.VideoTrainingCaptionRepositoryImpl">
+                <property name="sessionFactory" ref="org.sakaiproject.springframework.orm.hibernate.GlobalSessionFactory"/>
+        </bean>
+
+        <bean id="org.sakaiproject.videotraining.api.repository.VideoTrainingAnalyticsEventRepository"
+                    class="org.sakaiproject.videotraining.impl.repository.VideoTrainingAnalyticsEventRepositoryImpl">
+                <property name="sessionFactory" ref="org.sakaiproject.springframework.orm.hibernate.GlobalSessionFactory"/>
+        </bean>
+
+        <bean id="org.sakaiproject.videotraining.api.repository.VideoTrainingCategoryRepository"
+                class="org.sakaiproject.videotraining.impl.repository.VideoTrainingCategoryRepositoryImpl">
+            <property name="sessionFactory" ref="org.sakaiproject.springframework.orm.hibernate.GlobalSessionFactory"/>
+        </bean>
+
+        <bean id="org.sakaiproject.videotraining.api.repository.VideoTrainingVideoCategoryRepository"
+                class="org.sakaiproject.videotraining.impl.repository.VideoTrainingVideoCategoryRepositoryImpl">
+            <property name="sessionFactory" ref="org.sakaiproject.springframework.orm.hibernate.GlobalSessionFactory"/>
+        </bean>
+
+        <bean id="org.sakaiproject.videotraining.api.repository.VideoTrainingLessonLinkRepository"
+                class="org.sakaiproject.videotraining.impl.repository.VideoTrainingLessonLinkRepositoryImpl">
+            <property name="sessionFactory" ref="org.sakaiproject.springframework.orm.hibernate.GlobalSessionFactory"/>
+        </bean>
+
+    <bean id="org.sakaiproject.videotraining.api.service.VideoTrainingService"
+          class="org.sakaiproject.videotraining.impl.service.VideoTrainingServiceImpl"
+          init-method="init">
+                <property name="videoRepository" ref="org.sakaiproject.videotraining.api.repository.VideoTrainingVideoRepository"/>
+                <property name="captionRepository" ref="org.sakaiproject.videotraining.api.repository.VideoTrainingCaptionRepository"/>
+                <property name="analyticsEventRepository" ref="org.sakaiproject.videotraining.api.repository.VideoTrainingAnalyticsEventRepository"/>
+            <property name="categoryRepository" ref="org.sakaiproject.videotraining.api.repository.VideoTrainingCategoryRepository"/>
+            <property name="videoCategoryRepository" ref="org.sakaiproject.videotraining.api.repository.VideoTrainingVideoCategoryRepository"/>
+            <property name="lessonLinkRepository" ref="org.sakaiproject.videotraining.api.repository.VideoTrainingLessonLinkRepository"/>
+            <property name="contentHostingService" ref="org.sakaiproject.content.api.ContentHostingService"/>
+            <property name="eventTrackingService" ref="org.sakaiproject.event.api.EventTrackingService"/>
+        <property name="functionManager" ref="org.sakaiproject.authz.api.FunctionManager"/>
+        <property name="securityService" ref="org.sakaiproject.authz.api.SecurityService"/>
+        <property name="sessionManager" ref="org.sakaiproject.tool.api.SessionManager"/>
+        <property name="siteService" ref="org.sakaiproject.site.api.SiteService"/>
+            <property name="memoryService" ref="org.sakaiproject.memory.api.MemoryService"/>
+    </bean>
+</beans>

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/common :: head(#{video.training.details})}"></head>
+<body>
+<div class="portletBody container-fluid sakai-video-training" th:if="${video}">
+    <div th:replace="~{fragments/common :: menu('list', ${canManage}, ${canAnalytics})}"></div>
+    <div th:replace="~{fragments/common :: messages(${success}, ${error})}"></div>
+
+    <div class="vt-page-header">
+        <h1 class="h3" th:text="${video.title}">Video title</h1>
+        <p class="vt-page-subtitle" th:text="${video.description}">Description</p>
+    </div>
+
+    <div class="vt-player-wrap">
+        <video class="vt-player" controls th:if="${!isExternalVideo}">
+            <source th:src="${nativePlaybackUrl}" th:type="${nativeContentType}" />
+        </video>
+        <div class="ratio ratio-16x9" th:if="${isExternalVideo}">
+            <iframe th:src="${externalEmbedUrl}"
+                    title="Video player"
+                    frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    referrerpolicy="strict-origin-when-cross-origin"
+                    allowfullscreen></iframe>
+        </div>
+    </div>
+
+    <div class="vt-toolbar" th:if="${canManage}">
+        <a class="btn btn-outline-primary" th:href="@{/videos/{id}/edit(id=${video.id})}" th:text="#{video.training.edit}">Edit</a>
+        <form class="vt-inline-form" method="post" th:if="${video.publicationStatus == null || video.publicationStatus.name() != 'PUBLISHED'}" th:action="@{/videos/{id}/publish(id=${video.id})}">
+            <button class="btn btn-outline-success" type="submit" th:text="#{video.training.publish}">Publish</button>
+        </form>
+        <form class="vt-inline-form" method="post" th:if="${video.publicationStatus != null && video.publicationStatus.name() == 'PUBLISHED'}" th:action="@{/videos/{id}/withdraw(id=${video.id})}">
+            <button class="btn btn-outline-warning" type="submit" th:text="#{video.training.withdraw}">Withdraw</button>
+        </form>
+        <form class="vt-inline-form" method="post" th:action="@{/videos/{id}/delete(id=${video.id})}">
+            <button class="btn btn-outline-danger" type="submit" th:text="#{video.training.delete}">Delete</button>
+        </form>
+    </div>
+
+    <dl class="row vt-metadata">
+        <dt class="col-sm-3" th:text="#{video.training.form.provider}">Provider</dt>
+        <dd class="col-sm-9" th:text="${video.providerType}">NATIVE</dd>
+        <dt class="col-sm-3" th:text="#{video.training.form.visibilityScope}">Visibility scope</dt>
+        <dd class="col-sm-9" th:text="${video.visibilityScope != null ? video.visibilityScope : 'COURSE'}">COURSE</dd>
+        <dt class="col-sm-3" th:text="#{video.training.form.publicationStatus}">Publication status</dt>
+        <dd class="col-sm-9" th:text="${video.publicationStatus != null ? video.publicationStatus : 'PUBLISHED'}">PUBLISHED</dd>
+        <dt class="col-sm-3" th:text="#{video.training.form.lessonOriginRestricted.short}">Lesson restricted</dt>
+        <dd class="col-sm-9" th:text="${video.lessonOriginRestricted} ? #{video.training.value.yes} : #{video.training.value.no}">No</dd>
+        <dt class="col-sm-3" th:text="#{video.training.form.source}">Source</dt>
+        <dd class="col-sm-9" th:text="${video.sourceReference}">reference</dd>
+        <dt class="col-sm-3" th:text="#{video.training.form.releaseDate}">Release date</dt>
+        <dd class="col-sm-9" th:text="${releaseDateDisplay}">-</dd>
+        <dt class="col-sm-3" th:text="#{video.training.form.retractDate}">Retract date</dt>
+        <dd class="col-sm-9" th:text="${retractDateDisplay}">-</dd>
+    </dl>
+
+    <h2 class="h4" th:text="#{video.training.captions}">Captions and transcript</h2>
+    <form class="vt-caption-form" method="post" th:if="${canManageCaptions}" th:action="@{/videos/{id}/captions(id=${video.id})}">
+        <div class="vt-form-grid">
+            <div class="vt-form-section">
+                <label class="form-label" for="languageTag" th:text="#{video.training.caption.language}">Language</label>
+                <input class="form-control" id="languageTag" name="languageTag" type="text" maxlength="35" placeholder="en" required>
+            </div>
+            <div class="vt-form-section">
+                <label class="form-label" for="contentReference" th:text="#{video.training.caption.reference}">Content reference</label>
+                <input class="form-control" id="contentReference" name="contentReference" type="text" maxlength="1024">
+            </div>
+        </div>
+        <div class="vt-form-section">
+            <label class="form-label" for="transcriptText" th:text="#{video.training.caption.transcript}">Transcript</label>
+            <textarea class="form-control" id="transcriptText" name="transcriptText" rows="4" maxlength="12000"></textarea>
+        </div>
+        <div class="vt-form-actions">
+            <button class="btn btn-outline-primary" type="submit" th:text="#{video.training.caption.add}">Add caption</button>
+        </div>
+    </form>
+
+    <div class="table-responsive" th:if="${!#lists.isEmpty(captions)}">
+    <table class="table table-sm table-striped vt-caption-table">
+        <thead>
+        <tr>
+            <th scope="col" th:text="#{video.training.caption.language}">Language</th>
+            <th scope="col" th:text="#{video.training.caption.reference}">Content reference</th>
+            <th scope="col" th:text="#{video.training.caption.transcript}">Transcript</th>
+            <th scope="col" th:if="${canManageCaptions}" th:text="#{video.training.actions}">Actions</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="caption : ${captions}">
+            <td th:text="${caption.languageTag}">en</td>
+            <td th:text="${caption.contentReference}">/content/path</td>
+            <td>
+                <div class="vt-transcript" th:text="${caption.transcriptText}">Transcript text</div>
+            </td>
+            <td th:if="${canManageCaptions}" class="vt-actions-cell">
+                <form class="vt-inline-form" method="post" th:action="@{/videos/{videoId}/captions/{captionId}/delete(videoId=${video.id},captionId=${caption.id})}">
+                    <button class="btn btn-sm btn-outline-danger" type="submit" th:text="#{video.training.delete}">Delete</button>
+                </form>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+    </div>
+
+    <div class="sak-banner-info" role="status" th:if="${#lists.isEmpty(captions)}" th:text="#{video.training.captions.empty}">No captions available yet.</div>
+
+    <a class="btn btn-outline-secondary" th:href="@{/videos}" th:text="#{video.training.back}">Back</a>
+</div>
+<div th:replace="~{fragments/common :: jQuery}"></div>
+</body>
+</html>

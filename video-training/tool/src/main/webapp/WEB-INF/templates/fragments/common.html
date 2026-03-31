@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<body>
+<head th:fragment="head(title)">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link media="all" href="/library/skin/tool_base.css" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <title th:text="${title}">Video Training</title>
+    <script src="/library/js/headscripts.js"></script>
+    <script src="/library/js/spinner.js"></script>
+</head>
+
+<div th:fragment="jQuery">
+    <script>includeLatestJQuery('sakai.video.training');</script>
+    <script th:inline="javascript">
+        $(document).ready(function () {
+            var toolId = /*[[${#httpServletRequest.getAttribute('sakai.tool.placement.id')}]]*/'toolId';
+            if (toolId) {
+                setMainFrameHeight('Main' + toolId.replace(/-/g, 'x'));
+            }
+        });
+    </script>
+</div>
+
+<div th:fragment="menu(current, canManage, canAnalytics)">
+    <ul class="navIntraTool">
+        <li>
+            <span th:class="${current} == 'list' ? 'current'">
+                <span th:if="${current} == 'list'" th:text="#{video.training.menu.library}">Library</span>
+                <a th:unless="${current} == 'list'" th:href="@{/videos}" th:text="#{video.training.menu.library}">Library</a>
+            </span>
+        </li>
+        <li th:if="${canManage}">
+            <span th:class="${current} == 'add' ? 'current'">
+                <span th:if="${current} == 'add'" th:text="#{video.training.menu.add}">Add video</span>
+                <a th:unless="${current} == 'add'" th:href="@{/videos/new}" th:text="#{video.training.menu.add}">Add video</a>
+            </span>
+        </li>
+        <li th:if="${canAnalytics}">
+            <span th:class="${current} == 'analytics' ? 'current'">
+                <span th:if="${current} == 'analytics'" th:text="#{video.training.menu.analytics}">Analytics</span>
+                <a th:unless="${current} == 'analytics'" th:href="@{/analytics}" th:text="#{video.training.menu.analytics}">Analytics</a>
+            </span>
+        </li>
+    </ul>
+</div>
+
+<div th:fragment="messages(success, error)">
+    <div class="sak-banner-success" role="status" th:if="${success}" th:text="${success}">Saved</div>
+    <div class="sak-banner-error" role="alert" th:if="${error}" th:text="${error}">Error</div>
+</div>
+</body>
+</html>
