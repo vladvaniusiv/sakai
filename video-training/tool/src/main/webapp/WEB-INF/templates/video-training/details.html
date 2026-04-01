@@ -63,8 +63,6 @@
         <dd class="col-sm-9" th:text="${video.visibilityScope != null ? video.visibilityScope : 'COURSE'}">COURSE</dd>
         <dt class="col-sm-3" th:text="#{video.training.form.publicationStatus}">Publication status</dt>
         <dd class="col-sm-9" th:text="${video.publicationStatus != null ? video.publicationStatus : 'DRAFT'}">DRAFT</dd>
-        <dt class="col-sm-3" th:text="#{video.training.form.lessonOriginRestricted.short}">Lesson restricted</dt>
-        <dd class="col-sm-9" th:text="${video.lessonOriginRestricted} ? #{video.training.value.yes} : #{video.training.value.no}">No</dd>
         <dt class="col-sm-3" th:text="#{video.training.form.source}">Source</dt>
         <dd class="col-sm-9" th:text="${video.sourceReference}">reference</dd>
         <dt class="col-sm-3" th:text="#{video.training.form.releaseDate}">Release date</dt>

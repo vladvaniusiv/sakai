@@ -380,7 +380,6 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         bean.setFileSizeBytes(video.getFileSizeBytes());
         bean.setVisibilityScope(video.getVisibilityScope() != null ? video.getVisibilityScope().name() : "");
         bean.setPublicationStatus(video.getPublicationStatus() != null ? video.getPublicationStatus().name() : "");
-        bean.setLessonOriginRestricted(Boolean.TRUE.equals(video.getLessonOriginRestricted()));
         bean.setLessonLinkCount(videoTrainingService.getLessonLinksForVideo(video.getId()).size());
         bean.setCategoryIds(videoTrainingService.getVideoCategoryIds(video.getId()));
         bean.setRequiredViewPermission(video.getRequiredViewPermission());
@@ -449,10 +448,6 @@ public class VideoTrainingController extends AbstractSakaiApiController {
             }
         }
 
-        if (request.getLessonOriginRestricted() != null) {
-            video.setLessonOriginRestricted(request.getLessonOriginRestricted());
-        }
-
         if (request.getFileSizeBytes() != null && request.getFileSizeBytes() >= 0L) {
             video.setFileSizeBytes(request.getFileSizeBytes());
         }
@@ -480,7 +475,6 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         private String description;
         private String visibilityScope;
         private String publicationStatus;
-        private Boolean lessonOriginRestricted;
         private Long releaseDateEpochMs;
         private Long retractDateEpochMs;
         private Boolean clearReleaseDate;
@@ -518,14 +512,6 @@ public class VideoTrainingController extends AbstractSakaiApiController {
 
         public void setPublicationStatus(String publicationStatus) {
             this.publicationStatus = publicationStatus;
-        }
-
-        public Boolean getLessonOriginRestricted() {
-            return lessonOriginRestricted;
-        }
-
-        public void setLessonOriginRestricted(Boolean lessonOriginRestricted) {
-            this.lessonOriginRestricted = lessonOriginRestricted;
         }
 
         public Long getReleaseDateEpochMs() {

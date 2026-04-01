@@ -12,8 +12,8 @@ import javax.persistence.Id;
 import javax.persistence.Table;
 
 import org.hibernate.annotations.GenericGenerator;
-import org.sakaiproject.videotraining.api.VideoTrainingConstants;
 import org.sakaiproject.springframework.data.PersistableEntity;
+import org.sakaiproject.videotraining.api.VideoTrainingConstants;
 
 @Entity
 @Table(name = "VTM_VIDEO")
@@ -54,9 +54,6 @@ public class VideoTrainingVideo implements PersistableEntity<String> {
     @Enumerated(EnumType.STRING)
     @Column(name = "PUBLICATION_STATUS", nullable = false, length = 16)
     private VideoPublicationStatus publicationStatus = VideoPublicationStatus.DRAFT;
-
-    @Column(name = "LESSON_ORIGIN_RESTRICTED", nullable = false)
-    private Boolean lessonOriginRestricted = Boolean.FALSE;
 
     @Column(name = "RELEASE_DATE")
     @Convert(converter = InstantEpochMillisConverter.class)
@@ -155,14 +152,6 @@ public class VideoTrainingVideo implements PersistableEntity<String> {
 
     public void setPublicationStatus(VideoPublicationStatus publicationStatus) {
         this.publicationStatus = publicationStatus;
-    }
-
-    public Boolean getLessonOriginRestricted() {
-        return lessonOriginRestricted;
-    }
-
-    public void setLessonOriginRestricted(Boolean lessonOriginRestricted) {
-        this.lessonOriginRestricted = lessonOriginRestricted;
     }
 
     public Instant getReleaseDate() {

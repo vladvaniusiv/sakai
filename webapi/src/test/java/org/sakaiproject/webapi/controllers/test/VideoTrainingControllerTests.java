@@ -121,7 +121,6 @@ public class VideoTrainingControllerTests extends BaseControllerTests {
                 .andExpect(jsonPath("$.videos[0].id", is(VIDEO_ID)))
                 .andExpect(jsonPath("$.videos[0].visibilityScope", is("COURSE")))
                 .andExpect(jsonPath("$.videos[0].publicationStatus", is("PUBLISHED")))
-                .andExpect(jsonPath("$.videos[0].lessonOriginRestricted", is(false)))
                 .andExpect(jsonPath("$.videos[0].lessonLinkCount", is(0)))
                 .andExpect(jsonPath("$.videos[0].canView", is(true)))
                 .andExpect(jsonPath("$.videos[0].canManage", is(false)))
@@ -294,7 +293,6 @@ public class VideoTrainingControllerTests extends BaseControllerTests {
     public void testPromoteLessonResourceApiV1Endpoint() throws Exception {
         VideoTrainingVideo video = createVideo();
         video.setVisibilityScope(VideoVisibilityScope.LESSON);
-        video.setLessonOriginRestricted(Boolean.TRUE);
 
         when(videoTrainingService.canManageLibrary(SITE_ID, USER_ID)).thenReturn(true);
         when(videoTrainingService.canViewAnalytics(SITE_ID, USER_ID)).thenReturn(false);
@@ -316,8 +314,7 @@ public class VideoTrainingControllerTests extends BaseControllerTests {
                     .content(payload))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(VIDEO_ID)))
-                .andExpect(jsonPath("$.visibilityScope", is("LESSON")))
-                .andExpect(jsonPath("$.lessonOriginRestricted", is(true)));
+                .andExpect(jsonPath("$.visibilityScope", is("LESSON")));
     }
 
     @Test
@@ -346,8 +343,7 @@ public class VideoTrainingControllerTests extends BaseControllerTests {
                 "\"title\":\"Updated title\"," +
                 "\"description\":\"Updated description\"," +
                 "\"visibilityScope\":\"LESSON\"," +
-                "\"publicationStatus\":\"WITHDRAWN\"," +
-                "\"lessonOriginRestricted\":true" +
+                "\"publicationStatus\":\"WITHDRAWN\"" +
                 "}";
 
         mockMvc.perform(post("/sites/{siteId}/video-training/{videoId}/metadata", SITE_ID, VIDEO_ID)
@@ -359,7 +355,6 @@ public class VideoTrainingControllerTests extends BaseControllerTests {
                 .andExpect(jsonPath("$.description", is("Updated description")))
                 .andExpect(jsonPath("$.visibilityScope", is("LESSON")))
                 .andExpect(jsonPath("$.publicationStatus", is("WITHDRAWN")))
-                .andExpect(jsonPath("$.lessonOriginRestricted", is(true)))
                 .andExpect(jsonPath("$.canManage", is(true)));
     }
 
@@ -372,7 +367,6 @@ public class VideoTrainingControllerTests extends BaseControllerTests {
         video.setProviderType(VideoProviderType.NATIVE);
         video.setVisibilityScope(VideoVisibilityScope.COURSE);
         video.setPublicationStatus(VideoPublicationStatus.PUBLISHED);
-        video.setLessonOriginRestricted(Boolean.FALSE);
         video.setSourceReference("/content/group/site-1/video.mp4");
         return video;
     }

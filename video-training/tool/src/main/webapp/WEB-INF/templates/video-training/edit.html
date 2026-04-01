@@ -78,13 +78,6 @@
                 </select>
             </div>
             <div class="vt-form-section">
-                <label class="form-label" th:text="#{video.training.form.lessonOriginRestricted}">Lesson origin restriction</label>
-                <div class="form-check mt-2">
-                    <input class="form-check-input" id="lessonOriginRestricted" name="lessonOriginRestricted" type="checkbox" value="true" th:checked="${video.lessonOriginRestricted}">
-                    <label class="form-check-label" for="lessonOriginRestricted" th:text="#{video.training.form.lessonOriginRestricted.help}">Exclude this video from catalog visibility.</label>
-                </div>
-            </div>
-            <div class="vt-form-section">
                 <label class="form-label" for="releaseDate" th:text="#{video.training.form.releaseDate}">Release date</label>
                 <input class="form-control" id="releaseDate" name="releaseDate" type="datetime-local" th:value="${releaseDateInput}">
             </div>

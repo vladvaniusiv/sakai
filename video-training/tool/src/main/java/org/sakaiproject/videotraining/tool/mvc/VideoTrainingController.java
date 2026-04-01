@@ -86,7 +86,6 @@ public class VideoTrainingController {
             "title", "title",
             "scope", "visibilityScope",
             "status", "publicationStatus",
-            "lesson", "lessonOriginRestricted",
             "release", "releaseDate",
             "retract", "retractDate",
             "modified", "modifiedOn");
@@ -302,7 +301,6 @@ public class VideoTrainingController {
             @RequestParam(name = "nativeFile", required = false) MultipartFile nativeFile,
             @RequestParam(name = "visibilityScope", required = false) String visibilityScope,
             @RequestParam(name = "publicationStatus", required = false) String publicationStatus,
-            @RequestParam(name = "lessonOriginRestricted", required = false, defaultValue = "false") boolean lessonOriginRestricted,
             @RequestParam(name = "releaseDate", required = false) String releaseDate,
             @RequestParam(name = "retractDate", required = false) String retractDate,
             RedirectAttributes redirectAttributes,
@@ -410,7 +408,6 @@ public class VideoTrainingController {
         video.setFileSizeBytes(parsedProviderType == VideoProviderType.NATIVE ? resolvedFileSizeBytes : null);
         video.setVisibilityScope(parsedVisibilityScope);
         video.setPublicationStatus(parsedPublicationStatus);
-        video.setLessonOriginRestricted(lessonOriginRestricted);
         video.setRequiredViewPermission(VideoTrainingConstants.PERMISSION_VIEW);
         video.setReleaseDate(parsedReleaseDate);
         video.setRetractDate(parsedRetractDate);
@@ -445,7 +442,6 @@ public class VideoTrainingController {
             @RequestParam(name = "nativeFile", required = false) MultipartFile nativeFile,
             @RequestParam(name = "visibilityScope", required = false) String visibilityScope,
             @RequestParam(name = "publicationStatus", required = false) String publicationStatus,
-            @RequestParam(name = "lessonOriginRestricted", required = false, defaultValue = "false") boolean lessonOriginRestricted,
             @RequestParam(name = "releaseDate", required = false) String releaseDate,
             @RequestParam(name = "retractDate", required = false) String retractDate,
             RedirectAttributes redirectAttributes,
@@ -592,7 +588,6 @@ public class VideoTrainingController {
         existing.setFileSizeBytes(parsedProviderType == VideoProviderType.NATIVE ? resolvedFileSizeBytes : null);
         existing.setVisibilityScope(parsedVisibilityScope);
         existing.setPublicationStatus(parsedPublicationStatus);
-        existing.setLessonOriginRestricted(lessonOriginRestricted);
         existing.setRequiredViewPermission(VideoTrainingConstants.PERMISSION_VIEW);
         existing.setReleaseDate(parsedReleaseDate);
         existing.setRetractDate(parsedRetractDate);

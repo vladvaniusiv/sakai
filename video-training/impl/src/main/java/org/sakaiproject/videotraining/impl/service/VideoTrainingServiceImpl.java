@@ -145,10 +145,6 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
             validatePublicationStatusTransition(currentStatus, requestedStatus, video.getVisibilityScope());
         }
 
-        if (video.getLessonOriginRestricted() == null) {
-            video.setLessonOriginRestricted(Boolean.FALSE);
-        }
-
         if (video.getProviderType() == VideoProviderType.NATIVE) {
             long currentSize = existing != null && existing.getFileSizeBytes() != null ? existing.getFileSizeBytes() : 0L;
             long requestedSize = video.getFileSizeBytes() != null ? Math.max(video.getFileSizeBytes(), 0L) : currentSize;
@@ -511,7 +507,7 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
             return true;
         }
 
-        if (!isPublishedForEndUsers(video) || !isCatalogVisibleScope(video) || isLessonOriginRestricted(video)) {
+        if (!isPublishedForEndUsers(video) || !isCatalogVisibleScope(video)) {
             return false;
         }
 
@@ -808,7 +804,6 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
         video.setSourceReference(StringUtils.trimToEmpty(resourceReference));
         video.setVisibilityScope(VideoVisibilityScope.LESSON);
         video.setPublicationStatus(VideoPublicationStatus.DRAFT);
-        video.setLessonOriginRestricted(Boolean.TRUE);
         video.setRequiredViewPermission(VideoTrainingConstants.PERMISSION_VIEW);
         video.setFileSizeBytes(fileSizeBytes);
 
@@ -945,10 +940,6 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
     private boolean isCatalogVisibleScope(VideoTrainingVideo video) {
         VideoVisibilityScope scope = video.getVisibilityScope();
         return scope == null || scope != VideoVisibilityScope.LESSON;
-    }
-
-    private boolean isLessonOriginRestricted(VideoTrainingVideo video) {
-        return Boolean.TRUE.equals(video.getLessonOriginRestricted());
     }
 
     private long visibilityBucket(Instant now) {
