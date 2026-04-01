@@ -1,42 +1,41 @@
 package org.sakaiproject.videotraining.impl.service;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertEquals;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.Mockito;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import org.sakaiproject.authz.api.FunctionManager;
+import org.sakaiproject.authz.api.SecurityService;
 import org.sakaiproject.content.api.ContentCollection;
 import org.sakaiproject.content.api.ContentHostingService;
 import org.sakaiproject.event.api.EventTrackingService;
-import org.sakaiproject.authz.api.SecurityService;
 import org.sakaiproject.site.api.SiteService;
 import org.sakaiproject.tool.api.SessionManager;
 import org.sakaiproject.videotraining.api.VideoTrainingConstants;
-import org.sakaiproject.videotraining.api.model.VideoPublicationStatus;
 import org.sakaiproject.videotraining.api.model.VideoProviderType;
-import org.sakaiproject.videotraining.api.model.VideoVisibilityScope;
+import org.sakaiproject.videotraining.api.model.VideoPublicationStatus;
 import org.sakaiproject.videotraining.api.model.VideoTrainingAnalyticsEvent;
 import org.sakaiproject.videotraining.api.model.VideoTrainingCaption;
 import org.sakaiproject.videotraining.api.model.VideoTrainingVideo;
+import org.sakaiproject.videotraining.api.model.VideoVisibilityScope;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingAnalyticsEventRepository;
-import org.sakaiproject.videotraining.api.repository.VideoTrainingCategoryRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingCaptionRepository;
+import org.sakaiproject.videotraining.api.repository.VideoTrainingCategoryRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingLessonLinkRepository;
-import org.sakaiproject.videotraining.api.repository.VideoTrainingVideoRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingVideoCategoryRepository;
+import org.sakaiproject.videotraining.api.repository.VideoTrainingVideoRepository;
 
 public class VideoTrainingServiceImplTest {
 
@@ -169,18 +168,6 @@ public class VideoTrainingServiceImplTest {
     }
 
     @Test
-    public void canViewVideoShouldReturnFalseWhenLessonOriginRestricted() {
-        VideoTrainingVideo video = baseVideo();
-        video.setLessonOriginRestricted(Boolean.TRUE);
-        when(securityService.unlock(USER_ID, VideoTrainingConstants.PERMISSION_MANAGE, SITE_REF)).thenReturn(false);
-
-        boolean result = service.canViewVideo(video, USER_ID, Instant.now());
-
-        assertFalse(result);
-        verify(securityService, never()).unlock(USER_ID, VideoTrainingConstants.PERMISSION_VIEW, SITE_REF);
-    }
-
-    @Test
     public void canViewVideoShouldRequireVideoSpecificPermission() {
         VideoTrainingVideo video = baseVideo();
         video.setRequiredViewPermission("video.training.custom");
@@ -227,7 +214,6 @@ public class VideoTrainingServiceImplTest {
         video.setRequiredViewPermission(null);
         video.setVisibilityScope(null);
         video.setPublicationStatus(null);
-        video.setLessonOriginRestricted(null);
         when(securityService.unlock(USER_ID, VideoTrainingConstants.PERMISSION_MANAGE, SITE_REF)).thenReturn(true);
         when(videoRepository.save(video)).thenReturn(video);
 
@@ -239,7 +225,6 @@ public class VideoTrainingServiceImplTest {
         assertTrue(VideoTrainingConstants.PERMISSION_VIEW.equals(saved.getRequiredViewPermission()));
         assertTrue(VideoVisibilityScope.COURSE == saved.getVisibilityScope());
         assertTrue(VideoPublicationStatus.DRAFT == saved.getPublicationStatus());
-        assertFalse(Boolean.TRUE.equals(saved.getLessonOriginRestricted()));
         verify(videoRepository).save(video);
     }
 

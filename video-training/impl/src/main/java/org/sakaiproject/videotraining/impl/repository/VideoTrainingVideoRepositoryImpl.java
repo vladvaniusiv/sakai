@@ -299,10 +299,6 @@ public class VideoTrainingVideoRepositoryImpl extends SpringCrudRepositoryImpl<V
             cb.isNull(root.get("visibilityScope")),
             cb.notEqual(root.get("visibilityScope"), VideoVisibilityScope.LESSON)
         );
-        Predicate lessonRestrictionPredicate = cb.or(
-            cb.isNull(root.get("lessonOriginRestricted")),
-            cb.isFalse(root.get("lessonOriginRestricted"))
-        );
         Predicate releasePredicate = cb.or(
                 cb.isNull(root.get("releaseDate")),
                 cb.lessThanOrEqualTo(root.get("releaseDate"), now)
@@ -311,7 +307,7 @@ public class VideoTrainingVideoRepositoryImpl extends SpringCrudRepositoryImpl<V
                 cb.isNull(root.get("retractDate")),
                 cb.greaterThan(root.get("retractDate"), now)
         );
-        return cb.and(sitePredicate, publicationPredicate, scopePredicate, lessonRestrictionPredicate, releasePredicate, retractPredicate);
+        return cb.and(sitePredicate, publicationPredicate, scopePredicate, releasePredicate, retractPredicate);
     }
 
     private Predicate buildSearchPredicate(CriteriaBuilder cb, Root<VideoTrainingVideo> root, String searchText) {
@@ -410,7 +406,6 @@ public class VideoTrainingVideoRepositoryImpl extends SpringCrudRepositoryImpl<V
             case "providerType":
             case "visibilityScope":
             case "publicationStatus":
-            case "lessonOriginRestricted":
             case "releaseDate":
             case "retractDate":
             case "modifiedOn":

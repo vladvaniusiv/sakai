@@ -84,7 +84,14 @@
                             <span class="bi bi-globe" aria-hidden="true"></span>
                         </span>
                         <span class="vt-card-badge"
-                            th:if="${video.visibilityScope == null || video.visibilityScope.name() != 'GLOBAL'}"
+                            th:if="${video.visibilityScope != null && video.visibilityScope.name() == 'LESSON'}"
+                            data-bs-toggle="tooltip"
+                            data-bs-placement="left"
+                            th:title="#{video.training.visibility.lesson}">
+                            <span class="bi bi-file-text" aria-hidden="true"></span>
+                        </span>
+                        <span class="vt-card-badge"
+                            th:if="${video.visibilityScope == null || video.visibilityScope.name() == 'COURSE'}"
                             data-bs-toggle="tooltip"
                             data-bs-placement="left"
                             th:title="#{video.training.visibility.course}">
@@ -125,14 +132,6 @@
                             data-bs-placement="left"
                             th:title="#{video.training.status.ARCHIVED}">
                             <span class="bi bi-archive" aria-hidden="true"></span>
-                        </span>
-
-                        <span class="vt-card-badge"
-                            th:if="${video.lessonOriginRestricted}"
-                            data-bs-toggle="tooltip"
-                            data-bs-placement="left"
-                            th:title="#{video.training.lessonRestricted}">
-                            <span class="bi bi-file-text" aria-hidden="true"></span>
                         </span>
                     </div>
 
@@ -206,7 +205,6 @@
             <th scope="col" th:text="#{video.training.form.title}">Title</th>
             <th scope="col" th:if="${canManage}" th:text="#{video.training.form.visibilityScope}">Visibility scope</th>
             <th scope="col" th:if="${canManage}" th:text="#{video.training.form.publicationStatus}">Publication status</th>
-            <th scope="col" th:if="${canManage}" th:text="#{video.training.form.lessonOriginRestricted.short}">Lesson restricted</th>
             <th scope="col" th:text="#{video.training.form.releaseDate}">Release date</th>
             <th scope="col" th:text="#{video.training.form.retractDate}">Retract date</th>
         </tr>
@@ -283,7 +281,6 @@
             <td th:if="${canManage}"
                 th:title="${video.publicationStatus != null && video.publicationStatus.name() == 'PENDING_APPROVAL'} ? #{video.training.status.PENDING_APPROVAL} : (${video.publicationStatus != null && video.publicationStatus.name() == 'PUBLISHED'} ? #{video.training.status.PUBLISHED} : (${video.publicationStatus != null && video.publicationStatus.name() == 'WITHDRAWN'} ? #{video.training.status.WITHDRAWN} : (${video.publicationStatus != null && video.publicationStatus.name() == 'ARCHIVED'} ? #{video.training.status.ARCHIVED} : #{video.training.status.DRAFT})))"
                 th:text="${video.publicationStatus != null ? video.publicationStatus : 'DRAFT'}">DRAFT</td>
-            <td th:if="${canManage}" th:text="${video.lessonOriginRestricted} ? #{video.training.value.yes} : #{video.training.value.no}">No</td>
             <td th:text="${releaseDisplayById[video.id]}">-</td>
             <td th:text="${retractDisplayById[video.id]}">-</td>
         </tr>

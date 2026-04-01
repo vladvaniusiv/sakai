@@ -13,7 +13,6 @@ public class VideoTrainingRestBean {
     private Long fileSizeBytes;
     private String visibilityScope;
     private String publicationStatus;
-    private boolean lessonOriginRestricted;
     private int lessonLinkCount;
     private List<String> categoryIds = new ArrayList<>();
     private String requiredViewPermission;
@@ -84,14 +83,6 @@ public class VideoTrainingRestBean {
 
     public void setPublicationStatus(String publicationStatus) {
         this.publicationStatus = publicationStatus;
-    }
-
-    public boolean isLessonOriginRestricted() {
-        return lessonOriginRestricted;
-    }
-
-    public void setLessonOriginRestricted(boolean lessonOriginRestricted) {
-        this.lessonOriginRestricted = lessonOriginRestricted;
     }
 
     public int getLessonLinkCount() {
