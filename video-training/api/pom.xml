@@ -23,6 +23,8 @@
             <groupId>org.sakaiproject.kernel</groupId>
             <artifactId>sakai-kernel-api</artifactId>
         </dependency>
+        <!-- Javax Persistence API / This should be changed to inherit Sakai Jakarta when
+        the tomcat 10 update is completed -->
         <dependency>
             <groupId>javax.persistence</groupId>
             <artifactId>javax.persistence-api</artifactId>

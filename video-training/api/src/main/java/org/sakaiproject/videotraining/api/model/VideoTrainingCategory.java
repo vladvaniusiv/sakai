@@ -12,7 +12,10 @@ import javax.persistence.Table;
 import org.hibernate.annotations.GenericGenerator;
 import org.sakaiproject.springframework.data.PersistableEntity;
 
+import lombok.Data;
+
 @Entity
+@Data
 @Table(name = "VTM_CATEGORY")
 public class VideoTrainingCategory implements PersistableEntity<String> {
 
@@ -42,59 +45,4 @@ public class VideoTrainingCategory implements PersistableEntity<String> {
     @Convert(converter = InstantEpochMillisConverter.class)
     private Instant modifiedOn = Instant.now();
 
-    public String getId() {
-        return id;
-    }
-
-    public void setId(String id) {
-        this.id = id;
-    }
-
-    public String getSiteId() {
-        return siteId;
-    }
-
-    public void setSiteId(String siteId) {
-        this.siteId = siteId;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getParentCategoryId() {
-        return parentCategoryId;
-    }
-
-    public void setParentCategoryId(String parentCategoryId) {
-        this.parentCategoryId = parentCategoryId;
-    }
-
-    public Integer getSortOrder() {
-        return sortOrder;
-    }
-
-    public void setSortOrder(Integer sortOrder) {
-        this.sortOrder = sortOrder;
-    }
-
-    public Instant getCreatedOn() {
-        return createdOn;
-    }
-
-    public void setCreatedOn(Instant createdOn) {
-        this.createdOn = createdOn;
-    }
-
-    public Instant getModifiedOn() {
-        return modifiedOn;
-    }
-
-    public void setModifiedOn(Instant modifiedOn) {
-        this.modifiedOn = modifiedOn;
-    }
 }
