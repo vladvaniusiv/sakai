@@ -1,4 +1,4 @@
-package org.sakaiproject.videotraining.impl.service;
+package java.org.sakaiproject.videotraining.impl.service;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -36,6 +36,7 @@ import org.sakaiproject.videotraining.api.repository.VideoTrainingCategoryReposi
 import org.sakaiproject.videotraining.api.repository.VideoTrainingLessonLinkRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingVideoCategoryRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingVideoRepository;
+import org.sakaiproject.videotraining.impl.service.VideoTrainingServiceImpl;
 
 public class VideoTrainingServiceImplTest {
 

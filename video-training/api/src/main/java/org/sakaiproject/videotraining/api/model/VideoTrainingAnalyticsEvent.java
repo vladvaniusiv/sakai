@@ -12,7 +12,10 @@ import javax.persistence.Table;
 import org.hibernate.annotations.GenericGenerator;
 import org.sakaiproject.springframework.data.PersistableEntity;
 
+import lombok.Data;
+
 @Entity
+@Data
 @Table(name = "VTM_ANALYTICS_EVENT")
 public class VideoTrainingAnalyticsEvent implements PersistableEntity<String> {
 
@@ -38,51 +41,4 @@ public class VideoTrainingAnalyticsEvent implements PersistableEntity<String> {
     @Convert(converter = InstantEpochMillisConverter.class)
     private Instant eventTime = Instant.now();
 
-    public String getId() {
-        return id;
-    }
-
-    public void setId(String id) {
-        this.id = id;
-    }
-
-    public String getVideoId() {
-        return videoId;
-    }
-
-    public void setVideoId(String videoId) {
-        this.videoId = videoId;
-    }
-
-    public String getSiteId() {
-        return siteId;
-    }
-
-    public void setSiteId(String siteId) {
-        this.siteId = siteId;
-    }
-
-    public String getUserId() {
-        return userId;
-    }
-
-    public void setUserId(String userId) {
-        this.userId = userId;
-    }
-
-    public String getEventType() {
-        return eventType;
-    }
-
-    public void setEventType(String eventType) {
-        this.eventType = eventType;
-    }
-
-    public Instant getEventTime() {
-        return eventTime;
-    }
-
-    public void setEventTime(Instant eventTime) {
-        this.eventTime = eventTime;
-    }
 }

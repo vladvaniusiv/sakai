@@ -15,7 +15,10 @@ import org.hibernate.annotations.GenericGenerator;
 import org.sakaiproject.springframework.data.PersistableEntity;
 import org.sakaiproject.videotraining.api.VideoTrainingConstants;
 
+import lombok.Data;
+
 @Entity
+@Data
 @Table(name = "VTM_VIDEO")
 public class VideoTrainingVideo implements PersistableEntity<String> {
 
@@ -74,123 +77,4 @@ public class VideoTrainingVideo implements PersistableEntity<String> {
     @Convert(converter = InstantEpochMillisConverter.class)
     private Instant modifiedOn = Instant.now();
 
-    public String getId() {
-        return id;
-    }
-
-    public void setId(String id) {
-        this.id = id;
-    }
-
-    public String getSiteId() {
-        return siteId;
-    }
-
-    public void setSiteId(String siteId) {
-        this.siteId = siteId;
-    }
-
-    public String getOwnerId() {
-        return ownerId;
-    }
-
-    public void setOwnerId(String ownerId) {
-        this.ownerId = ownerId;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public void setTitle(String title) {
-        this.title = title;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public VideoProviderType getProviderType() {
-        return providerType;
-    }
-
-    public void setProviderType(VideoProviderType providerType) {
-        this.providerType = providerType;
-    }
-
-    public String getSourceReference() {
-        return sourceReference;
-    }
-
-    public void setSourceReference(String sourceReference) {
-        this.sourceReference = sourceReference;
-    }
-
-    public Long getFileSizeBytes() {
-        return fileSizeBytes;
-    }
-
-    public void setFileSizeBytes(Long fileSizeBytes) {
-        this.fileSizeBytes = fileSizeBytes;
-    }
-
-    public VideoVisibilityScope getVisibilityScope() {
-        return visibilityScope;
-    }
-
-    public void setVisibilityScope(VideoVisibilityScope visibilityScope) {
-        this.visibilityScope = visibilityScope;
-    }
-
-    public VideoPublicationStatus getPublicationStatus() {
-        return publicationStatus;
-    }
-
-    public void setPublicationStatus(VideoPublicationStatus publicationStatus) {
-        this.publicationStatus = publicationStatus;
-    }
-
-    public Instant getReleaseDate() {
-        return releaseDate;
-    }
-
-    public void setReleaseDate(Instant releaseDate) {
-        this.releaseDate = releaseDate;
-    }
-
-    public Instant getRetractDate() {
-        return retractDate;
-    }
-
-    public void setRetractDate(Instant retractDate) {
-        this.retractDate = retractDate;
-    }
-
-    public String getRequiredViewPermission() {
-        return requiredViewPermission;
-    }
-
-    public void setRequiredViewPermission(String requiredViewPermission) {
-        this.requiredViewPermission = requiredViewPermission;
-    }
-
-    public Instant getCreatedOn() {
-        return createdOn;
-    }
-
-    public void setCreatedOn(Instant createdOn) {
-        this.createdOn = createdOn;
-    }
-
-    public Instant getModifiedOn() {
-        return modifiedOn;
-    }
-
-    public void setModifiedOn(Instant modifiedOn) {
-        this.modifiedOn = modifiedOn;
-    }
 }

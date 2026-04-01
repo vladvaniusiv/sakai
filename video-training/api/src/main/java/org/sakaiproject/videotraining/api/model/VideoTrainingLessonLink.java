@@ -12,7 +12,10 @@ import javax.persistence.Table;
 import org.hibernate.annotations.GenericGenerator;
 import org.sakaiproject.springframework.data.PersistableEntity;
 
+import lombok.Data;
+
 @Entity
+@Data
 @Table(name = "VTM_LESSON_LINK")
 public class VideoTrainingLessonLink implements PersistableEntity<String> {
 
@@ -38,51 +41,4 @@ public class VideoTrainingLessonLink implements PersistableEntity<String> {
     @Convert(converter = InstantEpochMillisConverter.class)
     private Instant createdOn = Instant.now();
 
-    public String getId() {
-        return id;
-    }
-
-    public void setId(String id) {
-        this.id = id;
-    }
-
-    public String getSiteId() {
-        return siteId;
-    }
-
-    public void setSiteId(String siteId) {
-        this.siteId = siteId;
-    }
-
-    public String getVideoId() {
-        return videoId;
-    }
-
-    public void setVideoId(String videoId) {
-        this.videoId = videoId;
-    }
-
-    public String getLessonPageId() {
-        return lessonPageId;
-    }
-
-    public void setLessonPageId(String lessonPageId) {
-        this.lessonPageId = lessonPageId;
-    }
-
-    public String getLessonItemId() {
-        return lessonItemId;
-    }
-
-    public void setLessonItemId(String lessonItemId) {
-        this.lessonItemId = lessonItemId;
-    }
-
-    public Instant getCreatedOn() {
-        return createdOn;
-    }
-
-    public void setCreatedOn(Instant createdOn) {
-        this.createdOn = createdOn;
-    }
 }

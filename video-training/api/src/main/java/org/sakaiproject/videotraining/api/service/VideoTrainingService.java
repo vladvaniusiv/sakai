@@ -27,8 +27,8 @@ public interface VideoTrainingService {
 
     List<VideoTrainingVideo> getSiteLibraryCursor(String siteId, String searchText, Instant cursorModifiedOn, String cursorVideoId, int size);
 
-        List<VideoTrainingVideo> getSiteLibrarySorted(String siteId, String searchText, int offset, int size,
-            String sortField, boolean ascending);
+    List<VideoTrainingVideo> getSiteLibrarySorted(String siteId, String searchText, int offset, int size,
+        String sortField, boolean ascending);
 
     long countSiteLibrary(String siteId, String searchText);
 
@@ -36,18 +36,18 @@ public interface VideoTrainingService {
 
     List<VideoTrainingVideo> getVisibleVideosForUserPage(String siteId, String userId, Instant now, String searchText, int page, int size);
 
-        List<VideoTrainingVideo> getVisibleVideosForUserSorted(String siteId, String userId, Instant now, String searchText,
-            int offset, int size, String sortField, boolean ascending);
+    List<VideoTrainingVideo> getVisibleVideosForUserSorted(String siteId, String userId, Instant now, String searchText,
+        int offset, int size, String sortField, boolean ascending);
 
-        List<VideoTrainingVideo> getVisibleVideosForUserCursor(String siteId, String userId, Instant now, String searchText,
-            Instant cursorModifiedOn, String cursorVideoId, int size);
+    List<VideoTrainingVideo> getVisibleVideosForUserCursor(String siteId, String userId, Instant now, String searchText,
+        Instant cursorModifiedOn, String cursorVideoId, int size);
 
     long countVisibleVideosForUser(String siteId, String userId, Instant now, String searchText);
 
     List<VideoTrainingVideo> getGlobalVideosCursor(String searchText, Instant cursorModifiedOn, String cursorVideoId, int size);
 
-        List<VideoTrainingVideo> getGlobalVideosSorted(String searchText, int offset, int size,
-            String sortField, boolean ascending);
+    List<VideoTrainingVideo> getGlobalVideosSorted(String searchText, int offset, int size,
+        String sortField, boolean ascending);
 
     List<VideoTrainingCaption> getCaptionsForVideo(String videoId);
 
