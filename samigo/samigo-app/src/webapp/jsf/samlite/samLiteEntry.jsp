@@ -132,111 +132,241 @@
 		 			<div class="col-md-12">
 		 				<h4><h:outputText value="#{samLiteMessages.samlite_formatgroup}"/></h4>
 						<a href="javascript:toggleLayer('general_instructions');"><h:outputText value="#{samLiteMessages.general_instructions_label}"/></a>
-					    	<div id="general_instructions" class="inopPanel" style="display:none">
-					   			<h:outputText value="#{samLiteMessages.general_instructions_prelude}"/><p/>
-					   			<ul>
-					   				<li><h:outputText value="#{samLiteMessages.general_instructions_format1}"/></li>
-					   				<li><h:outputText value="#{samLiteMessages.general_instructions_format2}"/></li>
-					   				<li><h:outputText value="#{samLiteMessages.general_instructions_format3}"/></li>
-					   				<li><h:outputText value="#{samLiteMessages.general_instructions_format4}"/></li>
-					   				<li><h:outputText value="#{samLiteMessages.general_instructions_format5}"/></li>
-					   			</ul>
-					   			<h:outputText value="#{samLiteMessages.general_instructions_conclude}"/><p/>
-								<h:outputText value="#{samLiteMessages.general_instructions_feedback}"/>
+						<div id="general_instructions" class="inopPanel" style="display:none">
+							<div class="card">
+								<div class="card-header">
+									<strong><h:outputText value="#{samLiteMessages.general_instructions_label}"/></strong>
+								</div>
+								<div class="card-body">
+									<h:outputText value="#{samLiteMessages.general_instructions_prelude}"/><p/>
+									<ul>
+										<li><h:outputText value="#{samLiteMessages.general_instructions_format1}"/></li>
+										<li><h:outputText value="#{samLiteMessages.general_instructions_format2}"/></li>
+										<li><h:outputText value="#{samLiteMessages.general_instructions_format3}"/></li>
+										<li><h:outputText value="#{samLiteMessages.general_instructions_format4}"/></li>
+										<li><h:outputText value="#{samLiteMessages.general_instructions_format5}"/></li>
+									</ul>
+									<h:outputText value="#{samLiteMessages.general_instructions_conclude}"/><p/>
+									<h:outputText value="#{samLiteMessages.general_instructions_feedback}"/>
+								</div>
+							</div>
 				    	</div>
 		 			</div>
 		 			<div class="col-md-12">
 						<a href="javascript:toggleLayer('rich_editor_instructions');"><h:outputText value="#{samLiteMessages.rich_editor_instructions_label}"/></a>
-					    	<div id="rich_editor_instructions" class="inopPanel" style="display:none">
-					   			<h:outputText value="#{samLiteMessages.rich_editor_instructions_prelude}"/><p/>
-					   			<h:outputText value="#{samLiteMessages.rich_editor_instructions_prelude_2}"/><p/>
-					   			<ol>
-					   				<li><h:outputText value="#{samLiteMessages.rich_editor_instructions_recomendation_1}"/></li>
-					   				<li><h:outputText value="#{samLiteMessages.rich_editor_instructions_recomendation_2}"/></li>
-					   				<li><h:outputText value="#{samLiteMessages.rich_editor_instructions_recomendation_3}"/></li>
-					   				<li><h:outputText value="#{samLiteMessages.rich_editor_instructions_recomendation_4}"/></li>
-					   				<li><h:outputText value="#{samLiteMessages.rich_editor_instructions_recomendation_5}"/></li>
-					   			</ol>
+						<div id="rich_editor_instructions" class="inopPanel" style="display:none">
+							<div class="card">
+								<div class="card-header">
+									<strong><h:outputText value="#{samLiteMessages.rich_editor_instructions_label}"/></strong>
+								</div>
+								<div class="card-body">
+									<h:outputText value="#{samLiteMessages.rich_editor_instructions_prelude}"/><p/>
+									<h:outputText value="#{samLiteMessages.rich_editor_instructions_prelude_2}"/><p/>
+									<ol>
+										<li><h:outputText value="#{samLiteMessages.rich_editor_instructions_recomendation_1}"/></li>
+										<li><h:outputText value="#{samLiteMessages.rich_editor_instructions_recomendation_2}"/></li>
+										<li><h:outputText value="#{samLiteMessages.rich_editor_instructions_recomendation_3}"/></li>
+										<li><h:outputText value="#{samLiteMessages.rich_editor_instructions_recomendation_4}"/></li>
+										<li><h:outputText value="#{samLiteMessages.rich_editor_instructions_recomendation_5}"/></li>
+									</ol>
+								</div>
+							</div>
 				    	</div>
 		 			</div>
 		 			<div class="col-md-12">
 					    <a href="javascript:toggleLayer('example_mc_question');"><h:outputText value="#{samLiteMessages.example_mc_label}"/></a>
 					    <div id="example_mc_question" class="inopPanel" style="display:none">
-					    	<strong><h:outputText value="#{samLiteMessages.example_instruction_label}"/></strong>
-					    	<h:outputText value="#{samLiteMessages.example_mc_instructions}"/><br/>
-					    	<h:outputText value="#{samLiteMessages.example_mc_instructions_1}"/><br/>
-					    	<h:outputText value="#{samLiteMessages.example_mc_instructions_2}"/><p/>
-				   			<strong><h:outputText value="#{samLiteMessages.example_example_label}"/></strong><br/>
-				   			<h:outputText value="#{samLiteMessages.example_mc_question_format4}"/><br/>
-				   			<h:outputText value="#{samLiteMessages.example_mc_question_text}"/><p/>
-				   			<h:outputText value="#{samLiteMessages.example_mc_answer_a}"/><br/>
-				   			<h:outputText value="#{samLiteMessages.example_mc_answer_b}"/><br/>
-				   			<h:outputText value="#{samLiteMessages.example_mc_answer_c}"/><br/>
-				   			<h:outputText value="#{samLiteMessages.example_mc_answer_d}"/><br/>
-				   			<h:outputText value="#{samLiteMessages.example_mc_question_random}"/><br/>
-				   			<h:outputText value="#{samLiteMessages.example_mc_question_rationale}"/>
+					    	<!-- Instructions -->
+							<div class="card">
+								<div class="card-header">
+									<strong><h:outputText value="#{samLiteMessages.example_instruction_label}"/></strong>
+								</div>
+								<div class="card-body">
+									<h:outputText value="#{samLiteMessages.example_mc_instructions}"/><br/>
+									<h:outputText value="#{samLiteMessages.example_mc_instructions_1}"/><br/>
+									<h:outputText value="#{samLiteMessages.example_mc_instructions_2}"/><br/>
+									<strong><h:outputText value="#{samLiteMessages.example_fn_instructions_5}"/></strong>
+								</div>
+							</div>
+
+							<!-- Example -->
+							<div class="card">
+								<div class="card-header">
+									<strong><h:outputText value="#{samLiteMessages.example_example_label}"/></strong>
+								</div>
+								<div class="card-body">
+									<pre style="white-space:normal;">
+										<h:outputText value="#{samLiteMessages.example_mc_question_format4}"/><br/>
+										<h:outputText value="#{samLiteMessages.example_mc_question_text}"/><br/>
+										<h:outputText value="#{samLiteMessages.example_mc_answer_a}"/><br/>
+										<h:outputText value="#{samLiteMessages.example_mc_answer_b}"/><br/>
+										<h:outputText value="#{samLiteMessages.example_mc_answer_c}"/><br/>
+										<h:outputText value="#{samLiteMessages.example_mc_answer_d}"/><br/>
+										<h:outputText value="#{samLiteMessages.example_mc_question_random}"/><br/>
+										<h:outputText value="#{samLiteMessages.example_mc_question_rationale}"/>
+									</pre>
+								</div>
+							</div>
 				   		</div>
 		 			</div>
 		 			<div class="col-md-12">
-						    <a href="javascript:toggleLayer('example_mcmc_question');"><h:outputText value="#{samLiteMessages.example_mcmc_label}"/></a>
-						    <div id="example_mcmc_question" class="inopPanel" style="display:none">
-				    			<strong><h:outputText value="#{samLiteMessages.example_instruction_label}"/></strong>
-				    			<h:outputText value="#{samLiteMessages.example_mcmc_instructions}"/><br/>
-				    			<h:outputText value="#{samLiteMessages.example_mcmc_instructions_1}"/><br/>
-				    			<h:outputText value="#{samLiteMessages.example_mcmc_instructions_2}"/><p/>
-				    			<strong><h:outputText value="#{samLiteMessages.example_example_label}"/></strong><br/>
-				    			<h:outputText value="#{samLiteMessages.example_mcmc_question_format4}"/><br/>
-				    			<h:outputText value="#{samLiteMessages.example_mcmc_question_text}"/><p/>
-				    			<h:outputText value="#{samLiteMessages.example_mcmc_answer_a}"/><br/>
-				    			<h:outputText value="#{samLiteMessages.example_mcmc_answer_b}"/><br/>
-				    			<h:outputText value="#{samLiteMessages.example_mcmc_answer_c}"/><br/>
-				    			<h:outputText value="#{samLiteMessages.example_mcmc_question_random}"/><br/>
-				    			<h:outputText value="#{samLiteMessages.example_mcmc_question_rationale}"/><br/>
-				    		</div>
+						<a href="javascript:toggleLayer('example_mcmc_question');"><h:outputText value="#{samLiteMessages.example_mcmc_label}"/></a>
+						<div id="example_mcmc_question" class="inopPanel" style="display:none">
+							<!-- Instructions -->
+							<div class="card">
+								<div class="card-header">
+									<strong><h:outputText value="#{samLiteMessages.example_instruction_label}"/></strong>
+								</div>
+								<div class="card-body">
+									<h:outputText value="#{samLiteMessages.example_mcmc_instructions}"/><br/>
+									<h:outputText value="#{samLiteMessages.example_mcmc_instructions_1}"/><br/>
+									<h:outputText value="#{samLiteMessages.example_mcmc_instructions_2}"/><br/>
+									<strong><h:outputText value="#{samLiteMessages.example_fn_instructions_5}"/></strong>
+								</div>
+							</div>
+
+							<!-- Example -->
+							<div class="card">
+								<div class="card-header">
+									<strong><h:outputText value="#{samLiteMessages.example_example_label}"/></strong>
+								</div>
+								<div class="card-body">
+									<pre style="white-space:normal;">
+										<h:outputText value="#{samLiteMessages.example_mcmc_question_format4}"/><br/>
+										<h:outputText value="#{samLiteMessages.example_mcmc_question_text}"/><br/>
+										<h:outputText value="#{samLiteMessages.example_mcmc_answer_a}"/><br/>
+										<h:outputText value="#{samLiteMessages.example_mcmc_answer_b}"/><br/>
+										<h:outputText value="#{samLiteMessages.example_mcmc_answer_c}"/><br/>
+										<h:outputText value="#{samLiteMessages.example_mcmc_question_random}"/><br/>
+										<h:outputText value="#{samLiteMessages.example_mcmc_question_rationale}"/>
+									</pre>
+								</div>
+							</div>
+						</div>
 		 			</div>
 		 			<div class="col-md-12">
 						    <a href="javascript:toggleLayer('example_fib_question');"><h:outputText value="#{samLiteMessages.example_fib_label}"/></a>
 						    <div id="example_fib_question" class="inopPanel" style="display:none">
-				    			<strong><h:outputText value="#{samLiteMessages.example_instruction_label}"/></strong><h:outputText value="#{samLiteMessages.example_fib_instructions}"/><p/>
-				    			<strong><h:outputText value="#{samLiteMessages.example_example_label}"/></strong><br/>
-				    			<h:outputText value="#{samLiteMessages.example_fib_question_format4}"/><br/>
-				    			<h:outputText value="#{samLiteMessages.example_fib_question_text}"/><p/>
-				    			<h:outputText value="#{samLiteMessages.example_fib_answer}"/>
+				    			<!-- Instructions -->
+								<div class="card">
+									<div class="card-header">
+										<strong><h:outputText value="#{samLiteMessages.example_instruction_label}"/></strong>
+									</div>
+									<div class="card-body">
+										<h:outputText value="#{samLiteMessages.example_fib_instructions}"/><br/>
+										<strong><h:outputText value="#{samLiteMessages.example_fn_instructions_5}"/></strong>
+									</div>
+								</div>
+
+								<!-- Example -->
+								<div class="card">
+									<div class="card-header">
+										<strong><h:outputText value="#{samLiteMessages.example_example_label}"/></strong>
+									</div>
+									<div class="card-body">
+										<pre style="white-space:normal;">
+											<h:outputText value="#{samLiteMessages.example_fib_question_format4}"/><br/>
+											<h:outputText value="#{samLiteMessages.example_fib_question_text}"/><br/>
+											<h:outputText value="#{samLiteMessages.example_fib_answer}"/>
+										</pre>
+									</div>
+								</div>
 				    		</div>
 		 			</div>
 		 			<div class="col-md-12">
-						    <a href="javascript:toggleLayer('example_se_question');"><h:outputText value="#{samLiteMessages.example_se_label}"/></a>
-						    <div id="example_se_question" class="inopPanel" style="display:none">
-				    			<strong><h:outputText value="#{samLiteMessages.example_instruction_label}"/></strong><h:outputText value="#{samLiteMessages.example_se_instructions}"/><p/>
-				    			<strong><h:outputText value="#{samLiteMessages.example_example_label}"/></strong><br/>
-				    			<h:outputText value="#{samLiteMessages.example_se_question_format4}"/><br/>
-				    			<h:outputText value="#{samLiteMessages.example_se_question_text}"/>
-				    		</div>
+						<a href="javascript:toggleLayer('example_se_question');"><h:outputText value="#{samLiteMessages.example_se_label}"/></a>
+						<div id="example_se_question" class="inopPanel" style="display:none">
+							<!-- Instructions -->
+							<div class="card">
+								<div class="card-header">
+									<strong><h:outputText value="#{samLiteMessages.example_instruction_label}"/></strong>
+								</div>
+								<div class="card-body">
+									<h:outputText value="#{samLiteMessages.example_se_instructions}"/><br/>
+									<strong><h:outputText value="#{samLiteMessages.example_fn_instructions_5}"/></strong>
+								</div>
+							</div>
+
+							<!-- Example -->
+							<div class="card">
+								<div class="card-header">
+									<strong><h:outputText value="#{samLiteMessages.example_example_label}"/></strong>
+								</div>
+								<div class="card-body">
+									<pre style="white-space:normal;">
+										<h:outputText value="#{samLiteMessages.example_se_question_format4}"/><br/>
+										<h:outputText value="#{samLiteMessages.example_se_question_text}"/>
+									</pre>
+								</div>
+							</div>
+						</div>
 		 			</div>
 		 			<div class="col-md-12">
-						    <a href="javascript:toggleLayer('example_tf_question');"><h:outputText value="#{samLiteMessages.example_tf_label}"/></a>
-						    <div id="example_tf_question" class="inopPanel" style="display:none">
-				    			<strong><h:outputText value="#{samLiteMessages.example_instruction_label}"/>
-				    			</strong><h:outputText value="#{samLiteMessages.example_tf_instructions}"/><br/>
-				    			<h:outputText value="#{samLiteMessages.example_mcmc_instructions_2}"/><p/>
-				    			<strong><h:outputText value="#{samLiteMessages.example_example_label}"/></strong><br/>
-				    			<h:outputText value="#{samLiteMessages.example_tf_question_format4}"/><br/>
-				    			<h:outputText value="#{samLiteMessages.example_tf_question_text}"/><p/>
-				    			<h:outputText value="#{samLiteMessages.example_tf_answer_a}"/><br/>
-				    			<h:outputText value="#{samLiteMessages.example_tf_answer_b}"/><br/>
-				    			<h:outputText value="#{samLiteMessages.example_mcmc_question_rationale}"/><br/>
-				    		</div>
+						<a href="javascript:toggleLayer('example_tf_question');"><h:outputText value="#{samLiteMessages.example_tf_label}"/></a>
+						<div id="example_tf_question" class="inopPanel" style="display:none">
+							<!-- Instructions -->
+							<div class="card">
+								<div class="card-header">
+									<strong><h:outputText value="#{samLiteMessages.example_instruction_label}"/></strong>
+								</div>
+								<div class="card-body">
+									<h:outputText value="#{samLiteMessages.example_tf_instructions}"/><br/>
+									<h:outputText value="#{samLiteMessages.example_mcmc_instructions_2}"/><br/>
+									<strong><h:outputText value="#{samLiteMessages.example_fn_instructions_5}"/></strong>
+								</div>
+							</div>
+
+							<!-- Example -->
+							<div class="card">
+								<div class="card-header">
+									<strong><h:outputText value="#{samLiteMessages.example_example_label}"/></strong>
+								</div>
+								<div class="card-body">
+									<pre style="white-space:normal;">
+										<h:outputText value="#{samLiteMessages.example_tf_question_format4}"/><br/>
+										<h:outputText value="#{samLiteMessages.example_tf_question_text}"/><br/>
+										<h:outputText value="#{samLiteMessages.example_tf_answer_a}"/><br/>
+										<h:outputText value="#{samLiteMessages.example_tf_answer_b}"/><br/>
+										<h:outputText value="#{samLiteMessages.example_mcmc_question_rationale}"/>
+									</pre>
+								</div>
+							</div>
+						</div>
 		 			</div>
 		 			<div class="col-md-12">
-						    <a href="javascript:toggleLayer('example_fn_question');"><h:outputText value="#{samLiteMessages.example_fn_label}"/></a>
-						    <div id="example_fn_question" class="inopPanel" style="display:none">
-				    			<strong><h:outputText value="#{samLiteMessages.example_instruction_label}"/></strong><h:outputText value="#{samLiteMessages.example_fn_instructions}"/><p/>
-				    			<strong><h:outputText value="#{samLiteMessages.example_example_label}"/></strong><br/>
-				    			<h:outputText value="#{samLiteMessages.example_fn_question_format4}"/><br/>
-				    			<h:outputText value="#{samLiteMessages.example_fn_question_text}"/><p/>
-				    			<h:outputText value="#{samLiteMessages.example_fn_answer}"/>
-				    		</div>
-		 			</div>
+						<a href="javascript:toggleLayer('example_fn_question');">
+							<h:outputText value="#{samLiteMessages.example_fn_label}"/>
+						</a>
+						<div id="example_fn_question" class="inopPanel" style="display:none">
+							<!-- Instructions -->
+							<div class="card">
+								<div class="card-header">
+									<strong><h:outputText value="#{samLiteMessages.example_instruction_label}"/></strong>
+								</div>
+								<div class="card-body">
+									<h:outputText value="#{samLiteMessages.example_fn_instructions_1}"/><br/>
+									<h:outputText value="#{samLiteMessages.example_fn_instructions_2}"/><br/>
+									<h:outputText value="#{samLiteMessages.example_fn_instructions_3}"/><br/>
+									<h:outputText value="#{samLiteMessages.example_fn_instructions_4}"/><br/>
+									<strong><h:outputText value="#{samLiteMessages.example_fn_instructions_5}"/></strong>
+								</div>
+							</div>
+
+							<!-- Example -->
+							<div class="card">
+								<div class="card-header">
+									<strong><h:outputText value="#{samLiteMessages.example_example_label}"/></strong>
+								</div>
+								<div class="card-body">
+									<pre style="white-space:normal;">
+										<h:outputText value="#{samLiteMessages.example_fn_question_format4}"/><br/>
+										<h:outputText value="#{samLiteMessages.example_fn_question_text}"/><br/>
+										<h:outputText value="#{samLiteMessages.example_fn_answer}"/>
+									</pre>
+								</div>
+							</div>
+						</div>
+					</div>
 		 		</div>
 		 	</div>
 		 </div>
