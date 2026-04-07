@@ -263,6 +263,21 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
 
     @Override
     @Transactional(readOnly = true)
+    public long countGlobalVideos(String searchText) {
+        String normalizedSearchText = normalizeSearchText(searchText);
+        ListCacheKey cacheKey = new ListCacheKey("count-global", null, null, normalizedSearchText, 0, 0L);
+        Long cached = readCachedCount(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+
+        long count = videoRepository.countByGlobal(normalizedSearchText);
+        writeCachedCount(cacheKey, count);
+        return count;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<VideoTrainingVideo> getVisibleVideosForUser(String siteId, String userId, Instant now) {
         Instant effectiveNow = now != null ? now : Instant.now();
         List<VideoTrainingVideo> visible = new ArrayList<>();
@@ -305,6 +320,21 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
             ListCacheKey cacheKey = ListCacheKey.firstPageVisible(siteId, userId, normalizedSearchText, safeSize, visibilityBucket);
             writeCachedList(cacheKey, results);
         }
+
+        return results;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VideoTrainingVideo> getVisibleGlobalVideosPage(String searchText, int page, int size) {
+        int safeSize = sanitizePageSize(size);
+        int safePage = sanitizePage(page);
+        String normalizedSearchText = normalizeSearchText(searchText);
+
+        int offset = (safePage - 1) * safeSize;
+
+        List<VideoTrainingVideo> results = videoRepository.findVisibleByGlobal(normalizedSearchText, offset, safeSize)
+                .stream().toList();
 
         return results;
     }

@@ -3,6 +3,13 @@ package org.sakaiproject.webapi.beans;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.sakaiproject.videotraining.api.model.VideoProviderType;
+import org.sakaiproject.videotraining.api.model.VideoPublicationStatus;
+import org.sakaiproject.videotraining.api.model.VideoTrainingVideo;
+import org.sakaiproject.videotraining.api.model.VideoVisibilityScope;
+
+import lombok.Data;
+@Data
 public class VideoTrainingRestBean {
 
     private String id;
@@ -13,131 +20,32 @@ public class VideoTrainingRestBean {
     private Long fileSizeBytes;
     private String visibilityScope;
     private String publicationStatus;
-    private int lessonLinkCount;
-    private List<String> categoryIds = new ArrayList<>();
-    private String requiredViewPermission;
-    private boolean canView;
+    /*private boolean canView;
     private boolean canManage;
     private boolean canManageCaptions;
-    private boolean canViewAnalytics;
+    private boolean canViewAnalytics;*/
 
-    public String getId() {
-        return id;
+    public void setProviderType(VideoProviderType providerType) {
+        this.providerType = providerType != null ? providerType.name() : "";
     }
 
-    public void setId(String id) {
-        this.id = id;
+    public void setVisibilityScope(VideoVisibilityScope visibilityScope) {
+        this.visibilityScope = visibilityScope != null ? visibilityScope.name() : "";
     }
 
-    public String getTitle() {
-        return title;
+    public void setPublicationStatus(VideoPublicationStatus publicationStatus) {
+        this.publicationStatus = publicationStatus != null ? publicationStatus.name() : "";
     }
 
-    public void setTitle(String title) {
-        this.title = title;
+    public VideoTrainingRestBean(VideoTrainingVideo video) {
+        this.id = video.getId();
+        this.title = video.getTitle();
+        this.description = video.getDescription();
+        this.setProviderType(video.getProviderType());
+        this.setSourceReference(video.getSourceReference());
+        this.fileSizeBytes = video.getFileSizeBytes();
+        this.setVisibilityScope(video.getVisibilityScope());
+        this.setPublicationStatus(video.getPublicationStatus());
     }
 
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public String getProviderType() {
-        return providerType;
-    }
-
-    public void setProviderType(String providerType) {
-        this.providerType = providerType;
-    }
-
-    public String getSourceReference() {
-        return sourceReference;
-    }
-
-    public void setSourceReference(String sourceReference) {
-        this.sourceReference = sourceReference;
-    }
-
-    public Long getFileSizeBytes() {
-        return fileSizeBytes;
-    }
-
-    public void setFileSizeBytes(Long fileSizeBytes) {
-        this.fileSizeBytes = fileSizeBytes;
-    }
-
-    public String getVisibilityScope() {
-        return visibilityScope;
-    }
-
-    public void setVisibilityScope(String visibilityScope) {
-        this.visibilityScope = visibilityScope;
-    }
-
-    public String getPublicationStatus() {
-        return publicationStatus;
-    }
-
-    public void setPublicationStatus(String publicationStatus) {
-        this.publicationStatus = publicationStatus;
-    }
-
-    public int getLessonLinkCount() {
-        return lessonLinkCount;
-    }
-
-    public void setLessonLinkCount(int lessonLinkCount) {
-        this.lessonLinkCount = lessonLinkCount;
-    }
-
-    public List<String> getCategoryIds() {
-        return categoryIds;
-    }
-
-    public void setCategoryIds(List<String> categoryIds) {
-        this.categoryIds = categoryIds;
-    }
-
-    public String getRequiredViewPermission() {
-        return requiredViewPermission;
-    }
-
-    public void setRequiredViewPermission(String requiredViewPermission) {
-        this.requiredViewPermission = requiredViewPermission;
-    }
-
-    public boolean isCanView() {
-        return canView;
-    }
-
-    public void setCanView(boolean canView) {
-        this.canView = canView;
-    }
-
-    public boolean isCanManage() {
-        return canManage;
-    }
-
-    public void setCanManage(boolean canManage) {
-        this.canManage = canManage;
-    }
-
-    public boolean isCanManageCaptions() {
-        return canManageCaptions;
-    }
-
-    public void setCanManageCaptions(boolean canManageCaptions) {
-        this.canManageCaptions = canManageCaptions;
-    }
-
-    public boolean isCanViewAnalytics() {
-        return canViewAnalytics;
-    }
-
-    public void setCanViewAnalytics(boolean canViewAnalytics) {
-        this.canViewAnalytics = canViewAnalytics;
-    }
 }

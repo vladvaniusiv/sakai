@@ -137,6 +137,36 @@ public class VideoTrainingVideoRepositoryImpl extends SpringCrudRepositoryImpl<V
     }
 
     @Override
+    public long countByGlobal(String searchText) {
+        CriteriaBuilder cb = sessionFactory.getCriteriaBuilder();
+        CriteriaQuery<Long> query = cb.createQuery(Long.class);
+        Root<VideoTrainingVideo> root = query.from(VideoTrainingVideo.class);
+
+        Predicate scopePredicate = cb.equal(root.get("visibilityScope"), VideoVisibilityScope.GLOBAL);
+        Predicate publicationPredicate = cb.equal(root.get("publicationStatus"), VideoPublicationStatus.PUBLISHED);
+
+        Predicate releasePredicate = cb.or(
+                cb.isNull(root.get("releaseDate")),
+                cb.lessThanOrEqualTo(root.get("releaseDate"), Instant.now())
+        );
+
+        Predicate retractPredicate = cb.or(
+                cb.isNull(root.get("retractDate")),
+                cb.greaterThan(root.get("retractDate"), Instant.now())
+        );
+
+        Predicate searchPredicate = buildSearchPredicate(cb, root, searchText);
+
+        Predicate finalPredicate = searchPredicate == null
+                ? cb.and(scopePredicate, publicationPredicate, releasePredicate, retractPredicate)
+                : cb.and(scopePredicate, publicationPredicate, releasePredicate, retractPredicate, searchPredicate);
+
+        query.select(cb.count(root)).where(finalPredicate);
+
+        return sessionFactory.getCurrentSession().createQuery(query).getSingleResult();
+    }
+
+    @Override
     public List<VideoTrainingVideo> findVisibleBySiteIdAt(String siteId, Instant now) {
         if (siteId == null || now == null) {
             return Collections.emptyList();
@@ -245,6 +275,48 @@ public class VideoTrainingVideoRepositoryImpl extends SpringCrudRepositoryImpl<V
             typedQuery.setMaxResults(limit);
         }
         return typedQuery.getResultList();
+    }
+
+    @Override
+    public List<VideoTrainingVideo> findVisibleByGlobal(String searchText, int offset, int size) {
+        if (size <= 0) {
+            return Collections.emptyList();
+        }
+
+        CriteriaBuilder cb = sessionFactory.getCriteriaBuilder();
+        CriteriaQuery<VideoTrainingVideo> query = cb.createQuery(VideoTrainingVideo.class);
+        Root<VideoTrainingVideo> root = query.from(VideoTrainingVideo.class);
+
+        Predicate globalPredicate = cb.equal(root.get("visibilityScope"),
+            VideoVisibilityScope.GLOBAL);
+
+        Predicate publishedPredicate = cb.equal(root.get("publicationStatus"),
+            VideoPublicationStatus.PUBLISHED);
+
+        Predicate releasePredicate = cb.or(
+                cb.isNull(root.get("releaseDate")),
+                cb.lessThanOrEqualTo(root.get("releaseDate"), Instant.now())
+        );
+
+        Predicate retractPredicate = cb.or(
+                cb.isNull(root.get("retractDate")),
+                cb.greaterThan(root.get("retractDate"), Instant.now())
+        );
+
+        Predicate searchPredicate = buildSearchPredicate(cb, root, searchText);
+        Predicate finalPredicate = searchPredicate == null
+            ? cb.and(globalPredicate, publishedPredicate, releasePredicate, retractPredicate)
+            : cb.and(globalPredicate, publishedPredicate, releasePredicate, retractPredicate, searchPredicate);
+
+        query.select(root)
+            .where(finalPredicate)
+            .orderBy(cb.desc(root.get("modifiedOn")));
+
+        return sessionFactory.getCurrentSession()
+                .createQuery(query)
+                .setFirstResult(offset)
+                .setMaxResults(size)
+                .getResultList();
     }
 
     @Override

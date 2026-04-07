@@ -32,6 +32,8 @@ public interface VideoTrainingService {
 
     long countSiteLibrary(String siteId, String searchText);
 
+    long countGlobalVideos(String searchText);
+
     List<VideoTrainingVideo> getVisibleVideosForUser(String siteId, String userId, Instant now);
 
     List<VideoTrainingVideo> getVisibleVideosForUserPage(String siteId, String userId, Instant now, String searchText, int page, int size);
@@ -43,6 +45,8 @@ public interface VideoTrainingService {
         Instant cursorModifiedOn, String cursorVideoId, int size);
 
     long countVisibleVideosForUser(String siteId, String userId, Instant now, String searchText);
+
+    List<VideoTrainingVideo> getVisibleGlobalVideosPage(String searchText, int page, int size);
 
     List<VideoTrainingVideo> getGlobalVideosCursor(String searchText, Instant cursorModifiedOn, String cursorVideoId, int size);
 
