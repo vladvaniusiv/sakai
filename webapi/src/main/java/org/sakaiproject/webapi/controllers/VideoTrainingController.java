@@ -20,10 +20,12 @@ import org.sakaiproject.videotraining.api.model.VideoTrainingCourseGroup;
 import org.sakaiproject.videotraining.api.model.VideoTrainingLessonLink;
 import org.sakaiproject.videotraining.api.model.VideoTrainingVideo;
 import org.sakaiproject.videotraining.api.service.VideoTrainingService;
+import org.sakaiproject.webapi.beans.PagedResponse;
 import org.sakaiproject.webapi.beans.VideoTrainingAnalyticsRestBean;
 import org.sakaiproject.webapi.beans.VideoTrainingRestBean;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -38,72 +40,65 @@ public class VideoTrainingController extends AbstractSakaiApiController {
     @Resource(name = "org.sakaiproject.videotraining.api.service.VideoTrainingService")
     private VideoTrainingService videoTrainingService;
 
-        private static final int DEFAULT_PAGE_SIZE = 24;
-        private static final int MAX_PAGE_SIZE = 100;
+    private static final int DEFAULT_PAGE_SIZE = 10;
+    private static final int MAX_PAGE_SIZE = 25;
 
-    @GetMapping(value = {"/sites/{siteId}/video-training", "/api/v1/sites/{siteId}/video-training"}, produces = MediaType.APPLICATION_JSON_VALUE)
-        public Map<String, Object> getSiteVideos(@PathVariable("siteId") String siteId,
-            @RequestParam(name = "q", required = false) String q,
-            @RequestParam(name = "page", required = false, defaultValue = "1") int page,
-            @RequestParam(name = "size", required = false, defaultValue = "24") int size) {
+    @GetMapping(value = {"/videos"}, produces = MediaType.APPLICATION_JSON_VALUE)
+    public PagedResponse<VideoTrainingRestBean> getGlobalVideos(
+        @RequestParam(name = "q", required = false) String q,
+        @RequestParam(name = "page", defaultValue = "1") int page,
+        @RequestParam(name = "size", defaultValue = "10") int size
+    ) {
+        // At least the user is logged in, we won't filter by site or anything
+        // just return all videos the user has access to across the entire system.
+        checkSakaiSession();
 
-        Session session = checkSakaiSession();
-        checkSite(siteId);
-
-        String userId = session.getUserId();
-        boolean canManage = videoTrainingService.canManageLibrary(siteId, userId);
-        boolean canManageCaptions = canManage;
-        boolean canAnalytics = videoTrainingService.canViewAnalytics(siteId, userId);
-        String query = q == null ? "" : q.trim();
+        String query = StringUtils.trimToEmpty(q);
         int safeSize = normalizePageSize(size);
-        int safePage = Math.max(page, 1);
-        Instant now = Instant.now();
 
-        List<VideoTrainingVideo> videos;
-        Long totalCount = null;
-        int totalPages = 1;
-        boolean hasPrev = false;
-        boolean hasNext = false;
-        totalCount = canManage
-                ? videoTrainingService.countSiteLibrary(siteId, query)
-                : videoTrainingService.countVisibleVideosForUser(siteId, userId, now, query);
+        Long totalCount = videoTrainingService.countGlobalVideos(query);
 
-        safePage = normalizePage(safePage, safeSize, totalCount);
+        int safePage = normalizePage(page, safeSize, totalCount);
 
-        videos = canManage
-                ? videoTrainingService.getSiteLibraryPage(siteId, query, safePage, safeSize)
-                : videoTrainingService.getVisibleVideosForUserPage(siteId, userId, now, query, safePage, safeSize);
+        List<VideoTrainingVideo> paginatedVideoList = videoTrainingService.getVisibleGlobalVideosPage(query, safePage, safeSize);
 
-        totalPages = totalCount == 0 ? 1 : (int) Math.max(1, Math.ceil((double) totalCount / safeSize));
-        hasPrev = safePage > 1;
-        hasNext = safePage < totalPages;
-
-        List<VideoTrainingRestBean> beans = videos.stream()
-            .map(video -> toRestBean(video, userId, canManage, canManageCaptions, canAnalytics))
+        List<VideoTrainingRestBean> beans = paginatedVideoList.stream()
+            .map(video -> new VideoTrainingRestBean(video))
             .collect(Collectors.toList());
 
-        Map<String, Object> pagination = new HashMap<>();
-        pagination.put("page", safePage);
-        pagination.put("size", safeSize);
-        pagination.put("totalCount", totalCount);
-        pagination.put("totalPages", totalPages);
-        pagination.put("hasPrev", hasPrev);
-        pagination.put("hasNext", hasNext);
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("videos", beans);
-        response.put("query", query);
-        response.put("pagination", pagination);
-        return response;
+        return new PagedResponse<>(beans, totalCount, safePage, safeSize);
     }
 
-    @GetMapping(value = "/api/v1/courses/{courseId}/videos", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Map<String, Object> getCourseVideos(@PathVariable("courseId") String courseId,
-            @RequestParam(name = "q", required = false) String q,
-            @RequestParam(name = "page", required = false, defaultValue = "1") int page,
-            @RequestParam(name = "size", required = false, defaultValue = "24") int size) {
+    @GetMapping(value = {"/sites/{siteId}/videos"}, produces = MediaType.APPLICATION_JSON_VALUE)
+    public PagedResponse<VideoTrainingRestBean> getSiteVideos(
+        @PathVariable(required = true) String siteId,
+        @RequestParam(name = "q", required = false) String q,
+        @RequestParam(name = "page", defaultValue = "1") int page,
+        @RequestParam(name = "size", defaultValue = "10") int size
+    ) {
+        Session session = checkSakaiSession();
+        String userId = session.getUserId();
 
-        return getSiteVideos(courseId, q, page, size);
+        boolean canManage = videoTrainingService.canManageLibrary(siteId, userId);
+
+        String query = StringUtils.trimToEmpty(q);
+        int safeSize = normalizePageSize(size);
+
+        Long totalCount = canManage
+                ? videoTrainingService.countSiteLibrary(siteId, query)
+                : videoTrainingService.countVisibleVideosForUser(siteId, userId, Instant.now(), query);
+
+        int safePage = normalizePage(page, safeSize, totalCount);
+
+        List<VideoTrainingVideo> paginatedVideoList = canManage
+            ? videoTrainingService.getSiteLibraryPage(siteId, query, safePage, safeSize)
+            : videoTrainingService.getVisibleVideosForUserPage(siteId, userId, Instant.now(), query, safePage, safeSize);
+
+        List<VideoTrainingRestBean> beans = paginatedVideoList.stream()
+            .map(video -> new VideoTrainingRestBean(video))
+            .collect(Collectors.toList());
+
+        return new PagedResponse<>(beans, totalCount, safePage, safeSize);
     }
 
     @GetMapping(value = "/api/v1/videos/grouped-by-course", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -120,23 +115,12 @@ public class VideoTrainingController extends AbstractSakaiApiController {
             groupPayload.put("siteTitle", group.getSiteTitle());
             groupPayload.put("totalVideos", group.getTotalVideos());
             groupPayload.put("videos", group.getVideos().stream()
-                    .map(video -> toRestBean(video, session.getUserId(), videoTrainingService.canManageLibrary(group.getSiteId(), session.getUserId()),
-                            videoTrainingService.canManageLibrary(group.getSiteId(), session.getUserId()),
-                            videoTrainingService.canViewAnalytics(group.getSiteId(), session.getUserId())))
+                    .map(VideoTrainingRestBean::new)
                     .collect(Collectors.toList()));
             payload.add(groupPayload);
         }
 
         return Map.of("groups", payload);
-    }
-
-    @GetMapping(value = "/api/v1/videos", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Map<String, Object> getVideosCatalogV1(@RequestParam(name = "siteId") String siteId,
-            @RequestParam(name = "q", required = false) String q,
-            @RequestParam(name = "page", required = false, defaultValue = "1") int page,
-            @RequestParam(name = "size", required = false, defaultValue = "24") int size) {
-
-        return getSiteVideos(siteId, q, page, size);
     }
 
     @GetMapping(value = {"/sites/{siteId}/video-training/{videoId}", "/api/v1/sites/{siteId}/video-training/{videoId}"}, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -162,14 +146,7 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         boolean canManageCaptions = canManage;
         boolean canAnalytics = videoTrainingService.canViewAnalytics(siteId, userId);
 
-        return toRestBean(video, userId, canManage, canManageCaptions, canAnalytics);
-    }
-
-    @GetMapping(value = "/api/v1/videos/{videoId}", produces = MediaType.APPLICATION_JSON_VALUE)
-    public VideoTrainingRestBean getVideoDetailsV1(@PathVariable("videoId") String videoId,
-            @RequestParam(name = "siteId") String siteId) {
-
-        return getVideoDetails(siteId, videoId);
+        return new VideoTrainingRestBean(video);
     }
 
     @GetMapping(value = "/sites/{siteId}/video-training/analytics", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -228,7 +205,7 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         if (request != null && request.getCategoryIds() != null) {
             videoTrainingService.setVideoCategoryIds(saved.getId(), request.getCategoryIds());
         }
-        return toRestBean(saved, userId, true, true, canAnalytics);
+        return new VideoTrainingRestBean(saved);
     }
 
     @GetMapping(value = "/api/v1/sites/{siteId}/video-training/categories", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -270,7 +247,7 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         }
     }
 
-    @PostMapping(value = "/api/v1/sites/{siteId}/video-training/categories/{categoryId}/delete")
+    @DeleteMapping(value = "/api/v1/sites/{siteId}/video-training/categories/{categoryId}/delete")
     public Map<String, Object> deleteCategory(@PathVariable("siteId") String siteId,
             @PathVariable("categoryId") String categoryId) {
         Session session = checkSakaiSession();
@@ -354,7 +331,7 @@ public class VideoTrainingController extends AbstractSakaiApiController {
                 request.getDescription(),
                 request.getFileSizeBytes());
 
-        return toRestBean(promoted, session.getUserId(), true, true, videoTrainingService.canViewAnalytics(siteId, session.getUserId()));
+        return new VideoTrainingRestBean(promoted);
     }
 
     @GetMapping(value = "/api/v1/video-training/health", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -364,30 +341,6 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         health.put("service", "video-training");
         health.put("timestamp", Instant.now().toEpochMilli());
         return health;
-    }
-
-    private VideoTrainingRestBean toRestBean(VideoTrainingVideo video,
-            String userId,
-            boolean canManage,
-            boolean canManageCaptions,
-            boolean canAnalytics) {
-        VideoTrainingRestBean bean = new VideoTrainingRestBean();
-        bean.setId(video.getId());
-        bean.setTitle(video.getTitle());
-        bean.setDescription(video.getDescription());
-        bean.setProviderType(video.getProviderType() != null ? video.getProviderType().name() : "");
-        bean.setSourceReference(video.getSourceReference());
-        bean.setFileSizeBytes(video.getFileSizeBytes());
-        bean.setVisibilityScope(video.getVisibilityScope() != null ? video.getVisibilityScope().name() : "");
-        bean.setPublicationStatus(video.getPublicationStatus() != null ? video.getPublicationStatus().name() : "");
-        bean.setLessonLinkCount(videoTrainingService.getLessonLinksForVideo(video.getId()).size());
-        bean.setCategoryIds(videoTrainingService.getVideoCategoryIds(video.getId()));
-        bean.setRequiredViewPermission(video.getRequiredViewPermission());
-        bean.setCanView(videoTrainingService.canViewVideo(video, userId, Instant.now()) || canManage);
-        bean.setCanManage(canManage);
-        bean.setCanManageCaptions(canManageCaptions);
-        bean.setCanViewAnalytics(canAnalytics);
-        return bean;
     }
 
     private VideoTrainingAnalyticsRestBean toAnalyticsRestBean(VideoTrainingAnalyticsSummary summary) {

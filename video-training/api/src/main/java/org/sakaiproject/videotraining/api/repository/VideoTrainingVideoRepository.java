@@ -20,6 +20,8 @@ public interface VideoTrainingVideoRepository extends SpringCrudRepository<Video
 
     long countBySiteId(String siteId, String searchText);
 
+    long countByGlobal(String searchText);
+
     List<VideoTrainingVideo> findVisibleBySiteIdAt(String siteId, Instant now);
 
     List<VideoTrainingVideo> findVisibleBySiteIdAt(String siteId, Instant now, String searchText, int offset, int limit);
@@ -31,6 +33,8 @@ public interface VideoTrainingVideoRepository extends SpringCrudRepository<Video
         Instant cursorModifiedOn, String cursorVideoId, int limit);
 
     long countVisibleBySiteIdAt(String siteId, Instant now, String searchText);
+
+    List<VideoTrainingVideo> findVisibleByGlobal(String searchText, int offset, int size);
 
     List<VideoTrainingVideo> findGlobalPublishedCursor(String searchText, Instant cursorModifiedOn, String cursorVideoId, int limit);
 

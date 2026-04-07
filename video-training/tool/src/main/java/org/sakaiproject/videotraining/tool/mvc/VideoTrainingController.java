@@ -29,8 +29,10 @@ import org.sakaiproject.exception.IdUnusedException;
 import org.sakaiproject.exception.OverQuotaException;
 import org.sakaiproject.site.api.SiteService;
 import org.sakaiproject.time.api.UserTimeService;
+import org.sakaiproject.tool.api.Session;
 import org.sakaiproject.tool.api.SessionManager;
 import org.sakaiproject.tool.api.ToolManager;
+import org.sakaiproject.user.api.PreferencesService;
 import org.sakaiproject.util.Validator;
 import org.sakaiproject.videotraining.api.VideoTrainingConstants;
 import org.sakaiproject.videotraining.api.model.VideoProviderType;
@@ -97,6 +99,7 @@ public class VideoTrainingController {
     private final ToolManager toolManager;
     private final UserTimeService userTimeService;
     private final VideoTrainingService videoTrainingService;
+    private final PreferencesService preferencesService;
 
     public VideoTrainingController(MessageSource messageSource,
             ContentHostingService contentHostingService,
@@ -104,7 +107,8 @@ public class VideoTrainingController {
             SiteService siteService,
             ToolManager toolManager,
             @Qualifier("org.sakaiproject.time.api.UserTimeService") UserTimeService userTimeService,
-            VideoTrainingService videoTrainingService) {
+            VideoTrainingService videoTrainingService,
+            PreferencesService preferencesService) {
         this.messageSource = messageSource;
         this.contentHostingService = contentHostingService;
         this.sessionManager = sessionManager;
@@ -112,6 +116,8 @@ public class VideoTrainingController {
         this.toolManager = toolManager;
         this.userTimeService = userTimeService;
         this.videoTrainingService = videoTrainingService;
+        this.preferencesService = preferencesService;
+
     }
 
     @GetMapping({"/", "/videos"})
@@ -126,7 +132,6 @@ public class VideoTrainingController {
             Model model) {
         String siteId = currentSiteId();
         String userId = currentUserId();
-        Instant now = Instant.now();
         boolean canManage = videoTrainingService.canManageLibrary(siteId, userId);
         Locale effectiveLocale = locale != null ? locale : Locale.getDefault();
         String effectiveViewMode = resolveEffectiveViewMode(siteId, canManage, viewMode);
@@ -152,7 +157,7 @@ public class VideoTrainingController {
             if (isUserSite) {
                 fetched = videoTrainingService.getGlobalVideosSorted(normalizedQuery, safeOffset, requested, sortField, ascending);
             } else {
-                fetched = videoTrainingService.getVisibleVideosForUserSorted(siteId, userId, now, normalizedQuery,
+                fetched = videoTrainingService.getVisibleVideosForUserSorted(siteId, userId, Instant.now(), normalizedQuery,
                         safeOffset, requested, sortField, ascending);
             }
         }
