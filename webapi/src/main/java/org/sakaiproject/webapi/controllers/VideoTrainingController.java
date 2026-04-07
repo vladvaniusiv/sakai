@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 import javax.annotation.Resource;
 
 import org.apache.commons.lang3.StringUtils;
+import org.sakaiproject.authz.api.SecurityService;
 import org.sakaiproject.tool.api.Session;
 import org.sakaiproject.videotraining.api.model.VideoPublicationStatus;
 import org.sakaiproject.videotraining.api.model.VideoVisibilityScope;
@@ -23,6 +24,7 @@ import org.sakaiproject.videotraining.api.service.VideoTrainingService;
 import org.sakaiproject.webapi.beans.PagedResponse;
 import org.sakaiproject.webapi.beans.VideoTrainingAnalyticsRestBean;
 import org.sakaiproject.webapi.beans.VideoTrainingRestBean;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -37,8 +39,11 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 public class VideoTrainingController extends AbstractSakaiApiController {
 
-    @Resource(name = "org.sakaiproject.videotraining.api.service.VideoTrainingService")
+    @Autowired
     private VideoTrainingService videoTrainingService;
+
+    @Autowired
+    private SecurityService securityService;
 
     private static final int DEFAULT_PAGE_SIZE = 10;
     private static final int MAX_PAGE_SIZE = 25;
@@ -53,14 +58,20 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         // just return all videos the user has access to across the entire system.
         checkSakaiSession();
 
+        boolean isSuperAdmin = securityService.isSuperUser();
+
         String query = StringUtils.trimToEmpty(q);
         int safeSize = normalizePageSize(size);
 
-        Long totalCount = videoTrainingService.countGlobalVideos(query);
+        Long totalCount = isSuperAdmin
+                ? videoTrainingService.adminCountAllGlobal(query)
+                : videoTrainingService.countGlobalVideos(query);
 
         int safePage = normalizePage(page, safeSize, totalCount);
 
-        List<VideoTrainingVideo> paginatedVideoList = videoTrainingService.getVisibleGlobalVideosPage(query, safePage, safeSize);
+        List<VideoTrainingVideo> paginatedVideoList = isSuperAdmin
+                ? videoTrainingService.getAdminAllGlobalVideosPage(query, safePage, safeSize)
+                : videoTrainingService.getVisibleGlobalVideosPage(query, safePage, safeSize);
 
         List<VideoTrainingRestBean> beans = paginatedVideoList.stream()
             .map(video -> new VideoTrainingRestBean(video))

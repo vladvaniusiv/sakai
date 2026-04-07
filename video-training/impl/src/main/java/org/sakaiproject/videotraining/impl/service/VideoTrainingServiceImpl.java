@@ -341,6 +341,33 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<VideoTrainingVideo> getAdminAllGlobalVideosPage(String searchText, int page, int size) {
+        int safeSize = sanitizePageSize(size);
+        int safePage = sanitizePage(page);
+        String normalizedSearchText = normalizeSearchText(searchText);
+
+        int offset = (safePage - 1) * safeSize;
+
+        return videoRepository.adminFindAllGlobal(normalizedSearchText, offset, safeSize).stream().toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long adminCountAllGlobal(String searchText) {
+        String normalizedSearchText = normalizeSearchText(searchText);
+        ListCacheKey cacheKey = new ListCacheKey("count-admin-global", null, null, normalizedSearchText, 0, 0L);
+        Long cached = readCachedCount(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+
+        long count = videoRepository.adminCountAllGlobal(normalizedSearchText);
+        writeCachedCount(cacheKey, count);
+        return count;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<VideoTrainingVideo> getVisibleVideosForUserCursor(String siteId, String userId, Instant now, String searchText,
             Instant cursorModifiedOn, String cursorVideoId, int size) {
         Instant effectiveNow = now != null ? now : Instant.now();
