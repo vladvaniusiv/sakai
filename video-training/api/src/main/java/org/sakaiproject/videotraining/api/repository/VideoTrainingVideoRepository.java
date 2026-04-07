@@ -36,6 +36,10 @@ public interface VideoTrainingVideoRepository extends SpringCrudRepository<Video
 
     List<VideoTrainingVideo> findVisibleByGlobal(String searchText, int offset, int size);
 
+    long adminCountAllGlobal(String searchText);
+
+    List<VideoTrainingVideo> adminFindAllGlobal(String searchText, int offset, int size);
+
     List<VideoTrainingVideo> findGlobalPublishedCursor(String searchText, Instant cursorModifiedOn, String cursorVideoId, int limit);
 
     List<VideoTrainingVideo> findGlobalPublishedSorted(String searchText, int offset, int limit,

@@ -48,6 +48,10 @@ public interface VideoTrainingService {
 
     List<VideoTrainingVideo> getVisibleGlobalVideosPage(String searchText, int page, int size);
 
+    List<VideoTrainingVideo> getAdminAllGlobalVideosPage(String searchText, int page, int size);
+
+    long adminCountAllGlobal(String searchText);
+
     List<VideoTrainingVideo> getGlobalVideosCursor(String searchText, Instant cursorModifiedOn, String cursorVideoId, int size);
 
     List<VideoTrainingVideo> getGlobalVideosSorted(String searchText, int offset, int size,
