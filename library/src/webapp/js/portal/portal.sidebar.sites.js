@@ -10,9 +10,10 @@ class SitesSidebar {
     this._currentSite = config?._currentSite;
 
     this._sitesAndToolsNav = document.querySelector("#portal-nav-sidebar");
-    if (this._sitesAndToolsNav) {
-        this._sitesAndToolsNav.addEventListener("mouseover", this.onHover.bind(this));
-        this._sitesAndToolsNav.addEventListener("mouseout", this.onHoverOut.bind(this));
+    const collapseButton = document.getElementById("sidebar-collapse-button");
+    if (collapseButton) {
+        collapseButton.addEventListener("mouseover", this.onHover.bind(this));
+        collapseButton.addEventListener("mouseout", this.onHoverOut.bind(this));
     }
 
     const sitesListItems = element.querySelectorAll(".site-list-item");
@@ -75,22 +76,25 @@ class SitesSidebar {
 
   onHover() {
     const iconElement = document.querySelector("#sidebar-collapse-button span");
-    if (iconElement) {
-        const hoverIconClass = "portal-nav-sidebar-icon-hover";
-        const expandedIconClass = "portal-nav-sidebar-icon";
-        iconElement.classList.add(hoverIconClass);
-        iconElement.classList.remove(expandedIconClass);
+    const button = document.getElementById("sidebar-collapse-button");
+    if (!iconElement || !button) return;
+    const isCollapsed = button.getAttribute("data-portal-sidebar-collapsed") === "true";
+    iconElement.classList.add("portal-nav-sidebar-icon-hover");
+    if (isCollapsed) {
+        iconElement.classList.add("hover-expanded");
+        iconElement.classList.remove("hover-collapsed");
+    } else {
+        iconElement.classList.add("hover-collapsed");
+        iconElement.classList.remove("hover-expanded");
     }
   }
 
   onHoverOut() {
     const iconElement = document.querySelector("#sidebar-collapse-button span");
-    if (iconElement) {
-        const hoverIconClass = "portal-nav-sidebar-icon-hover";
-        const expandedIconClass = "portal-nav-sidebar-icon";
-        iconElement.classList.add(expandedIconClass);
-        iconElement.classList.remove(hoverIconClass);
-    }
+    if (!iconElement) return;
+    iconElement.classList.remove("portal-nav-sidebar-icon-hover");
+    iconElement.classList.remove("hover-expanded");
+    iconElement.classList.remove("hover-collapsed");
   }
 
   setView(mobile) {

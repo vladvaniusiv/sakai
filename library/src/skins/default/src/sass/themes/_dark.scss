@@ -361,4 +361,8 @@
         background: #fff !important;
         color-scheme: light;
     }
+
+    .portal-nav-sidebar-icon, .portal-nav-sidebar-icon-collapsed {
+      filter: invert(1) brightness(2);
+    }
 }

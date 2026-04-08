@@ -364,7 +364,9 @@
   @include button-variant($primary, $light);
 
   > span {
-    font-size: 28px;
+    width: 40px;
+    height: 40px;
+    display: inline-block;
   }
 }
 
@@ -390,28 +392,38 @@
   color: var(--sakai-modal-header-color) !important;
 }
 
+.portal-nav-sidebar-icon,
+.portal-nav-sidebar-icon-collapsed {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  background-repeat: no-repeat;
+  background-size: 40px 40px;
+  background-position: center;
+  transition: opacity .2s ease;
+  color: var(--sakai-text-color-1);
+}
+
 .portal-nav-sidebar-icon {
-  &::before {
-    content: "\f479";
-  }
-  &:hover::before {
-    content: "\f1c2";
-  }
+  background-image: url(#{$skin-path}images/sidebar-icon-expanded.svg);
 }
 
 .portal-nav-sidebar-icon-collapsed {
-  &::before {
-    content: "\f479";
-  }
-  &:hover::before {
-    content: "\f1c3";
-  }
+  background-image: url(#{$skin-path}images/sidebar-icon-collapsed.svg);
 }
 
 .portal-nav-sidebar-icon-hover {
-  &::before {
-    content: "\f1c2";
-  }
+  opacity: .8;
+  background-repeat: no-repeat;
+  background-size: 40px 40px;
+}
+
+.portal-nav-sidebar-icon-hover.hover-expanded {
+  background-image: url(#{$skin-path}images/sidebar-icon-expanded.svg);
+}
+
+.portal-nav-sidebar-icon-hover.hover-collapsed {
+  background-image: url(#{$skin-path}images/sidebar-icon-collapsed.svg);
 }
 
 #portal-nav-sidebar {
