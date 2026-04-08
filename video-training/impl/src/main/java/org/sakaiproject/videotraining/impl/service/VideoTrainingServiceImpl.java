@@ -29,6 +29,7 @@ import org.sakaiproject.videotraining.api.VideoTrainingConstants;
 import static org.sakaiproject.videotraining.api.VideoTrainingConstants.PERMISSION_ANALYTICS;
 import static org.sakaiproject.videotraining.api.VideoTrainingConstants.PERMISSION_CAPTIONS_MANAGE;
 import static org.sakaiproject.videotraining.api.VideoTrainingConstants.PERMISSION_MANAGE;
+import static org.sakaiproject.videotraining.api.VideoTrainingConstants.PERMISSION_MANAGE_ALL;
 import static org.sakaiproject.videotraining.api.VideoTrainingConstants.PERMISSION_VIEW;
 import org.sakaiproject.videotraining.api.model.VideoProviderType;
 import org.sakaiproject.videotraining.api.model.VideoPublicationStatus;
@@ -81,6 +82,7 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
     public void init() {
         functionManager.registerFunction(PERMISSION_VIEW, true);
         functionManager.registerFunction(PERMISSION_MANAGE, true);
+        functionManager.registerFunction(PERMISSION_MANAGE_ALL, true);
         functionManager.registerFunction(PERMISSION_ANALYTICS, true);
         functionManager.registerFunction(PERMISSION_CAPTIONS_MANAGE, true);
         initializeDistributedCaches();
@@ -107,8 +109,24 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
         }
 
         String currentUserId = sessionManager.getCurrentSessionUserId();
-        if (!canManageLibrary(video.getSiteId(), currentUserId)) {
-            throw new SecurityException("User cannot manage video library for site " + video.getSiteId());
+        String siteRefForVideo = siteService.siteReference(video.getSiteId());
+        // Allow full site managers, or users with owner-level manage permission (for creation/edit of their own videos)
+        if (StringUtils.isNotBlank(video.getId())) {
+            // editing existing video: permit if manage all, superuser, or manage+owner
+            VideoTrainingVideo existingCheck = getVideoById(video.getId()).orElse(null);
+            if (!(securityService.isSuperUser()
+                    || securityService.unlock(currentUserId, PERMISSION_MANAGE_ALL, siteRefForVideo)
+                    || (securityService.unlock(currentUserId, PERMISSION_MANAGE, siteRefForVideo)
+                        && existingCheck != null && Objects.equals(existingCheck.getOwnerId(), currentUserId)))) {
+                throw new SecurityException("User cannot manage video library for site " + video.getSiteId());
+            }
+        } else {
+            // creating new video: allow if superuser or has either manage_all or manage
+            if (!(securityService.isSuperUser()
+                    || securityService.unlock(currentUserId, PERMISSION_MANAGE_ALL, siteRefForVideo)
+                    || securityService.unlock(currentUserId, PERMISSION_MANAGE, siteRefForVideo))) {
+                throw new SecurityException("User cannot manage video library for site " + video.getSiteId());
+            }
         }
 
         Instant now = Instant.now();
@@ -176,7 +194,10 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
         }
 
         String currentUserId = sessionManager.getCurrentSessionUserId();
-        if (!canManageLibrary(existing.getSiteId(), currentUserId)) {
+        String siteRef = siteService.siteReference(existing.getSiteId());
+        if (!(securityService.isSuperUser()
+                || securityService.unlock(currentUserId, PERMISSION_MANAGE_ALL, siteRef)
+                || (securityService.unlock(currentUserId, PERMISSION_MANAGE, siteRef) && Objects.equals(existing.getOwnerId(), currentUserId)))) {
             throw new SecurityException("User cannot delete video " + videoId);
         }
 
@@ -230,6 +251,21 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<VideoTrainingVideo> getSiteLibraryPageForOwner(String siteId, String ownerId, String searchText, int page, int size) {
+        int safeSize = sanitizePageSize(size);
+        int safePage = sanitizePage(page);
+        String normalizedSearchText = normalizeSearchText(searchText);
+
+        if (safePage == 1) {
+            // no caching for owner-specific lists for simplicity
+        }
+
+        int offset = (safePage - 1) * safeSize;
+        return videoRepository.findBySiteIdAndOwnerIdOrderByModifiedOnDesc(siteId, ownerId, normalizedSearchText, offset, safeSize);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public List<VideoTrainingVideo> getSiteLibraryCursor(String siteId, String searchText, Instant cursorModifiedOn, String cursorVideoId, int size) {
         int safeSize = sanitizePageSize(size);
         String normalizedSearchText = normalizeSearchText(searchText);
@@ -248,6 +284,16 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<VideoTrainingVideo> getSiteLibrarySortedForOwner(String siteId, String ownerId, String searchText, int offset, int size,
+            String sortField, boolean ascending) {
+        int safeSize = sanitizePageSize(size);
+        int safeOffset = Math.max(0, offset);
+        String normalizedSearchText = normalizeSearchText(searchText);
+        return videoRepository.findBySiteIdAndOwnerIdSorted(siteId, ownerId, normalizedSearchText, safeOffset, safeSize, sortField, ascending);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public long countSiteLibrary(String siteId, String searchText) {
         String normalizedSearchText = normalizeSearchText(searchText);
         ListCacheKey cacheKey = ListCacheKey.countManage(siteId, normalizedSearchText);
@@ -259,6 +305,33 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
         long count = videoRepository.countBySiteId(siteId, normalizedSearchText);
         writeCachedCount(cacheKey, count);
         return count;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long countSiteLibraryForOwner(String siteId, String ownerId, String searchText) {
+        String normalizedSearchText = normalizeSearchText(searchText);
+        // no caching for owner-specific counts for simplicity
+        return videoRepository.countBySiteIdAndOwnerId(siteId, ownerId, normalizedSearchText);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long countSiteVideosForUser(String siteId, String userId, String searchText) {
+        String query = normalizeSearchText(searchText);
+
+        // Is the user a full site manager (manage_all / superuser)? If so, count all videos.
+        if (canManageLibrary(siteId, userId)) {
+            return countSiteLibrary(siteId, query);
+        }
+
+        // Is the user an owner-level manager (manage)? If so, count their videos.
+        if (hasManagePermission(siteId, userId)) {
+            return countSiteLibraryForOwner(siteId, userId, query);
+        }
+
+        // Otherwise, count the visible videos for the user.
+        return countVisibleVideosForUser(siteId, userId, Instant.now(), query);
     }
 
     @Override
@@ -322,6 +395,27 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
         }
 
         return results;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VideoTrainingVideo> getSiteVideosForUserPage(String siteId, String userId, String searchText, int page, int size) {
+        String query = normalizeSearchText(searchText);
+        int safePage = Math.max(1, page);
+        int safeSize = sanitizePageSize(size);
+
+        // Is the user a full site manager (manage_all / superuser)? If so, show all videos.
+        if (canManageLibrary(siteId, userId)) {
+            return getSiteLibraryPage(siteId, query, safePage, safeSize);
+        }
+
+        // Is the user an owner-level manager (manage)? If so, show their videos.
+        if (hasManagePermission(siteId, userId)) {
+            return getSiteLibraryPageForOwner(siteId, userId, query, safePage, safeSize);
+        }
+
+        // Otherwise, show the visible videos for the user.
+        return getVisibleVideosForUserPage(siteId, userId, Instant.now(), query, safePage, safeSize);
     }
 
     @Override
@@ -412,7 +506,7 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
 
         String siteRef = siteService.siteReference(siteId);
         if (!securityService.isSuperUser()
-                && !securityService.unlock(userId, PERMISSION_MANAGE, siteRef)
+                && !securityService.unlock(userId, PERMISSION_MANAGE_ALL, siteRef)
                 && !securityService.unlock(userId, PERMISSION_VIEW, siteRef)) {
             return 0;
         }
@@ -460,8 +554,11 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
 
         VideoTrainingVideo video = getVideoById(caption.getVideoId()).orElseThrow(() -> new IllegalArgumentException("Unknown video"));
         String currentUserId = sessionManager.getCurrentSessionUserId();
-        if (!canManageLibrary(video.getSiteId(), currentUserId)
-                && !securityService.unlock(currentUserId, PERMISSION_CAPTIONS_MANAGE, siteService.siteReference(video.getSiteId()))) {
+        String siteRef = siteService.siteReference(video.getSiteId());
+        if (!(securityService.isSuperUser()
+                || securityService.unlock(currentUserId, PERMISSION_MANAGE_ALL, siteRef)
+                || securityService.unlock(currentUserId, PERMISSION_CAPTIONS_MANAGE, siteRef)
+                || (securityService.unlock(currentUserId, PERMISSION_MANAGE, siteRef) && Objects.equals(video.getOwnerId(), currentUserId)))) {
             throw new SecurityException("User cannot manage captions for video " + caption.getVideoId());
         }
 
@@ -485,8 +582,11 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
         }
 
         String currentUserId = sessionManager.getCurrentSessionUserId();
-        if (!canManageLibrary(video.getSiteId(), currentUserId)
-                && !securityService.unlock(currentUserId, PERMISSION_CAPTIONS_MANAGE, siteService.siteReference(video.getSiteId()))) {
+        String siteRef = siteService.siteReference(video.getSiteId());
+        if (!(securityService.isSuperUser()
+                || securityService.unlock(currentUserId, PERMISSION_MANAGE_ALL, siteRef)
+                || securityService.unlock(currentUserId, PERMISSION_CAPTIONS_MANAGE, siteRef)
+                || (securityService.unlock(currentUserId, PERMISSION_MANAGE, siteRef) && Objects.equals(video.getOwnerId(), currentUserId)))) {
             throw new SecurityException("User cannot delete caption " + captionId);
         }
         captionRepository.delete(caption);
@@ -550,6 +650,14 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
         if (securityService.isSuperUser()) {
             return true;
         }
+        return securityService.unlock(userId, PERMISSION_MANAGE_ALL, siteService.siteReference(siteId));
+    }
+
+    @Override
+    public boolean hasManagePermission(String siteId, String userId) {
+        if (securityService.isSuperUser()) {
+            return true;
+        }
         return securityService.unlock(userId, PERMISSION_MANAGE, siteService.siteReference(siteId));
     }
 
@@ -560,7 +668,12 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
         }
 
         String siteRef = siteService.siteReference(video.getSiteId());
-        if (securityService.isSuperUser() || securityService.unlock(userId, PERMISSION_MANAGE, siteRef)) {
+        if (canManageLibrary(video.getSiteId(), userId)) {
+            return true;
+        }
+
+        // Owner-level managers can view videos they own (including drafts/unpublished)
+        if (hasManagePermission(video.getSiteId(), userId) && Objects.equals(video.getOwnerId(), userId)) {
             return true;
         }
 
@@ -598,7 +711,8 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
             return true;
         }
         String siteRef = siteService.siteReference(siteId);
-        return securityService.unlock(userId, PERMISSION_MANAGE, siteRef)
+        return securityService.unlock(userId, PERMISSION_MANAGE_ALL, siteRef)
+                || securityService.unlock(userId, PERMISSION_MANAGE, siteRef)
                 || securityService.unlock(userId, PERMISSION_CAPTIONS_MANAGE, siteRef);
     }
 

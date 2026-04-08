@@ -12,6 +12,13 @@ public interface VideoTrainingVideoRepository extends SpringCrudRepository<Video
 
     List<VideoTrainingVideo> findBySiteIdOrderByModifiedOnDesc(String siteId, String searchText, int offset, int limit);
 
+    List<VideoTrainingVideo> findBySiteIdAndOwnerIdOrderByModifiedOnDesc(String siteId, String ownerId);
+
+    List<VideoTrainingVideo> findBySiteIdAndOwnerIdOrderByModifiedOnDesc(String siteId, String ownerId, String searchText, int offset, int limit);
+
+    List<VideoTrainingVideo> findBySiteIdAndOwnerIdSorted(String siteId, String ownerId, String searchText, int offset, int limit,
+        String sortField, boolean ascending);
+
     List<VideoTrainingVideo> findBySiteIdSorted(String siteId, String searchText, int offset, int limit,
         String sortField, boolean ascending);
 
@@ -19,6 +26,8 @@ public interface VideoTrainingVideoRepository extends SpringCrudRepository<Video
         Instant cursorModifiedOn, String cursorVideoId, int limit);
 
     long countBySiteId(String siteId, String searchText);
+
+    long countBySiteIdAndOwnerId(String siteId, String ownerId, String searchText);
 
     long countByGlobal(String searchText);
 

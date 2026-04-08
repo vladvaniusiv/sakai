@@ -69,6 +69,80 @@ public class VideoTrainingVideoRepositoryImpl extends SpringCrudRepositoryImpl<V
     }
 
     @Override
+    public List<VideoTrainingVideo> findBySiteIdAndOwnerIdOrderByModifiedOnDesc(String siteId, String ownerId) {
+        if (siteId == null) {
+            return Collections.emptyList();
+        }
+
+        CriteriaBuilder cb = sessionFactory.getCriteriaBuilder();
+        CriteriaQuery<VideoTrainingVideo> query = cb.createQuery(VideoTrainingVideo.class);
+        Root<VideoTrainingVideo> root = query.from(VideoTrainingVideo.class);
+
+        query.select(root)
+                .where(cb.and(cb.equal(root.get("siteId"), siteId), cb.equal(root.get("ownerId"), ownerId)))
+                .orderBy(cb.desc(root.get("modifiedOn")));
+
+        return sessionFactory.getCurrentSession().createQuery(query).getResultList();
+    }
+
+    @Override
+    public List<VideoTrainingVideo> findBySiteIdAndOwnerIdOrderByModifiedOnDesc(String siteId, String ownerId, String searchText, int offset, int limit) {
+        if (siteId == null) {
+            return Collections.emptyList();
+        }
+
+        CriteriaBuilder cb = sessionFactory.getCriteriaBuilder();
+        CriteriaQuery<VideoTrainingVideo> query = cb.createQuery(VideoTrainingVideo.class);
+        Root<VideoTrainingVideo> root = query.from(VideoTrainingVideo.class);
+
+        Predicate base = cb.and(cb.equal(root.get("siteId"), siteId), cb.equal(root.get("ownerId"), ownerId));
+        Predicate predicate = buildSiteSearchPredicate(cb, root, siteId, searchText);
+        Predicate finalPredicate = predicate == null ? base : cb.and(base, predicate);
+
+        query.select(root)
+                .where(finalPredicate)
+                .orderBy(cb.desc(root.get("modifiedOn")));
+
+        TypedQuery<VideoTrainingVideo> typedQuery = sessionFactory.getCurrentSession().createQuery(query);
+        if (offset > 0) {
+            typedQuery.setFirstResult(offset);
+        }
+        if (limit > 0) {
+            typedQuery.setMaxResults(limit);
+        }
+        return typedQuery.getResultList();
+    }
+
+    @Override
+    public List<VideoTrainingVideo> findBySiteIdAndOwnerIdSorted(String siteId, String ownerId, String searchText, int offset, int limit,
+            String sortField, boolean ascending) {
+        if (siteId == null) {
+            return Collections.emptyList();
+        }
+
+        CriteriaBuilder cb = sessionFactory.getCriteriaBuilder();
+        CriteriaQuery<VideoTrainingVideo> query = cb.createQuery(VideoTrainingVideo.class);
+        Root<VideoTrainingVideo> root = query.from(VideoTrainingVideo.class);
+
+        Predicate base = cb.and(cb.equal(root.get("siteId"), siteId), cb.equal(root.get("ownerId"), ownerId));
+        Predicate searchPredicate = buildSearchPredicate(cb, root, searchText);
+        Predicate finalPredicate = searchPredicate == null ? base : cb.and(base, searchPredicate);
+
+        query.select(root)
+                .where(finalPredicate)
+                .orderBy(buildSortOrders(cb, root, sortField, ascending));
+
+        TypedQuery<VideoTrainingVideo> typedQuery = sessionFactory.getCurrentSession().createQuery(query);
+        if (offset > 0) {
+            typedQuery.setFirstResult(offset);
+        }
+        if (limit > 0) {
+            typedQuery.setMaxResults(limit);
+        }
+        return typedQuery.getResultList();
+    }
+
+    @Override
     public List<VideoTrainingVideo> findBySiteIdSorted(String siteId, String searchText, int offset, int limit,
             String sortField, boolean ascending) {
         if (siteId == null) {
@@ -133,6 +207,24 @@ public class VideoTrainingVideoRepositoryImpl extends SpringCrudRepositoryImpl<V
         Predicate predicate = buildSiteSearchPredicate(cb, root, siteId, searchText);
 
         query.select(cb.count(root)).where(predicate);
+        return sessionFactory.getCurrentSession().createQuery(query).getSingleResult();
+    }
+
+    @Override
+    public long countBySiteIdAndOwnerId(String siteId, String ownerId, String searchText) {
+        if (siteId == null) {
+            return 0;
+        }
+
+        CriteriaBuilder cb = sessionFactory.getCriteriaBuilder();
+        CriteriaQuery<Long> query = cb.createQuery(Long.class);
+        Root<VideoTrainingVideo> root = query.from(VideoTrainingVideo.class);
+
+        Predicate base = cb.and(cb.equal(root.get("siteId"), siteId), cb.equal(root.get("ownerId"), ownerId));
+        Predicate searchPredicate = buildSearchPredicate(cb, root, searchText);
+        Predicate finalPredicate = searchPredicate == null ? base : cb.and(base, searchPredicate);
+
+        query.select(cb.count(root)).where(finalPredicate);
         return sessionFactory.getCurrentSession().createQuery(query).getSingleResult();
     }
 
