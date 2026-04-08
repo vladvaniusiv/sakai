@@ -25,12 +25,19 @@ public interface VideoTrainingService {
 
     List<VideoTrainingVideo> getSiteLibraryPage(String siteId, String searchText, int page, int size);
 
+    List<VideoTrainingVideo> getSiteLibraryPageForOwner(String siteId, String ownerId, String searchText, int page, int size);
+
     List<VideoTrainingVideo> getSiteLibraryCursor(String siteId, String searchText, Instant cursorModifiedOn, String cursorVideoId, int size);
 
     List<VideoTrainingVideo> getSiteLibrarySorted(String siteId, String searchText, int offset, int size,
         String sortField, boolean ascending);
 
+    List<VideoTrainingVideo> getSiteLibrarySortedForOwner(String siteId, String ownerId, String searchText, int offset, int size,
+        String sortField, boolean ascending);
+
     long countSiteLibrary(String siteId, String searchText);
+
+    long countSiteLibraryForOwner(String siteId, String ownerId, String searchText);
 
     long countGlobalVideos(String searchText);
 
@@ -46,7 +53,17 @@ public interface VideoTrainingService {
 
     long countVisibleVideosForUser(String siteId, String userId, Instant now, String searchText);
 
+    /**
+     * Return the total count of videos for a site as seen by a given user, delegating permission checks.
+     */
+    long countSiteVideosForUser(String siteId, String userId, String searchText);
+
     List<VideoTrainingVideo> getVisibleGlobalVideosPage(String searchText, int page, int size);
+
+    /**
+     * Return a page of videos for a site as seen by a given user, delegating permission checks.
+     */
+    List<VideoTrainingVideo> getSiteVideosForUserPage(String siteId, String userId, String searchText, int page, int size);
 
     List<VideoTrainingVideo> getAdminAllGlobalVideosPage(String searchText, int page, int size);
 
@@ -70,6 +87,8 @@ public interface VideoTrainingService {
     List<VideoTrainingAnalyticsSummary> getSiteAnalyticsSummary(String siteId);
 
     boolean canManageLibrary(String siteId, String userId);
+
+    boolean hasManagePermission(String siteId, String userId);
 
     boolean canViewVideo(VideoTrainingVideo video, String userId, Instant now);
 

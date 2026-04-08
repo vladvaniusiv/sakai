@@ -90,20 +90,15 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         Session session = checkSakaiSession();
         String userId = session.getUserId();
 
-        boolean canManage = videoTrainingService.canManageLibrary(siteId, userId);
-
         String query = StringUtils.trimToEmpty(q);
         int safeSize = normalizePageSize(size);
 
-        Long totalCount = canManage
-                ? videoTrainingService.countSiteLibrary(siteId, query)
-                : videoTrainingService.countVisibleVideosForUser(siteId, userId, Instant.now(), query);
+        Long totalCount = videoTrainingService.countSiteVideosForUser(siteId, userId, query);
 
         int safePage = normalizePage(page, safeSize, totalCount);
 
-        List<VideoTrainingVideo> paginatedVideoList = canManage
-            ? videoTrainingService.getSiteLibraryPage(siteId, query, safePage, safeSize)
-            : videoTrainingService.getVisibleVideosForUserPage(siteId, userId, Instant.now(), query, safePage, safeSize);
+        List<VideoTrainingVideo> paginatedVideoList =
+            videoTrainingService.getSiteVideosForUserPage(siteId, userId, query, safePage, safeSize);
 
         List<VideoTrainingRestBean> beans = paginatedVideoList.stream()
             .map(video -> new VideoTrainingRestBean(video))

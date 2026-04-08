@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.Objects;
 import java.util.TimeZone;
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -132,7 +133,9 @@ public class VideoTrainingController {
             Model model) {
         String siteId = currentSiteId();
         String userId = currentUserId();
-        boolean canManage = videoTrainingService.canManageLibrary(siteId, userId);
+        boolean canManageAll = videoTrainingService.canManageLibrary(siteId, userId);
+        boolean canManageOwn = videoTrainingService.hasManagePermission(siteId, userId);
+        boolean canManage = canManageAll;
         Locale effectiveLocale = locale != null ? locale : Locale.getDefault();
         String effectiveViewMode = resolveEffectiveViewMode(siteId, canManage, viewMode);
         String normalizedQuery = StringUtils.trimToEmpty(query);
@@ -151,8 +154,11 @@ public class VideoTrainingController {
         String sortField = mapSortField(normalizedSortBy, isUserSite);
         boolean ascending = "asc".equals(normalizedSortDir);
         int requested = fetchSize + 1;
-        if (canManage) {
+        if (canManageAll) {
             fetched = videoTrainingService.getSiteLibrarySorted(siteId, normalizedQuery, safeOffset, requested, sortField, ascending);
+        } else if (canManageOwn) {
+            // owner-level managers see only their own videos
+            fetched = videoTrainingService.getSiteLibrarySortedForOwner(siteId, userId, normalizedQuery, safeOffset, requested, sortField, ascending);
         } else {
             if (isUserSite) {
                 fetched = videoTrainingService.getGlobalVideosSorted(normalizedQuery, safeOffset, requested, sortField, ascending);
@@ -236,7 +242,7 @@ public class VideoTrainingController {
     public String newVideo(RedirectAttributes redirectAttributes, Locale locale, Model model) {
         String siteId = currentSiteId();
         String userId = currentUserId();
-        if (!videoTrainingService.canManageLibrary(siteId, userId)) {
+        if (!(videoTrainingService.canManageLibrary(siteId, userId) || videoTrainingService.hasManagePermission(siteId, userId))) {
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage("video.training.accessDenied", null, locale));
             return "redirect:/videos";
@@ -265,16 +271,18 @@ public class VideoTrainingController {
 
         String siteId = currentSiteId();
         String userId = currentUserId();
-        if (!videoTrainingService.canManageLibrary(siteId, userId)) {
-            redirectAttributes.addFlashAttribute("error",
-                    messageSource.getMessage("video.training.accessDenied", null, locale));
-            return "redirect:/videos";
-        }
-
         VideoTrainingVideo video = videoTrainingService.getVideoById(videoId).orElse(null);
         if (video == null) {
             redirectAttributes.addFlashAttribute("error",
-                    messageSource.getMessage("video.training.notFound", null, locale));
+                messageSource.getMessage("video.training.notFound", null, locale));
+            return "redirect:/videos";
+        }
+
+        // allow full site managers or owner-level managers for their own videos
+        if (!(videoTrainingService.canManageLibrary(siteId, userId)
+            || (videoTrainingService.hasManagePermission(siteId, userId) && Objects.equals(video.getOwnerId(), userId)))) {
+            redirectAttributes.addFlashAttribute("error",
+                messageSource.getMessage("video.training.accessDenied", null, locale));
             return "redirect:/videos";
         }
 
@@ -712,7 +720,9 @@ public class VideoTrainingController {
         }
 
         String userId = currentUserId();
-        boolean canManage = videoTrainingService.canManageLibrary(video.getSiteId(), userId);
+        boolean canManageAll = videoTrainingService.canManageLibrary(video.getSiteId(), userId);
+        boolean canManageOwn = videoTrainingService.hasManagePermission(video.getSiteId(), userId) && Objects.equals(video.getOwnerId(), userId);
+        boolean canManage = canManageAll || canManageOwn;
         if (!canManage && !videoTrainingService.canViewVideo(video, userId, Instant.now())) {
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage("video.training.accessDenied", null, locale));
