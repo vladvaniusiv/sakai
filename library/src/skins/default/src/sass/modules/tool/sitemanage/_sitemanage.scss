@@ -229,7 +229,6 @@
   #toolSelectionList {
     margin: 0;
     line-height: 200%;
-    border: $manageTools-panel-border;
     @include border-radius( $manageTools-border-radius-size );
     padding: 0;
 
@@ -750,4 +749,23 @@ td.disabled{
 
 #printme.btn i {
   color: white;
+}
+
+#toolHolderWW {
+  container-type: inline-size;
+}
+
+#toolHolderWW .col-md-8,
+#toolHolderWW .col-md-4 {
+  width: 100%;
+}
+
+@container (min-width: 768px) {
+  #toolHolderWW .col-md-8 {
+    max-width: 66.66666667%;
+  }
+
+  #toolHolderWW .col-md-4 {
+    max-width: 33.33333333%;
+  }
 }
