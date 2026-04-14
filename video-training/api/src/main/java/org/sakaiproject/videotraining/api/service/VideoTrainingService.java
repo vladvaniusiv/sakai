@@ -39,6 +39,8 @@ public interface VideoTrainingService {
 
     long countSiteLibraryForOwner(String siteId, String ownerId, String searchText);
 
+    long countSiteViewableVideosForUser(String siteId, String userId, String searchText);
+
     long countGlobalVideos(String searchText);
 
     List<VideoTrainingVideo> getVisibleVideosForUser(String siteId, String userId, Instant now);
@@ -65,6 +67,13 @@ public interface VideoTrainingService {
      */
     List<VideoTrainingVideo> getSiteVideosForUserPage(String siteId, String userId, String searchText, int page, int size);
 
+    /**
+     * Return a page of videos for a site that the user can view (not edit).
+     * Similar to `getSiteVideosForUserPage` but treats owner-level `manage` permission
+     * as a viewer (i.e., returns visible videos rather than owner-only lists).
+     */
+    List<VideoTrainingVideo> getSiteViewableVideosForUserPage(String siteId, String userId, String searchText, int page, int size);
+
     List<VideoTrainingVideo> getAdminAllGlobalVideosPage(String searchText, int page, int size);
 
     long adminCountAllGlobal(String searchText);
@@ -89,6 +98,8 @@ public interface VideoTrainingService {
     boolean canManageLibrary(String siteId, String userId);
 
     boolean hasManagePermission(String siteId, String userId);
+
+    boolean hasViewPermission(String siteId, String userId);
 
     boolean canViewVideo(VideoTrainingVideo video, String userId, Instant now);
 
