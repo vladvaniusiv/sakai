@@ -16,8 +16,10 @@ import java.util.TimeZone;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
+import org.sakaiproject.authz.api.SecurityService;
 import org.sakaiproject.component.cover.ServerConfigurationService;
 import org.sakaiproject.content.api.ContentCollectionEdit;
 import org.sakaiproject.content.api.ContentEntity;
@@ -36,14 +38,17 @@ import org.sakaiproject.tool.api.ToolManager;
 import org.sakaiproject.user.api.PreferencesService;
 import org.sakaiproject.util.Validator;
 import org.sakaiproject.videotraining.api.VideoTrainingConstants;
+import org.sakaiproject.videotraining.api.model.PaginationMetadata;
 import org.sakaiproject.videotraining.api.model.VideoProviderType;
 import org.sakaiproject.videotraining.api.model.VideoPublicationStatus;
 import org.sakaiproject.videotraining.api.model.VideoTrainingCaption;
 import org.sakaiproject.videotraining.api.model.VideoTrainingVideo;
+import org.sakaiproject.videotraining.api.model.VideoTrainingVideoView;
 import org.sakaiproject.videotraining.api.model.VideoVisibilityScope;
 import org.sakaiproject.videotraining.api.service.VideoTrainingService;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.MessageSource;
+import javax.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -101,6 +106,7 @@ public class VideoTrainingController {
     private final UserTimeService userTimeService;
     private final VideoTrainingService videoTrainingService;
     private final PreferencesService preferencesService;
+    private final SecurityService securityService;
 
     public VideoTrainingController(MessageSource messageSource,
             ContentHostingService contentHostingService,
@@ -109,7 +115,8 @@ public class VideoTrainingController {
             ToolManager toolManager,
             @Qualifier("org.sakaiproject.time.api.UserTimeService") UserTimeService userTimeService,
             VideoTrainingService videoTrainingService,
-            PreferencesService preferencesService) {
+            PreferencesService preferencesService,
+            SecurityService securityService) {
         this.messageSource = messageSource;
         this.contentHostingService = contentHostingService;
         this.sessionManager = sessionManager;
@@ -118,7 +125,153 @@ public class VideoTrainingController {
         this.userTimeService = userTimeService;
         this.videoTrainingService = videoTrainingService;
         this.preferencesService = preferencesService;
+        this.securityService = securityService;
 
+    }
+
+    @GetMapping("/videos-manageable")
+    public String getManageableVideos(
+            @RequestParam(name = "q", required = false) String query,
+            @RequestParam(name = "page", defaultValue = "1") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size,
+            @RequestParam(name = "asUser", required = false) String asUser,
+            HttpServletRequest request,
+            Model model,
+            Locale locale) {
+        String siteId = currentSiteId();
+        String userId = currentUserId();
+        if (StringUtils.isNotBlank(asUser) && securityService.isSuperUser()) {
+            userId = asUser;
+        }
+        Locale effectiveLocale = locale != null ? locale : Locale.getDefault();
+
+        boolean isUserSite = siteService.isUserSite(siteId);
+        boolean isSuperAdmin = securityService.isSuperUser();
+
+        if (!isUserSite && !videoTrainingService.canManageLibrary(siteId, userId) &&
+            !videoTrainingService.hasManagePermission(siteId, userId)) {
+            model.addAttribute("error",
+                messageSource.getMessage("video.training.accessDenied", null, request.getLocale()));
+            return "video-training/manageable";
+        }
+
+        Long totalCount = 0L;
+
+        if (isUserSite) {
+            // Admin verá todos y el resto verán los visibles.
+            totalCount = isSuperAdmin
+                ? videoTrainingService.adminCountAllGlobal(query)
+                : videoTrainingService.countGlobalVideos(query);
+        } else {
+            totalCount = videoTrainingService.countSiteVideosForUser(siteId, userId, query);
+        }
+
+        int safeSize = normalizePageSize(size);
+        int safePage = normalizePage(page, safeSize, totalCount);
+
+        List<VideoTrainingVideo> paginatedVideoList = new ArrayList<>();
+
+        if (isUserSite) {
+            // Admin verá todos y el resto verán los visibles.
+            paginatedVideoList = isSuperAdmin
+                ? videoTrainingService.getAdminAllGlobalVideosPage(query, safePage, safeSize)
+                : videoTrainingService.getVisibleGlobalVideosPage(query, safePage, safeSize);
+        } else {
+            // Admin/Profe verá todos, manage/TA verá los videos suyos, y el resto verá los visibles.
+            paginatedVideoList =
+                videoTrainingService.getSiteVideosForUserPage(siteId, userId, query, safePage, safeSize);
+        }
+
+        List<VideoTrainingVideoView> videoViews = new ArrayList<>();
+        for (VideoTrainingVideo video : paginatedVideoList) {
+            VideoTrainingVideoView view = VideoTrainingVideoView.builder()
+                    .id(video.getId())
+                    .title(video.getTitle())
+                    .description(video.getDescription())
+                    .siteName(isUserSite ? getSiteName(video.getSiteId()) : null)
+                    .releaseDisplay(formatInstantForDisplay(video.getReleaseDate(), effectiveLocale))
+                    .retractDisplay(formatInstantForDisplay(video.getRetractDate(), effectiveLocale))
+                    .thumbnailUrl(buildThumbnailUrl(video))
+                    .thumbnailIsVideo(isNativeVideoThumbnail(video))
+                    .visibilityScope(video.getVisibilityScope() != null ? video.getVisibilityScope().name() : "COURSE")
+                    .publicationStatus(video.getPublicationStatus() != null ? video.getPublicationStatus().name() : "DRAFT")
+                    .build();
+            videoViews.add(view);
+        }
+
+        PaginationMetadata pagination = new PaginationMetadata(totalCount, safePage, safeSize);
+
+        return new String();
+    }
+
+    @GetMapping("/videos-viewable")
+    public String getViewableVideos(
+            @RequestParam(name = "q", required = false) String query,
+            @RequestParam(name = "page", defaultValue = "1") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size,
+            @RequestParam(name = "asUser", required = false) String asUser,
+            HttpServletRequest request,
+            Model model,
+            Locale locale) {
+        String siteId = currentSiteId();
+        String userId = currentUserId();
+        if (StringUtils.isNotBlank(asUser) && securityService.isSuperUser()) {
+            userId = asUser;
+        }
+        Locale effectiveLocale = locale != null ? locale : Locale.getDefault();
+        String normalizedQuery = StringUtils.trimToEmpty(query);
+
+        boolean isSuperAdmin = securityService.isSuperUser();
+        boolean isUserSite = siteService.isUserSite(siteId);
+
+        Long totalCount = 0L;
+
+        if (isUserSite) {
+            // Admin verá todos y el resto verán los visibles.
+            totalCount = isSuperAdmin
+                ? videoTrainingService.adminCountAllGlobal(query)
+                : videoTrainingService.countGlobalVideos(query);
+        } else {
+            totalCount = videoTrainingService.countSiteViewableVideosForUser(
+                siteId, userId, normalizedQuery
+            );
+        }
+
+        int safeSize = normalizePageSize(size);
+        int safePage = normalizePage(page, safeSize, totalCount);
+
+        List<VideoTrainingVideo> paginatedVideoList = new ArrayList<>();
+
+        if (isUserSite) {
+            // Admin verá todos y el resto verán los visibles.
+            paginatedVideoList = isSuperAdmin
+                ? videoTrainingService.getAdminAllGlobalVideosPage(query, safePage, safeSize)
+                : videoTrainingService.getVisibleGlobalVideosPage(query, safePage, safeSize);
+        } else {
+            // Admin verá todos, manage y el resto verán los videos sites visibles.
+            paginatedVideoList = videoTrainingService.getSiteViewableVideosForUserPage(siteId, userId, normalizedQuery, safePage, safeSize);
+        }
+
+        List<VideoTrainingVideoView> videoViews = new ArrayList<>();
+        for (VideoTrainingVideo video : paginatedVideoList) {
+            VideoTrainingVideoView view = VideoTrainingVideoView.builder()
+                    .id(video.getId())
+                    .title(video.getTitle())
+                    .description(video.getDescription())
+                    .siteName(isUserSite ? getSiteName(video.getSiteId()) : null)
+                    .releaseDisplay(formatInstantForDisplay(video.getReleaseDate(), effectiveLocale))
+                    .retractDisplay(formatInstantForDisplay(video.getRetractDate(), effectiveLocale))
+                    .thumbnailUrl(buildThumbnailUrl(video))
+                    .thumbnailIsVideo(isNativeVideoThumbnail(video))
+                    .visibilityScope(video.getVisibilityScope() != null ? video.getVisibilityScope().name() : "COURSE")
+                    .publicationStatus(video.getPublicationStatus() != null ? video.getPublicationStatus().name() : "DRAFT")
+                    .build();
+            videoViews.add(view);
+        }
+
+        PaginationMetadata pagination = new PaginationMetadata(totalCount, safePage, safeSize);
+
+        return new String();
     }
 
     @GetMapping({"/", "/videos"})
@@ -1084,6 +1237,16 @@ public class VideoTrainingController {
             return DEFAULT_PAGE_SIZE;
         }
         return Math.min(MAX_PAGE_SIZE, requestedSize);
+    }
+
+    private int normalizePage(int requestedPage, int pageSize, long totalCount) {
+        int safePage = Math.max(requestedPage, 1);
+        if (totalCount <= 0) {
+            return 1;
+        }
+
+        int totalPages = (int) Math.max(1, Math.ceil((double) totalCount / pageSize));
+        return Math.min(safePage, totalPages);
     }
 
     private boolean isValidViewMode(String viewMode) {
