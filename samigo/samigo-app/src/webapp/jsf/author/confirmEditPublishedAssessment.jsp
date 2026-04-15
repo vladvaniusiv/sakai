@@ -49,6 +49,9 @@
 	   <br/>
 	   <h:outputText value="#{authorMessages.edit_published_assessment_heading_conf_info_4}" />
      </div>
+     <div class="bs-callout-danger tier1">
+      <h:outputText value="#{authorMessages.edit_published_assessment_heading_conf_info_5}" />
+     </div>
        <p class="act">
        <h:commandButton id="edit" value="#{commonMessages.edit_action}" type="submit"
          styleClass="active" action="#{author.getOutcome}" >
