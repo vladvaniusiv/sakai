@@ -40,11 +40,11 @@
             <input class="form-control" id="sourceReference" name="sourceReference" type="text" th:value="${video.providerType != null && video.providerType.name() == 'EXTERNAL' ? video.sourceReference : ''}">
             <div class="form-text" th:text="#{video.training.form.sourceHint}">Paste an external URL or a resource reference.</div>
             <div class="form-check mt-2">
-                <input class="form-check-input" id="inheritTitleMetadata" name="inheritTitleMetadata" type="checkbox">
+                <input class="form-check-input" id="inheritTitleMetadata" name="inheritTitleMetadata" type="checkbox" value="true" th:checked="${video != null and video.inheritTitleMetadata}">
                 <label class="form-check-label" for="inheritTitleMetadata">Heredar título desde la fuente</label>
             </div>
             <div class="form-check mt-1">
-                <input class="form-check-input" id="inheritDescriptionMetadata" name="inheritDescriptionMetadata" type="checkbox">
+                <input class="form-check-input" id="inheritDescriptionMetadata" name="inheritDescriptionMetadata" type="checkbox" value="true" th:checked="${video != null and video.inheritDescriptionMetadata}">
                 <label class="form-check-label" for="inheritDescriptionMetadata">Heredar descripción desde la fuente</label>
             </div>
         </div>
