@@ -16,32 +16,32 @@ import lombok.Data;
 
 @Entity
 @Data
-@Table(name = "VTM_CATEGORY")
+@Table(name = "vtm_category")
 public class VideoTrainingCategory implements PersistableEntity<String> {
 
     @Id
     @GeneratedValue(generator = "uuid2")
     @GenericGenerator(name = "uuid2", strategy = "uuid2")
-    @Column(name = "CATEGORY_ID", nullable = false, length = 36)
+    @Column(nullable = false, length = 36)
     private String id;
 
-    @Column(name = "SITE_ID", nullable = false, length = 99)
+    @Column(nullable = false, length = 99)
     private String siteId;
 
-    @Column(name = "NAME", nullable = false, length = 255)
+    @Column(nullable = false, length = 255)
     private String name;
 
-    @Column(name = "PARENT_CATEGORY_ID", length = 36)
+    @Column(length = 36)
     private String parentCategoryId;
 
-    @Column(name = "SORT_ORDER", nullable = false)
+    @Column(nullable = false)
     private Integer sortOrder = 0;
 
-    @Column(name = "CREATED_ON", nullable = false)
+    @Column(nullable = false)
     @Convert(converter = InstantEpochMillisConverter.class)
     private Instant createdOn = Instant.now();
 
-    @Column(name = "MODIFIED_ON", nullable = false)
+    @Column(nullable = false)
     @Convert(converter = InstantEpochMillisConverter.class)
     private Instant modifiedOn = Instant.now();
 

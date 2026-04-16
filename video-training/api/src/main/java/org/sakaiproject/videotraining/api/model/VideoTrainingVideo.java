@@ -19,61 +19,67 @@ import lombok.Data;
 
 @Entity
 @Data
-@Table(name = "VTM_VIDEO")
+@Table(name = "vtm_video")
 public class VideoTrainingVideo implements PersistableEntity<String> {
 
     @Id
     @GeneratedValue(generator = "uuid2")
     @GenericGenerator(name = "uuid2", strategy = "uuid2")
-    @Column(name = "VIDEO_ID", nullable = false, length = 36)
+    @Column(nullable = false, length = 36)
     private String id;
 
-    @Column(name = "SITE_ID", nullable = false, length = 99)
+    @Column(nullable = false, length = 99)
     private String siteId;
 
-    @Column(name = "OWNER_ID", nullable = false, length = 99)
+    @Column(nullable = false, length = 99)
     private String ownerId;
 
-    @Column(name = "TITLE", nullable = false, length = 255)
+    @Column(nullable = false, length = 255)
     private String title;
 
-    @Column(name = "DESCRIPTION", length = 4000)
+    @Column
+    private boolean inheritTitleMetadata;
+
+    @Column
+    private boolean inheritDescriptionMetadata;
+
+    @Column(length = 4000)
     private String description;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "PROVIDER_TYPE", nullable = false, length = 16)
+    @Column(nullable = false, length = 16)
     private VideoProviderType providerType = VideoProviderType.NATIVE;
 
-    @Column(name = "SOURCE_ID", nullable = false, length = 1024)
+    @Column(nullable = false, length = 1024)
     private String sourceReference;
 
-    @Column(name = "FILE_SIZE_BYTES")
+    @Column
     private Long fileSizeBytes;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "VISIBILITY_SCOPE", nullable = false, length = 16)
+    @Column(nullable = false, length = 16)
     private VideoVisibilityScope visibilityScope = VideoVisibilityScope.COURSE;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "PUBLICATION_STATUS", nullable = false, length = 16)
+    @Column(nullable = false, length = 16)
     private VideoPublicationStatus publicationStatus = VideoPublicationStatus.DRAFT;
 
-    @Column(name = "RELEASE_DATE")
+    @Column
     @Convert(converter = InstantEpochMillisConverter.class)
     private Instant releaseDate;
 
-    @Column(name = "RETRACT_DATE")
+    @Column
     @Convert(converter = InstantEpochMillisConverter.class)
     private Instant retractDate;
 
-    @Column(name = "REQUIRED_VIEW_PERMISSION", nullable = false, length = 99)
+    @Column(nullable = false, length = 99)
     private String requiredViewPermission = VideoTrainingConstants.PERMISSION_VIEW;
 
-    @Column(name = "CREATED_ON", nullable = false)
+    @Column(nullable = false)
     @Convert(converter = InstantEpochMillisConverter.class)
     private Instant createdOn = Instant.now();
 
-    @Column(name = "MODIFIED_ON", nullable = false)
+    @Column(nullable = false)
     @Convert(converter = InstantEpochMillisConverter.class)
     private Instant modifiedOn = Instant.now();
 
