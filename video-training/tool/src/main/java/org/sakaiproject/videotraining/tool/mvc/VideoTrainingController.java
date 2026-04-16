@@ -93,7 +93,9 @@ public class VideoTrainingController {
     private static final String MODERATION_ENABLED_PROPERTY = "video.training.moderation.enabled";
     private static final int DEFAULT_PAGE_SIZE = 24;
     private static final int MAX_PAGE_SIZE = 100;
-    private static final long MAX_NATIVE_UPLOAD_BYTES = 536_870_912L;
+    private static final String MAX_NATIVE_UPLOAD_SIZE_PROPERTY = "video.training.max.upload.size";
+    private static final long BYTES_PER_MB = 1024L * 1024L;
+    private static final long DEFAULT_MAX_NATIVE_UPLOAD_MB = 512L;
     private static final Set<String> ALLOWED_NATIVE_VIDEO_EXTENSIONS = Set.of("mp4", "webm", "ogg", "mov", "m4v", "avi", "mkv");
     private static final Pattern IFRAME_SRC_PATTERN = Pattern.compile("(?is)<iframe[^>]*\\bsrc=[\"']([^\"']+)[\"']");
     private static final Pattern YOUTUBE_WATCH_PATTERN = Pattern.compile("(?:v=)([A-Za-z0-9_-]{11})");
@@ -381,6 +383,7 @@ public class VideoTrainingController {
         List<ExistingResourceOption> existingResources = getExistingSiteVideoResources(siteId);
         model.addAttribute("existingVideoResources", existingResources);
         model.addAttribute("sourceMode", SOURCE_MODE_UPLOAD);
+        model.addAttribute("nativeUploadMaxBytes", getConfiguredMaxNativeUploadBytes());
         model.addAttribute("providerTypes", VideoProviderType.values());
         model.addAttribute("visibilityScopes", VideoVisibilityScope.values());
         model.addAttribute("publicationStatuses", publicationStatusesForForm());
@@ -419,6 +422,7 @@ public class VideoTrainingController {
         List<ExistingResourceOption> existingResources = getExistingSiteVideoResources(siteId);
         model.addAttribute("existingVideoResources", existingResources);
         model.addAttribute("sourceMode", determineSourceMode(video, existingResources));
+        model.addAttribute("nativeUploadMaxBytes", getConfiguredMaxNativeUploadBytes());
         model.addAttribute("providerTypes", VideoProviderType.values());
         model.addAttribute("visibilityScopes", VideoVisibilityScope.values());
         VideoVisibilityScope scope = video.getVisibilityScope() != null ? video.getVisibilityScope() : VideoVisibilityScope.COURSE;
@@ -509,8 +513,9 @@ public class VideoTrainingController {
                 return "redirect:/videos/new";
             }
 
-            Long maxNativeUploadBytes = Long.parseLong(ServerConfigurationService.getString("video.training.max.upload.size", "536870912"));
-            if (nativeFile.getSize() > maxNativeUploadBytes) {
+            Long maxNativeUploadBytes = getConfiguredMaxNativeUploadBytes();
+            Long margin = 64L * 1024L; // 64KB margin for multipart overhead
+            if (nativeFile.getSize() > (maxNativeUploadBytes + margin)) {
                 redirectAttributes.addFlashAttribute("error",
                         messageSource.getMessage("video.training.nativeUploadTooLarge", null, locale));
                 return "redirect:/videos/new";
@@ -686,8 +691,9 @@ public class VideoTrainingController {
                     return "redirect:/videos/" + videoId + "/edit";
                 }
 
-                Long maxNativeUploadBytes = Long.parseLong(ServerConfigurationService.getString("video.training.max.upload.size", "536870912"));
-                if (nativeFile.getSize() > maxNativeUploadBytes) {
+                Long maxNativeUploadBytes = getConfiguredMaxNativeUploadBytes();
+                Long margin = 64L * 1024L; // 64KB margin for multipart overhead
+                if (nativeFile.getSize() > (maxNativeUploadBytes + margin)) {
                     redirectAttributes.addFlashAttribute("error",
                             messageSource.getMessage("video.training.nativeUploadTooLarge", null, locale));
                     return "redirect:/videos/" + videoId + "/edit";
@@ -1284,6 +1290,19 @@ public class VideoTrainingController {
 
         int totalPages = (int) Math.max(1, Math.ceil((double) totalCount / pageSize));
         return Math.min(safePage, totalPages);
+    }
+
+    private long getConfiguredMaxNativeUploadBytes() {
+        String configuredValue = StringUtils.trimToEmpty(ServerConfigurationService.getString(
+                MAX_NATIVE_UPLOAD_SIZE_PROPERTY,
+                String.valueOf(DEFAULT_MAX_NATIVE_UPLOAD_MB)));
+        try {
+            long parsedMegabytes = Long.parseLong(configuredValue);
+            long safeMegabytes = parsedMegabytes > 0 ? parsedMegabytes : DEFAULT_MAX_NATIVE_UPLOAD_MB;
+            return safeMegabytes * BYTES_PER_MB;
+        } catch (NumberFormatException ex) {
+            return DEFAULT_MAX_NATIVE_UPLOAD_MB * BYTES_PER_MB;
+        }
     }
 
     private boolean isValidViewMode(String viewMode) {
