@@ -55,12 +55,16 @@ public interface VideoTrainingService {
 
     long countVisibleVideosForUser(String siteId, String userId, Instant now, String searchText);
 
+    long countGlobalVideosForUser(String userId, String searchText);
+
     /**
      * Return the total count of videos for a site as seen by a given user, delegating permission checks.
      */
     long countSiteVideosForUser(String siteId, String userId, String searchText);
 
     List<VideoTrainingVideo> getVisibleGlobalVideosPage(String searchText, int page, int size);
+
+    List<VideoTrainingVideo> getGlobalVideosForUser(String userId, String searchText, int page, int size);
 
     /**
      * Return a page of videos for a site as seen by a given user, delegating permission checks.

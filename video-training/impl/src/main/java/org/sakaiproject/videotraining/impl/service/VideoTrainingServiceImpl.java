@@ -317,6 +317,18 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
 
     @Override
     @Transactional(readOnly = true)
+    public long countGlobalVideosForUser(String userId, String searchText) {
+        String query = normalizeSearchText(searchText);
+
+        if (securityService.isSuperUser(userId)) {
+            return adminCountAllGlobal(query);
+        } else {
+            return countGlobalVideos(query);
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public long countSiteVideosForUser(String siteId, String userId, String searchText) {
         String query = normalizeSearchText(searchText);
 
@@ -413,6 +425,20 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
         }
 
         return results;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VideoTrainingVideo> getGlobalVideosForUser(String userId, String searchText, int page, int size) {
+        String query = normalizeSearchText(searchText);
+        int safePage = Math.max(1, page);
+        int safeSize = sanitizePageSize(size);
+
+        if (securityService.isSuperUser(userId)) {
+            return getAdminAllGlobalVideosPage(query, safePage, safeSize);
+        } else {
+            return getVisibleGlobalVideosPage(query, safePage, safeSize);
+        }
     }
 
     @Override
