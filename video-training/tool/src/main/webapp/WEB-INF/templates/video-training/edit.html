@@ -39,6 +39,14 @@
             <label class="form-label" for="sourceReference" th:text="#{video.training.form.source}">Source</label>
             <input class="form-control" id="sourceReference" name="sourceReference" type="text" th:value="${video.providerType != null && video.providerType.name() == 'EXTERNAL' ? video.sourceReference : ''}">
             <div class="form-text" th:text="#{video.training.form.sourceHint}">Paste an external URL or a resource reference.</div>
+            <div class="form-check mt-2">
+                <input class="form-check-input" id="inheritTitleMetadata" name="inheritTitleMetadata" type="checkbox">
+                <label class="form-check-label" for="inheritTitleMetadata">Heredar título desde la fuente</label>
+            </div>
+            <div class="form-check mt-1">
+                <input class="form-check-input" id="inheritDescriptionMetadata" name="inheritDescriptionMetadata" type="checkbox">
+                <label class="form-check-label" for="inheritDescriptionMetadata">Heredar descripción desde la fuente</label>
+            </div>
         </div>
 
         <div class="vt-form-section" id="uploadSourceSection">
@@ -93,6 +101,43 @@
     </form>
 </div>
 <script th:src="@{/js/video-training-edit.js}"></script>
+<script>
+    (function() {
+        function $(id) { return document.getElementById(id); }
+        function syncDisabled(checkbox, input) {
+            if (!checkbox || !input) return;
+            // Use readonly so the input value is still submitted with the form.
+            input.readOnly = checkbox.checked;
+            if (checkbox.checked) {
+                input.classList.add('vt-readonly');
+            } else {
+                input.classList.remove('vt-readonly');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            var titleCheckbox = $('inheritTitleMetadata');
+            var descCheckbox = $('inheritDescriptionMetadata');
+            var titleInput = $('title');
+            var descInput = $('description');
+
+            if (titleCheckbox) {
+                // initialize state
+                syncDisabled(titleCheckbox, titleInput);
+                titleCheckbox.addEventListener('change', function() { syncDisabled(titleCheckbox, titleInput); });
+            }
+
+            if (descCheckbox) {
+                // initialize state
+                syncDisabled(descCheckbox, descInput);
+                descCheckbox.addEventListener('change', function() { syncDisabled(descCheckbox, descInput); });
+            }
+        });
+    })();
+</script>
+<style>
+    .vt-readonly { background-color: #e9ecef; }
+</style>
 <div th:replace="~{fragments/common :: jQuery}"></div>
 </body>
 </html>

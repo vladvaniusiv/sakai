@@ -1,10 +1,17 @@
 package org.sakaiproject.videotraining.tool.mvc;
 
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -12,11 +19,16 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.TimeZone;
 import java.util.UUID;
+import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.json.jackson2.JacksonFactory;
+import com.google.api.services.youtube.YouTube;
+import com.google.api.services.youtube.model.VideoListResponse;
+import com.google.api.services.youtube.model.Video;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.StringUtils;
 import org.sakaiproject.authz.api.SecurityService;
@@ -32,13 +44,11 @@ import org.sakaiproject.exception.IdUnusedException;
 import org.sakaiproject.exception.OverQuotaException;
 import org.sakaiproject.site.api.SiteService;
 import org.sakaiproject.time.api.UserTimeService;
-import org.sakaiproject.tool.api.Session;
 import org.sakaiproject.tool.api.SessionManager;
 import org.sakaiproject.tool.api.ToolManager;
-import org.sakaiproject.user.api.PreferencesService;
 import org.sakaiproject.util.Validator;
 import org.sakaiproject.videotraining.api.VideoTrainingConstants;
-import org.sakaiproject.videotraining.api.model.PaginationMetadata;
+import org.sakaiproject.videotraining.api.model.PagedResponse;
 import org.sakaiproject.videotraining.api.model.VideoProviderType;
 import org.sakaiproject.videotraining.api.model.VideoPublicationStatus;
 import org.sakaiproject.videotraining.api.model.VideoTrainingCaption;
@@ -50,6 +60,10 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.MessageSource;
 import javax.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Controller;
+import java.io.IOException;
+import java.net.URI;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -105,7 +119,6 @@ public class VideoTrainingController {
     private final ToolManager toolManager;
     private final UserTimeService userTimeService;
     private final VideoTrainingService videoTrainingService;
-    private final PreferencesService preferencesService;
     private final SecurityService securityService;
 
     public VideoTrainingController(MessageSource messageSource,
@@ -115,7 +128,6 @@ public class VideoTrainingController {
             ToolManager toolManager,
             @Qualifier("org.sakaiproject.time.api.UserTimeService") UserTimeService userTimeService,
             VideoTrainingService videoTrainingService,
-            PreferencesService preferencesService,
             SecurityService securityService) {
         this.messageSource = messageSource;
         this.contentHostingService = contentHostingService;
@@ -124,13 +136,12 @@ public class VideoTrainingController {
         this.toolManager = toolManager;
         this.userTimeService = userTimeService;
         this.videoTrainingService = videoTrainingService;
-        this.preferencesService = preferencesService;
         this.securityService = securityService;
 
     }
 
     @GetMapping("/videos-manageable")
-    public String getManageableVideos(
+    public PagedResponse<VideoTrainingVideoView> getManageableVideos(
             @RequestParam(name = "q", required = false) String query,
             @RequestParam(name = "page", defaultValue = "1") int page,
             @RequestParam(name = "size", defaultValue = "10") int size,
@@ -146,22 +157,19 @@ public class VideoTrainingController {
         Locale effectiveLocale = locale != null ? locale : Locale.getDefault();
 
         boolean isUserSite = siteService.isUserSite(siteId);
-        boolean isSuperAdmin = securityService.isSuperUser();
 
         if (!isUserSite && !videoTrainingService.canManageLibrary(siteId, userId) &&
             !videoTrainingService.hasManagePermission(siteId, userId)) {
             model.addAttribute("error",
                 messageSource.getMessage("video.training.accessDenied", null, request.getLocale()));
-            return "video-training/manageable";
+            return new PagedResponse<>(Collections.emptyList(), 0L, page, size);
         }
 
         Long totalCount = 0L;
 
         if (isUserSite) {
-            // Admin verá todos y el resto verán los visibles.
-            totalCount = isSuperAdmin
-                ? videoTrainingService.adminCountAllGlobal(query)
-                : videoTrainingService.countGlobalVideos(query);
+            // Admin will see all and the rest will see the visible ones.
+            totalCount = videoTrainingService.countGlobalVideosForUser(userId, query);
         } else {
             totalCount = videoTrainingService.countSiteVideosForUser(siteId, userId, query);
         }
@@ -172,40 +180,23 @@ public class VideoTrainingController {
         List<VideoTrainingVideo> paginatedVideoList = new ArrayList<>();
 
         if (isUserSite) {
-            // Admin verá todos y el resto verán los visibles.
-            paginatedVideoList = isSuperAdmin
-                ? videoTrainingService.getAdminAllGlobalVideosPage(query, safePage, safeSize)
-                : videoTrainingService.getVisibleGlobalVideosPage(query, safePage, safeSize);
+            // Admin will see all and the rest will see the visible ones.
+            paginatedVideoList = videoTrainingService.getGlobalVideosForUser(userId, query, safePage, safeSize);
         } else {
-            // Admin/Profe verá todos, manage/TA verá los videos suyos, y el resto verá los visibles.
+            // Admin/Profe will see all, manage/TA will see their videos,
+            // and the rest will see the visible ones.
             paginatedVideoList =
                 videoTrainingService.getSiteVideosForUserPage(siteId, userId, query, safePage, safeSize);
         }
 
-        List<VideoTrainingVideoView> videoViews = new ArrayList<>();
-        for (VideoTrainingVideo video : paginatedVideoList) {
-            VideoTrainingVideoView view = VideoTrainingVideoView.builder()
-                    .id(video.getId())
-                    .title(video.getTitle())
-                    .description(video.getDescription())
-                    .siteName(isUserSite ? getSiteName(video.getSiteId()) : null)
-                    .releaseDisplay(formatInstantForDisplay(video.getReleaseDate(), effectiveLocale))
-                    .retractDisplay(formatInstantForDisplay(video.getRetractDate(), effectiveLocale))
-                    .thumbnailUrl(buildThumbnailUrl(video))
-                    .thumbnailIsVideo(isNativeVideoThumbnail(video))
-                    .visibilityScope(video.getVisibilityScope() != null ? video.getVisibilityScope().name() : "COURSE")
-                    .publicationStatus(video.getPublicationStatus() != null ? video.getPublicationStatus().name() : "DRAFT")
-                    .build();
-            videoViews.add(view);
-        }
+        List<VideoTrainingVideoView> videoViews = buildVideoViews(
+            paginatedVideoList, isUserSite, effectiveLocale);
 
-        PaginationMetadata pagination = new PaginationMetadata(totalCount, safePage, safeSize);
-
-        return new String();
+        return new PagedResponse<VideoTrainingVideoView>(videoViews, totalCount, safePage, safeSize);
     }
 
     @GetMapping("/videos-viewable")
-    public String getViewableVideos(
+    public PagedResponse<VideoTrainingVideoView> getViewableVideos(
             @RequestParam(name = "q", required = false) String query,
             @RequestParam(name = "page", defaultValue = "1") int page,
             @RequestParam(name = "size", defaultValue = "10") int size,
@@ -221,16 +212,13 @@ public class VideoTrainingController {
         Locale effectiveLocale = locale != null ? locale : Locale.getDefault();
         String normalizedQuery = StringUtils.trimToEmpty(query);
 
-        boolean isSuperAdmin = securityService.isSuperUser();
         boolean isUserSite = siteService.isUserSite(siteId);
 
         Long totalCount = 0L;
 
         if (isUserSite) {
-            // Admin verá todos y el resto verán los visibles.
-            totalCount = isSuperAdmin
-                ? videoTrainingService.adminCountAllGlobal(query)
-                : videoTrainingService.countGlobalVideos(query);
+            // Admin will see all and the rest will see the visible ones.
+            totalCount = videoTrainingService.countGlobalVideosForUser(userId, query);
         } else {
             totalCount = videoTrainingService.countSiteViewableVideosForUser(
                 siteId, userId, normalizedQuery
@@ -243,35 +231,18 @@ public class VideoTrainingController {
         List<VideoTrainingVideo> paginatedVideoList = new ArrayList<>();
 
         if (isUserSite) {
-            // Admin verá todos y el resto verán los visibles.
-            paginatedVideoList = isSuperAdmin
-                ? videoTrainingService.getAdminAllGlobalVideosPage(query, safePage, safeSize)
-                : videoTrainingService.getVisibleGlobalVideosPage(query, safePage, safeSize);
+            // Admin will see all and the rest will see the visible ones.
+            paginatedVideoList = videoTrainingService.getGlobalVideosForUser(userId, query, safePage, safeSize);
         } else {
-            // Admin verá todos, manage y el resto verán los videos sites visibles.
+            // Admin will see all, manage/TA will see their videos,
+            // and the rest will see the visible ones.
             paginatedVideoList = videoTrainingService.getSiteViewableVideosForUserPage(siteId, userId, normalizedQuery, safePage, safeSize);
         }
 
-        List<VideoTrainingVideoView> videoViews = new ArrayList<>();
-        for (VideoTrainingVideo video : paginatedVideoList) {
-            VideoTrainingVideoView view = VideoTrainingVideoView.builder()
-                    .id(video.getId())
-                    .title(video.getTitle())
-                    .description(video.getDescription())
-                    .siteName(isUserSite ? getSiteName(video.getSiteId()) : null)
-                    .releaseDisplay(formatInstantForDisplay(video.getReleaseDate(), effectiveLocale))
-                    .retractDisplay(formatInstantForDisplay(video.getRetractDate(), effectiveLocale))
-                    .thumbnailUrl(buildThumbnailUrl(video))
-                    .thumbnailIsVideo(isNativeVideoThumbnail(video))
-                    .visibilityScope(video.getVisibilityScope() != null ? video.getVisibilityScope().name() : "COURSE")
-                    .publicationStatus(video.getPublicationStatus() != null ? video.getPublicationStatus().name() : "DRAFT")
-                    .build();
-            videoViews.add(view);
-        }
+        List<VideoTrainingVideoView> videoViews = buildVideoViews(
+            paginatedVideoList, isUserSite, effectiveLocale);
 
-        PaginationMetadata pagination = new PaginationMetadata(totalCount, safePage, safeSize);
-
-        return new String();
+        return new PagedResponse<VideoTrainingVideoView>(videoViews, totalCount, safePage, safeSize);
     }
 
     @GetMapping({"/", "/videos"})
@@ -458,13 +429,16 @@ public class VideoTrainingController {
     }
 
     @PostMapping("/videos")
-    public String createVideo(@RequestParam("title") String title,
+        public String createVideo(
+            @RequestParam("title") String title,
             @RequestParam("description") String description,
             @RequestParam("providerType") String providerType,
             @RequestParam(name = "sourceMode", required = false) String sourceMode,
             @RequestParam(name = "sourceReference", required = false) String sourceReference,
             @RequestParam(name = "existingResourceReference", required = false) String existingResourceReference,
             @RequestParam(name = "nativeFile", required = false) MultipartFile nativeFile,
+            @RequestParam(name = "inheritTitleMetadata", required = false) String inheritTitleMetadata,
+            @RequestParam(name = "inheritDescriptionMetadata", required = false) String inheritDescriptionMetadata,
             @RequestParam(name = "visibilityScope", required = false) String visibilityScope,
             @RequestParam(name = "publicationStatus", required = false) String publicationStatus,
             @RequestParam(name = "releaseDate", required = false) String releaseDate,
@@ -487,6 +461,33 @@ public class VideoTrainingController {
                         messageSource.getMessage("video.training.invalidExternalSource", null, locale));
                 return "redirect:/videos/new";
             }
+            // If user requested inheriting metadata, fetch it (must succeed or return error)
+            boolean wantTitle = StringUtils.isNotBlank(inheritTitleMetadata);
+            boolean wantDescription = StringUtils.isNotBlank(inheritDescriptionMetadata);
+            if (wantTitle || wantDescription) {
+                String videoProvider = retrieveVideoProvider(resolvedSourceReference);
+                try {
+                    MetadataFetchResult meta = fetchExternalMetadata(resolvedSourceReference);
+
+                    if (wantTitle && StringUtils.isBlank(meta.title)) {
+                        redirectAttributes.addFlashAttribute("error", "La API de " + videoProvider + " no devolvió título; introduce los datos manualmente.");
+                        return "redirect:/videos/new";
+                    }
+                    if (wantDescription && StringUtils.isBlank(meta.description)) {
+                        redirectAttributes.addFlashAttribute("error", "La API de " + videoProvider + " no devolvió descripción; introduce los datos manualmente.");
+                        return "redirect:/videos/new";
+                    }
+                    if (wantTitle && StringUtils.isNotBlank(meta.title)) {
+                        title = meta.title;
+                    }
+                    if (wantDescription && StringUtils.isNotBlank(meta.description)) {
+                        description = meta.description;
+                    }
+                } catch (Exception e) {
+                    redirectAttributes.addFlashAttribute("error", "La API de " + videoProvider + " no funciona; introduce los datos manualmente.");
+                    return "redirect:/videos/new";
+                }
+            }
         } else if (SOURCE_MODE_RESOURCES.equals(effectiveSourceMode)) {
             resolvedSourceReference = StringUtils.trimToEmpty(existingResourceReference);
             if (StringUtils.isBlank(resolvedSourceReference)
@@ -507,7 +508,9 @@ public class VideoTrainingController {
                         messageSource.getMessage("video.training.nativeUploadInvalidType", null, locale));
                 return "redirect:/videos/new";
             }
-            if (nativeFile.getSize() > MAX_NATIVE_UPLOAD_BYTES) {
+
+            Long maxNativeUploadBytes = Long.parseLong(ServerConfigurationService.getString("video.training.max.upload.size", "536870912"));
+            if (nativeFile.getSize() > maxNativeUploadBytes) {
                 redirectAttributes.addFlashAttribute("error",
                         messageSource.getMessage("video.training.nativeUploadTooLarge", null, locale));
                 return "redirect:/videos/new";
@@ -606,6 +609,8 @@ public class VideoTrainingController {
             @RequestParam(name = "sourceReference", required = false) String sourceReference,
             @RequestParam(name = "existingResourceReference", required = false) String existingResourceReference,
             @RequestParam(name = "nativeFile", required = false) MultipartFile nativeFile,
+            @RequestParam(name = "inheritTitleMetadata", required = false) String inheritTitleMetadata,
+            @RequestParam(name = "inheritDescriptionMetadata", required = false) String inheritDescriptionMetadata,
             @RequestParam(name = "visibilityScope", required = false) String visibilityScope,
             @RequestParam(name = "publicationStatus", required = false) String publicationStatus,
             @RequestParam(name = "releaseDate", required = false) String releaseDate,
@@ -636,6 +641,32 @@ public class VideoTrainingController {
                 return "redirect:/videos/" + videoId + "/edit";
             }
             resolvedFileSizeBytes = null;
+            boolean wantTitle = StringUtils.isNotBlank(inheritTitleMetadata);
+            boolean wantDescription = StringUtils.isNotBlank(inheritDescriptionMetadata);
+            if (wantTitle || wantDescription) {
+                String videoProvider = retrieveVideoProvider(resolvedSourceReference);
+                try {
+                    MetadataFetchResult meta = fetchExternalMetadata(resolvedSourceReference);
+
+                    if (wantTitle && StringUtils.isBlank(meta.title)) {
+                        redirectAttributes.addFlashAttribute("error", "La API de " + videoProvider + " no devolvió título; introduce los datos manualmente.");
+                        return "redirect:/videos/" + videoId + "/edit";
+                    }
+                    if (wantDescription && StringUtils.isBlank(meta.description)) {
+                        redirectAttributes.addFlashAttribute("error", "La API de " + videoProvider + " no devolvió descripción; introduce los datos manualmente.");
+                        return "redirect:/videos/" + videoId + "/edit";
+                    }
+                    if (wantTitle && StringUtils.isNotBlank(meta.title)) {
+                        title = meta.title;
+                    }
+                    if (wantDescription && StringUtils.isNotBlank(meta.description)) {
+                        description = meta.description;
+                    }
+                } catch (Exception e) {
+                    redirectAttributes.addFlashAttribute("error", "La API de " + videoProvider + " no funciona; introduce los datos manualmente.");
+                    return "redirect:/videos/" + videoId + "/edit";
+                }
+            }
         } else if (SOURCE_MODE_RESOURCES.equals(effectiveSourceMode)) {
             resolvedSourceReference = StringUtils.trimToEmpty(existingResourceReference);
             if (StringUtils.isBlank(resolvedSourceReference)
@@ -652,7 +683,9 @@ public class VideoTrainingController {
                             messageSource.getMessage("video.training.nativeUploadInvalidType", null, locale));
                     return "redirect:/videos/" + videoId + "/edit";
                 }
-                if (nativeFile.getSize() > MAX_NATIVE_UPLOAD_BYTES) {
+
+                Long maxNativeUploadBytes = Long.parseLong(ServerConfigurationService.getString("video.training.max.upload.size", "536870912"));
+                if (nativeFile.getSize() > maxNativeUploadBytes) {
                     redirectAttributes.addFlashAttribute("error",
                             messageSource.getMessage("video.training.nativeUploadTooLarge", null, locale));
                     return "redirect:/videos/" + videoId + "/edit";
@@ -721,7 +754,7 @@ public class VideoTrainingController {
         }
 
         VideoPublicationStatus currentStatus = existing.getPublicationStatus();
-        if (!StringUtils.equals(currentStatus != null ? currentStatus.name() : null, 
+        if (!StringUtils.equals(currentStatus != null ? currentStatus.name() : null,
                 parsedPublicationStatus.name())) {
             try {
                 VideoPublicationStatus[] validTransitions = videoTrainingService.getValidPublicationStatusTransitions(
@@ -1517,5 +1550,128 @@ public class VideoTrainingController {
         } catch (Exception e) {
             return siteId;
         }
+    }
+
+    private List<VideoTrainingVideoView> buildVideoViews(
+            List<VideoTrainingVideo> videos,
+            boolean isUserSite,
+            Locale locale) {
+        List<VideoTrainingVideoView> views = new ArrayList<>();
+
+        for (VideoTrainingVideo video : videos) {
+            views.add(VideoTrainingVideoView.builder()
+                    .id(video.getId())
+                    .title(video.getTitle())
+                    .description(video.getDescription())
+                    .siteName(isUserSite ? getSiteName(video.getSiteId()) : null)
+                    .releaseDisplay(formatInstantForDisplay(video.getReleaseDate(), locale))
+                    .retractDisplay(formatInstantForDisplay(video.getRetractDate(), locale))
+                    .thumbnailUrl(buildThumbnailUrl(video))
+                    .thumbnailIsVideo(isNativeVideoThumbnail(video))
+                    .visibilityScope(
+                        Optional.ofNullable(video.getVisibilityScope())
+                                .map(Enum::name)
+                                .orElse("COURSE"))
+                    .publicationStatus(
+                        Optional.ofNullable(video.getPublicationStatus())
+                                .map(Enum::name)
+                                .orElse("DRAFT"))
+                    .build());
+        }
+
+        return views;
+    }
+
+    private static class MetadataFetchResult {
+        public final String title;
+        public final String description;
+
+        MetadataFetchResult(String title, String description) {
+            this.title = title;
+            this.description = description;
+        }
+    }
+
+    private MetadataFetchResult fetchYoutubeMetadata(String sourceReference) throws Exception {
+        String youtubeId = extractYoutubeVideoId(StringUtils.trimToEmpty(sourceReference));
+        if (StringUtils.isBlank(youtubeId)) {
+            throw new IllegalArgumentException("Not a YouTube URL");
+        }
+
+        String apiKey = ServerConfigurationService.getString("video.training.youtube.api.key", "");
+        if (StringUtils.isBlank(apiKey)) {
+            throw new IllegalStateException("YouTube API key not configured");
+        }
+
+        YouTube youtube = new YouTube.Builder(new NetHttpTransport(), JacksonFactory.getDefaultInstance(), request -> {
+        }).setApplicationName("video-training").build();
+
+        YouTube.Videos.List list = youtube.videos().list(Collections.singletonList("snippet")).setId(Collections.singletonList(youtubeId)).setKey(apiKey);
+        VideoListResponse resp = list.execute();
+        if (resp.getItems() == null || resp.getItems().isEmpty() || resp.getItems().get(0).getSnippet() == null) {
+            throw new java.io.IOException("YouTube API returned no snippet metadata");
+        }
+
+        Video v = resp.getItems().get(0);
+        String title = v.getSnippet().getTitle();
+        String description = v.getSnippet().getDescription();
+        return new MetadataFetchResult(title != null ? title : "", description != null ? description : "");
+    }
+
+    private MetadataFetchResult fetchVimeoMetadata(String sourceReference) throws Exception {
+        String vimeoId = extractVimeoVideoId(StringUtils.trimToEmpty(sourceReference));
+        if (StringUtils.isBlank(vimeoId)) {
+            throw new IllegalArgumentException("Not a Vimeo URL");
+        }
+
+        // Use oEmbed endpoint which doesn't require auth
+        String videoUrl = "https://vimeo.com/" + vimeoId;
+        String apiUrl = "https://vimeo.com/api/oembed.json?url=" + URLEncoder.encode(videoUrl, StandardCharsets.UTF_8);
+
+        HttpClient client = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(5))
+            .build();
+
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(apiUrl))
+            .GET()
+            .build();
+
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() != 200) {
+            throw new IOException("Vimeo oEmbed returned status " + response.statusCode());
+        }
+
+        JsonNode root = new ObjectMapper().readTree(response.body());
+
+        String title = root.path("title").asText("");
+        String description = root.path("description").asText("");
+
+        return new MetadataFetchResult(title, description);
+    }
+
+    private MetadataFetchResult fetchExternalMetadata(String sourceReference) throws Exception {
+        String youtubeId = extractYoutubeVideoId(StringUtils.trimToEmpty(sourceReference));
+        if (StringUtils.isNotBlank(youtubeId)) {
+            return fetchYoutubeMetadata(sourceReference);
+        }
+        String vimeoId = extractVimeoVideoId(StringUtils.trimToEmpty(sourceReference));
+        if (StringUtils.isNotBlank(vimeoId)) {
+            return fetchVimeoMetadata(sourceReference);
+        }
+        throw new IllegalArgumentException("Unsupported external video provider");
+    }
+
+    private String retrieveVideoProvider(String sourceReference) {
+        String youtubeId = extractYoutubeVideoId(StringUtils.trimToEmpty(sourceReference));
+        if (StringUtils.isNotBlank(youtubeId)) {
+            return "YouTube";
+        }
+        String vimeoId = extractVimeoVideoId(StringUtils.trimToEmpty(sourceReference));
+        if (StringUtils.isNotBlank(vimeoId)) {
+            return "Vimeo";
+        }
+        return ("Unsupported");
     }
 }
