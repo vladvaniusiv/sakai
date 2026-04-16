@@ -571,6 +571,8 @@ public class VideoTrainingController {
         VideoTrainingVideo video = new VideoTrainingVideo();
         video.setSiteId(siteId);
         video.setTitle(StringUtils.trimToEmpty(title));
+        video.setInheritTitleMetadata(StringUtils.isNotBlank(inheritTitleMetadata));
+        video.setInheritDescriptionMetadata(StringUtils.isNotBlank(inheritDescriptionMetadata));
         video.setDescription(StringUtils.trimToEmpty(description));
         video.setProviderType(parsedProviderType);
         video.setSourceReference(resolvedSourceReference);
@@ -781,6 +783,8 @@ public class VideoTrainingController {
         }
 
         existing.setTitle(StringUtils.trimToEmpty(title));
+        existing.setInheritTitleMetadata(StringUtils.isNotBlank(inheritTitleMetadata));
+        existing.setInheritDescriptionMetadata(StringUtils.isNotBlank(inheritDescriptionMetadata));
         existing.setDescription(StringUtils.trimToEmpty(description));
         existing.setProviderType(parsedProviderType);
         existing.setSourceReference(resolvedSourceReference);
