@@ -61,6 +61,9 @@ import org.sakaiproject.tool.assessment.ui.listener.util.ContextUtil;
 import org.sakaiproject.tool.assessment.util.BeanSort;
 import org.sakaiproject.tool.assessment.util.ExtendedTimeDeliveryService;
 import org.sakaiproject.util.ResourceLoader;
+import org.sakaiproject.event.cover.EventTrackingService;
+import org.sakaiproject.samigo.util.SamigoConstants;
+import org.sakaiproject.event.cover.NotificationService;
 
 /**
  * <p>Title: Samigo</p>
@@ -143,6 +146,7 @@ public class SelectActionListener implements ActionListener {
                 updatedAssessmentNeedResubmitList, updatedAssessmentList, siteId);
 		// 1c. prepare delivery bean
 		List<DeliveryBeanie> takeablePublishedList = new ArrayList<>();
+    StringBuilder sb = new StringBuilder();
 		for (PublishedAssessmentFacade f : takeableList) {
 			// note that this object is PublishedAssessmentFacade(assessmentBaseId,
 			// title, releaseTo, startDate, dueDate, retractDate,lateHandling,
@@ -167,8 +171,24 @@ public class SelectActionListener implements ActionListener {
 				updatedAssessmentList.contains(f.getPublishedAssessmentId())
 			);
 
+      sb.append("assessmentId=").append(f.getPublishedAssessmentId()).append(", ");
+
 			takeablePublishedList.add(delivery);
 		}
+
+    if (sb.length() > 0) {
+      String assessmentIds = sb.toString().substring(0, sb.length() - 2);
+
+      EventTrackingService.post(
+        EventTrackingService.newEvent(
+          SamigoConstants.EVENT_VIEW_LIST_TAKEABLE,
+          assessmentIds,
+          siteId,
+          false,
+          NotificationService.NOTI_OPTIONAL
+        )
+      );
+    }
 
     // --------------- prepare Submitted assessment grading list --------------
     // 1. get the most recent submission of a user
