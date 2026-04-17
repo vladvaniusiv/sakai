@@ -81,6 +81,10 @@ public class VideoTrainingController {
     private static final String SOURCE_MODE_EXTERNAL = "external";
     private static final String SOURCE_MODE_UPLOAD = "upload";
     private static final String SOURCE_MODE_RESOURCES = "resources";
+    private static final String MANAGEABLE_LIST_PATH = "/videos-manageable";
+    private static final String VIEWABLE_LIST_PATH = "/videos-viewable";
+    private static final String ACCESS_MODE_MANAGEABLE = "manageable";
+    private static final String ACCESS_MODE_VIEWABLE = "viewable";
     private static final String MANAGED_UPLOAD_PROPERTY = "video.training.managed";
     private static final String MANAGED_UPLOAD_SITE_PROPERTY = "video.training.siteId";
     private static final String MANAGED_BASE_FOLDER_PROPERTY = "video.training.basefolder";
@@ -143,7 +147,7 @@ public class VideoTrainingController {
 
     }
 
-    @GetMapping("/videos-manageable")
+    @GetMapping(value = MANAGEABLE_LIST_PATH, params = { "page" })
     public PagedResponse<VideoTrainingVideoView> getManageableVideos(
             @RequestParam(name = "q", required = false) String query,
             @RequestParam(name = "page", defaultValue = "1") int page,
@@ -198,7 +202,7 @@ public class VideoTrainingController {
         return new PagedResponse<VideoTrainingVideoView>(videoViews, totalCount, safePage, safeSize);
     }
 
-    @GetMapping("/videos-viewable")
+    @GetMapping(value = VIEWABLE_LIST_PATH, params = { "page" })
     public PagedResponse<VideoTrainingVideoView> getViewableVideos(
             @RequestParam(name = "q", required = false) String query,
             @RequestParam(name = "page", defaultValue = "1") int page,
@@ -256,15 +260,18 @@ public class VideoTrainingController {
             @RequestParam(name = "offset", required = false) Integer offset,
             @RequestParam(name = "sortBy", required = false) String sortBy,
             @RequestParam(name = "sortDir", required = false) String sortDir,
+            @RequestParam(name = "accessMode", required = false) String accessMode,
             Locale locale,
             Model model) {
+
         String siteId = currentSiteId();
         String userId = currentUserId();
         boolean canManageAll = videoTrainingService.canManageLibrary(siteId, userId);
         boolean canManageOwn = videoTrainingService.hasManagePermission(siteId, userId);
-        boolean canManage = canManageAll;
+        boolean manageableList = resolveManageableListMode(accessMode, canManageAll, canManageOwn);
+        String effectiveAccessMode = manageableList ? ACCESS_MODE_MANAGEABLE : ACCESS_MODE_VIEWABLE;
         Locale effectiveLocale = locale != null ? locale : Locale.getDefault();
-        String effectiveViewMode = resolveEffectiveViewMode(siteId, canManage, viewMode);
+        String effectiveViewMode = resolveEffectiveViewMode(siteId, manageableList, viewMode);
         String normalizedQuery = StringUtils.trimToEmpty(query);
         boolean isUserSite = siteService.isUserSite(siteId);
         int safeSize = normalizePageSize(size);
@@ -281,17 +288,15 @@ public class VideoTrainingController {
         String sortField = mapSortField(normalizedSortBy, isUserSite);
         boolean ascending = "asc".equals(normalizedSortDir);
         int requested = fetchSize + 1;
-        if (canManageAll) {
+        if (manageableList && canManageAll) {
             fetched = videoTrainingService.getSiteLibrarySorted(siteId, normalizedQuery, safeOffset, requested, sortField, ascending);
-        } else if (canManageOwn) {
-            // owner-level managers see only their own videos
+        } else if (manageableList && canManageOwn) {
             fetched = videoTrainingService.getSiteLibrarySortedForOwner(siteId, userId, normalizedQuery, safeOffset, requested, sortField, ascending);
         } else {
             if (isUserSite) {
                 fetched = videoTrainingService.getGlobalVideosSorted(normalizedQuery, safeOffset, requested, sortField, ascending);
             } else {
-                fetched = videoTrainingService.getVisibleVideosForUserSorted(siteId, userId, Instant.now(), normalizedQuery,
-                        safeOffset, requested, sortField, ascending);
+                fetched = videoTrainingService.getVisibleVideosForUserSorted(siteId, userId, Instant.now(), normalizedQuery, safeOffset, requested, sortField, ascending);
             }
         }
 
@@ -321,9 +326,25 @@ public class VideoTrainingController {
         model.addAttribute("siteId", siteId);
         model.addAttribute("siteRef", siteService.siteReference(siteId));
         model.addAttribute("currentPath", "/videos");
+        model.addAttribute("isManageableList", manageableList);
+        model.addAttribute("isViewableList", !manageableList);
+        model.addAttribute("accessMode", effectiveAccessMode);
+        model.addAttribute("showAccessModeSwitch", canManageOwn && !canManageAll);
         model.addAttribute("moderationEnabled", isModerationEnabled());
         model.addAttribute("title", messageSource.getMessage("video.training.title", null, locale));
         return "video-training/list";
+    }
+
+    private boolean resolveManageableListMode(String accessMode, boolean canManageAll, boolean canManageOwn) {
+        if (canManageAll) {
+            return true;
+        }
+        if (!canManageOwn) {
+            return false;
+        }
+
+        String normalizedAccessMode = StringUtils.lowerCase(StringUtils.trimToEmpty(accessMode));
+        return !ACCESS_MODE_VIEWABLE.equals(normalizedAccessMode);
     }
 
     private String normalizeSortBy(String sortBy) {
@@ -1106,11 +1127,13 @@ public class VideoTrainingController {
     }
 
     private void populateNavigationFlags(Model model, String siteId, String userId) {
-        model.addAttribute("canManage", videoTrainingService.canManageLibrary(siteId, userId));
+        boolean canManageAll = videoTrainingService.canManageLibrary(siteId, userId);
+        boolean canManageOwn = videoTrainingService.hasManagePermission(siteId, userId);
+        model.addAttribute("canManage", canManageAll || canManageOwn);
         model.addAttribute("canAnalytics", videoTrainingService.canViewAnalytics(siteId, userId));
         model.addAttribute("canView", videoTrainingService.hasViewPermission(siteId, userId)
-                || videoTrainingService.canManageLibrary(siteId, userId)
-                || videoTrainingService.hasManagePermission(siteId, userId));
+                || canManageAll
+                || canManageOwn);
     }
 
     private String resolveReturnPath(String returnTo, String fallback) {

@@ -3,7 +3,7 @@
 <head th:replace="~{fragments/common :: head(#{video.training.details})}"></head>
 <body>
 <div class="portletBody container-fluid sakai-video-training" th:if="${video}">
-    <div th:replace="~{fragments/common :: menu('list', ${canManage}, ${canAnalytics})}"></div>
+    <div th:replace="~{fragments/common :: menu('list', ${canManage}, ${canAnalytics}, ${canView})}"></div>
     <div th:replace="~{fragments/common :: messages(${success}, ${error})}"></div>
 
     <div class="vt-page-header">
@@ -25,34 +25,39 @@
         </div>
     </div>
 
-    <div class="vt-toolbar" th:if="${canManage}" th:with="status=${video.publicationStatus != null ? video.publicationStatus.name() : 'DRAFT'}, moderationRequired=${moderationEnabled && video.visibilityScope != null && video.visibilityScope.name() == 'GLOBAL'}">
-        <a class="btn btn-outline-primary" th:href="@{/videos/{id}/edit(id=${video.id})}" th:text="#{video.training.edit}">Edit</a>
+    <div class="mb-4 gap-1" th:if="${canManage || canManageAll}" th:with="status=${video.publicationStatus != null ? video.publicationStatus.name() : 'DRAFT'}, moderationEnabledSafe=${moderationEnabled != null ? moderationEnabled : false}, moderationRequired=${moderationEnabledSafe && video.visibilityScope != null && video.visibilityScope.name() == 'GLOBAL'}">
         <form class="vt-inline-form" method="post" th:if="${status == 'DRAFT' && !moderationRequired}" th:action="@{/videos/{id}/publish(id=${video.id})}">
-            <button class="btn btn-outline-success" type="submit" th:text="#{video.training.publish}">Publish</button>
+            <button class="btn btn-primary" type="submit" th:text="#{video.training.publish}">Publish</button>
         </form>
         <form class="vt-inline-form" method="post" th:if="${(status == 'DRAFT' || status == 'WITHDRAWN') && moderationRequired}" th:action="@{/videos/{id}/submit-approval(id=${video.id})}">
-            <button class="btn btn-outline-secondary" type="submit" th:text="#{video.training.submitApproval}">Submit for approval</button>
+            <button class="btn btn-primary" type="submit" th:text="#{video.training.submitApproval}">Submit for approval</button>
         </form>
         <form class="vt-inline-form" method="post" th:if="${status == 'PENDING_APPROVAL'}" th:action="@{/videos/{id}/publish(id=${video.id})}">
-            <button class="btn btn-outline-success" type="submit" th:text="#{video.training.approve}">Approve</button>
+            <button class="btn btn-primary" type="submit" th:text="#{video.training.approve}">Approve</button>
         </form>
         <form class="vt-inline-form" method="post" th:if="${status == 'PENDING_APPROVAL'}" th:action="@{/videos/{id}/reject-approval(id=${video.id})}">
-            <button class="btn btn-outline-secondary" type="submit" th:text="#{video.training.rejectApproval}">Reject</button>
+            <button class="btn btn-primary" type="submit" th:text="#{video.training.rejectApproval}">Reject</button>
         </form>
         <form class="vt-inline-form" method="post" th:if="${status == 'WITHDRAWN' && !moderationRequired}" th:action="@{/videos/{id}/publish(id=${video.id})}">
-            <button class="btn btn-outline-success" type="submit" th:text="#{video.training.publish}">Publish</button>
+            <button class="btn btn-primary" type="submit" th:text="#{video.training.publish}">Publish</button>
         </form>
         <form class="vt-inline-form" method="post" th:if="${status == 'PUBLISHED'}" th:action="@{/videos/{id}/withdraw(id=${video.id})}">
-            <button class="btn btn-outline-warning" type="submit" th:text="#{video.training.withdraw}">Withdraw</button>
+            <button class="btn btn-primary" type="submit" th:text="#{video.training.withdraw}">Withdraw</button>
         </form>
         <form class="vt-inline-form" method="post" th:if="${status == 'PUBLISHED'}" th:action="@{/videos/{id}/archive(id=${video.id})}">
-            <button class="btn btn-outline-secondary" type="submit" th:text="#{video.training.archive}">Archive</button>
+            <button class="btn btn-primary" type="submit" th:text="#{video.training.archive}">Archive</button>
         </form>
         <form class="vt-inline-form" method="post" th:if="${status == 'ARCHIVED'}" th:action="@{/videos/{id}/restore-draft(id=${video.id})}">
-            <button class="btn btn-outline-secondary" type="submit" th:text="#{video.training.restoreDraft}">Restore to draft</button>
+            <button class="btn btn-primary" type="submit" th:text="#{video.training.restoreDraft}">Restore to draft</button>
         </form>
+        <a class="btn ms-2" th:href="@{/videos/{id}/edit(id=${video.id})}" th:aria-label="#{video.training.edit}">
+            <span class="bi bi-pencil-fill" aria-hidden="true"></span>
+        </a>
         <form class="vt-inline-form" method="post" th:action="@{/videos/{id}/delete(id=${video.id})}">
-            <button class="btn btn-outline-danger" type="submit" th:text="#{video.training.delete}">Delete</button>
+            <button class="btn" type="submit" th:aria-label="#{video.training.delete}">
+                <span class="bi bi-trash-fill" aria-hidden="true"></span>
+                <span class="visually-hidden" th:text="#{video.training.delete}">Delete</span>
+            </button>
         </form>
     </div>
 
@@ -121,7 +126,7 @@
 
     <div class="sak-banner-info" role="status" th:if="${#lists.isEmpty(captions)}" th:text="#{video.training.captions.empty}">No captions available yet.</div>
 
-    <a class="btn btn-outline-secondary" th:href="@{/videos}" th:text="#{video.training.back}">Back</a>
+    <a class="btn btn-secondary" th:href="@{/videos}" th:text="#{video.training.back}">Back</a>
 </div>
 <div th:replace="~{fragments/common :: jQuery}"></div>
 </body>

@@ -17,8 +17,9 @@
         </div>
         <div class="col-12 col-md-auto d-flex gap-2 align-items-end">
             <button class="btn btn-outline-primary" type="submit" th:text="#{video.training.search.submit}">Search</button>
-            <a class="btn btn-outline-secondary" th:if="${!#strings.isEmpty(q)}" th:href="@{/videos(viewMode=${viewMode},size=${size},batchSize=${batchSize},sortBy=${sortBy},sortDir=${sortDir})}" th:text="#{video.training.search.clear}">Clear</a>
+            <a class="btn btn-outline-secondary" th:if="${!#strings.isEmpty(q)}" th:href="@{/videos(viewMode=${viewMode},accessMode=${accessMode},size=${size},batchSize=${batchSize},sortBy=${sortBy},sortDir=${sortDir})}" th:text="#{video.training.search.clear}">Clear</a>
         </div>
+        <input type="hidden" name="accessMode" th:value="${accessMode}">
         <input type="hidden" name="viewMode" th:value="${viewMode}">
         <input type="hidden" name="size" th:value="${size}">
         <input type="hidden" name="batchSize" th:value="${batchSize}">
@@ -26,28 +27,48 @@
         <input type="hidden" name="sortDir" th:value="${sortDir}">
     </form>
 
-    <div class="vt-toolbar-secondary d-flex justify-content-between align-items-center mb-3" th:if="${!#lists.isEmpty(videos) || canManage}">
-        <div class="vt-view-switch" th:if="${!#lists.isEmpty(videos)}">
-            <form method="get" class="d-inline-flex gap-1">
-                <input type="hidden" name="q" th:value="${q}">
-                <input type="hidden" name="size" th:value="${size}">
-                <input type="hidden" name="batchSize" th:value="${batchSize}">
-                <input type="hidden" name="sortBy" th:value="${sortBy}">
-                <input type="hidden" name="sortDir" th:value="${sortDir}">
-                <button type="submit" name="viewMode" value="cards" class="btn btn-sm" th:classappend="${isCardsView} ? 'btn-primary' : 'btn-outline-secondary'" title="Cards view" aria-label="Cards view">
-                    <span class="bi bi-grid"></span>
-                </button>
-                <button type="submit" name="viewMode" value="table" class="btn btn-sm" th:classappend="${isTableView} ? 'btn-primary' : 'btn-outline-secondary'" title="Table view" aria-label="Table view">
-                    <span class="bi bi-view-list"></span>
-                </button>
-            </form>
+    <div class="vt-toolbar-secondary d-flex justify-content-between align-items-center mb-3" th:if="${!#lists.isEmpty(videos) || canManage || showAccessModeSwitch}">
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <div class="vt-view-switch me-3" th:if="${showAccessModeSwitch}">
+                <a class="btn btn-sm"
+                   th:classappend="${isViewableList} ? 'btn-primary' : 'btn-outline-secondary'"
+                   th:href="@{/videos(viewMode=${viewMode},q=${q},accessMode='viewable',size=${size},batchSize=${batchSize},sortBy=${sortBy},sortDir=${sortDir})}"
+                   th:title="#{video.training.access.mode.viewable}"
+                   th:attr="aria-label=#{video.training.access.mode.viewable}">
+                    <span class="bi bi-eye" aria-hidden="true"></span>
+                </a>
+                <a class="btn btn-sm"
+                   th:classappend="${isManageableList} ? 'btn-primary' : 'btn-outline-secondary'"
+                   th:href="@{/videos(viewMode=${viewMode},q=${q},accessMode='manageable',size=${size},batchSize=${batchSize},sortBy=${sortBy},sortDir=${sortDir})}"
+                   th:title="#{video.training.access.mode.manageable}"
+                   th:attr="aria-label=#{video.training.access.mode.manageable}">
+                    <span class="bi bi-pencil" aria-hidden="true"></span>
+                </a>
+            </div>
+
+            <div class="vt-view-switch" th:if="${!#lists.isEmpty(videos)}">
+                <form method="get" class="d-inline-flex gap-1" th:action="@{/videos}">
+                    <input type="hidden" name="q" th:value="${q}">
+                    <input type="hidden" name="accessMode" th:value="${accessMode}">
+                    <input type="hidden" name="size" th:value="${size}">
+                    <input type="hidden" name="batchSize" th:value="${batchSize}">
+                    <input type="hidden" name="sortBy" th:value="${sortBy}">
+                    <input type="hidden" name="sortDir" th:value="${sortDir}">
+                    <button type="submit" name="viewMode" value="cards" class="btn btn-sm" th:classappend="${isCardsView} ? 'btn-primary' : 'btn-outline-secondary'" title="Cards view" aria-label="Cards view">
+                        <span class="bi bi-grid"></span>
+                    </button>
+                    <button type="submit" name="viewMode" value="table" class="btn btn-sm" th:classappend="${isTableView} ? 'btn-primary' : 'btn-outline-secondary'" title="Table view" aria-label="Table view">
+                        <span class="bi bi-view-list"></span>
+                    </button>
+                </form>
+            </div>
         </div>
-        <div class="vt-toolbar" th:if="${canManage}">
+        <div class="vt-toolbar" th:if="${canManage && isManageableList}">
             <a class="btn btn-primary" th:href="@{/videos/new}" th:text="#{video.training.add}">Add video</a>
         </div>
     </div>
 
-    <div class="vt-status-legend sak-banner-info" th:if="${canManage}">
+    <div class="vt-status-legend sak-banner-info" th:if="${canManage && isManageableList}">
         <h5 class="alert-heading" th:text="#{video.training.status.legend.title}">Publication Status</h5>
         <div>
             <strong th:text="#{video.training.status.DRAFT}">Draft</strong>
@@ -81,7 +102,7 @@
         <a class="btn btn-outline-primary"
             id="vt-load-more"
             th:if="${hasMore}"
-            th:href="@{/videos(viewMode=${viewMode},q=${q},size=${size},batchSize=${batchSize},offset=${nextOffset},sortBy=${sortBy},sortDir=${sortDir})}"
+            th:href="@{/videos(viewMode=${viewMode},q=${q},accessMode=${accessMode},size=${size},batchSize=${batchSize},offset=${nextOffset},sortBy=${sortBy},sortDir=${sortDir})}"
             th:text="#{video.training.pagination.loadMore}">Load more</a>
             <span id="vt-pagination-end" class="text-muted" th:if="${!hasMore && !#lists.isEmpty(videos)}" th:text="#{video.training.pagination.end}">No more videos</span>
     </div>
