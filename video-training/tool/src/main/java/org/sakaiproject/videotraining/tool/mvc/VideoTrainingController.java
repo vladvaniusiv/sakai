@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -302,29 +303,9 @@ public class VideoTrainingController {
         }
         nextOffset = safeOffset + videos.size();
 
-        Map<String, String> releaseDisplayById = new HashMap<>();
-        Map<String, String> retractDisplayById = new HashMap<>();
-        Map<String, String> thumbnailUrlById = new HashMap<>();
-        Map<String, Boolean> thumbnailIsVideoById = new HashMap<>();
-        Map<String, String> siteNameBySiteId = new HashMap<>();
-        for (VideoTrainingVideo video : videos) {
-            releaseDisplayById.put(video.getId(), formatInstantForDisplay(video.getReleaseDate(), effectiveLocale));
-            retractDisplayById.put(video.getId(), formatInstantForDisplay(video.getRetractDate(), effectiveLocale));
-            thumbnailUrlById.put(video.getId(), buildThumbnailUrl(video));
-            thumbnailIsVideoById.put(video.getId(), isNativeVideoThumbnail(video));
-            if (isUserSite && !siteNameBySiteId.containsKey(video.getSiteId())) {
-                siteNameBySiteId.put(video.getSiteId(), getSiteName(video.getSiteId()));
-            }
-        }
-
         populateNavigationFlags(model, siteId, userId);
 
-        model.addAttribute("videos", videos);
-        model.addAttribute("releaseDisplayById", releaseDisplayById);
-        model.addAttribute("retractDisplayById", retractDisplayById);
-        model.addAttribute("thumbnailUrlById", thumbnailUrlById);
-        model.addAttribute("thumbnailIsVideoById", thumbnailIsVideoById);
-        model.addAttribute("siteNameBySiteId", siteNameBySiteId);
+        populateVideoPresentationModel(model, videos, siteId, userId, effectiveLocale, isUserSite);
         model.addAttribute("isUserSite", isUserSite);
         model.addAttribute("viewMode", effectiveViewMode);
         model.addAttribute("isCardsView", VIEW_MODE_CARDS.equals(effectiveViewMode));
@@ -339,6 +320,7 @@ public class VideoTrainingController {
         model.addAttribute("hasMore", hasMore);
         model.addAttribute("siteId", siteId);
         model.addAttribute("siteRef", siteService.siteReference(siteId));
+        model.addAttribute("currentPath", "/videos");
         model.addAttribute("moderationEnabled", isModerationEnabled());
         model.addAttribute("title", messageSource.getMessage("video.training.title", null, locale));
         return "video-training/list";
@@ -945,7 +927,104 @@ public class VideoTrainingController {
         model.addAttribute("retractDateDisplay", formatInstantForDisplay(video.getRetractDate(), effectiveLocale));
         model.addAttribute("newCaption", new VideoTrainingCaption());
         model.addAttribute("captions", videoTrainingService.getCaptionsForVideo(videoId));
+        model.addAttribute("isFavorite",
+            videoTrainingService.getUserVideoPreference(video.getSiteId(), videoId, userId)
+                .map(pref -> pref.isFavorite())
+                .orElse(false));
+        model.addAttribute("isWatchLater",
+            videoTrainingService.getUserVideoPreference(video.getSiteId(), videoId, userId)
+                .map(pref -> pref.isWatchLater())
+                .orElse(false));
+        model.addAttribute("currentPath", "/videos/" + videoId);
         return "video-training/details";
+    }
+
+    @PostMapping("/videos/{videoId}/favorite")
+    public String setFavorite(@PathVariable String videoId,
+        @RequestParam(name = "favorite", defaultValue = "true") boolean favorite,
+        @RequestParam(name = "returnTo", required = false) String returnTo,
+        RedirectAttributes redirectAttributes,
+        Locale locale) {
+
+        String siteId = currentSiteId();
+        String userId = currentUserId();
+        try {
+            videoTrainingService.setUserFavorite(siteId, videoId, userId, favorite);
+            redirectAttributes.addFlashAttribute("success",
+                messageSource.getMessage(favorite ? "video.training.favorites.added" : "video.training.favorites.removed", null, locale));
+        } catch (SecurityException ex) {
+            redirectAttributes.addFlashAttribute("error",
+                messageSource.getMessage("video.training.accessDenied", null, locale));
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("error",
+                messageSource.getMessage("video.training.notFound", null, locale));
+        }
+
+        return "redirect:" + resolveReturnPath(returnTo, "/videos/" + videoId);
+    }
+
+    @PostMapping("/videos/{videoId}/watch-later")
+    public String setWatchLater(@PathVariable String videoId,
+        @RequestParam(name = "watchLater", defaultValue = "true") boolean watchLater,
+        @RequestParam(name = "returnTo", required = false) String returnTo,
+        RedirectAttributes redirectAttributes,
+        Locale locale) {
+
+        String siteId = currentSiteId();
+        String userId = currentUserId();
+        try {
+            videoTrainingService.setUserWatchLater(siteId, videoId, userId, watchLater);
+            redirectAttributes.addFlashAttribute("success",
+                messageSource.getMessage(watchLater ? "video.training.watchLater.added" : "video.training.watchLater.removed", null, locale));
+        } catch (SecurityException ex) {
+            redirectAttributes.addFlashAttribute("error",
+                messageSource.getMessage("video.training.accessDenied", null, locale));
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("error",
+                messageSource.getMessage("video.training.notFound", null, locale));
+        }
+
+        return "redirect:" + resolveReturnPath(returnTo, "/videos/" + videoId);
+    }
+
+    @GetMapping("/my-videos")
+    public String myVideos(RedirectAttributes redirectAttributes, Locale locale, Model model) {
+        String siteId = currentSiteId();
+        String userId = currentUserId();
+
+        if (!videoTrainingService.hasViewPermission(siteId, userId)
+            && !videoTrainingService.canManageLibrary(siteId, userId)
+            && !videoTrainingService.hasManagePermission(siteId, userId)) {
+            redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.accessDenied", null, locale));
+            return "redirect:/videos";
+        }
+
+        Locale effectiveLocale = locale != null ? locale : Locale.getDefault();
+        List<VideoTrainingVideo> favorites = videoTrainingService.getUserFavoriteVideos(siteId, userId, Instant.now());
+        List<VideoTrainingVideo> watchLater = videoTrainingService.getUserWatchLaterVideos(siteId, userId, Instant.now());
+        Map<String, VideoTrainingVideo> mergedById = new LinkedHashMap<>();
+        for (VideoTrainingVideo video : favorites) {
+            mergedById.put(video.getId(), video);
+        }
+        for (VideoTrainingVideo video : watchLater) {
+            mergedById.putIfAbsent(video.getId(), video);
+        }
+        List<VideoTrainingVideo> videos = new ArrayList<>(mergedById.values());
+
+        populateNavigationFlags(model, siteId, userId);
+        populateVideoPresentationModel(model, videos, siteId, userId, effectiveLocale, siteService.isUserSite(siteId));
+        model.addAttribute("videos", videos);
+        model.addAttribute("isUserSite", siteService.isUserSite(siteId));
+        model.addAttribute("viewMode", VIEW_MODE_TABLE);
+        model.addAttribute("isCardsView", false);
+        model.addAttribute("isTableView", true);
+        model.addAttribute("q", "");
+        model.addAttribute("size", videos.size());
+        model.addAttribute("batchSize", videos.size());
+        model.addAttribute("sortBy", "modified");
+        model.addAttribute("sortDir", "desc");
+        model.addAttribute("currentPath", "/my-videos");
+        return "video-training/my-videos";
     }
 
     @GetMapping("/analytics")
@@ -1012,18 +1091,15 @@ public class VideoTrainingController {
 
         VideoTrainingVideo video = videoTrainingService.getVideoById(videoId).orElse(null);
         if (video == null) {
-            redirectAttributes.addFlashAttribute("error",
-                    messageSource.getMessage("video.training.notFound", null, locale));
+            redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.notFound", null, locale));
             return "redirect:/videos";
         }
 
         try {
             videoTrainingService.deleteCaption(captionId);
-            redirectAttributes.addFlashAttribute("success",
-                    messageSource.getMessage("video.training.caption.deleted", null, locale));
+            redirectAttributes.addFlashAttribute("success", messageSource.getMessage("video.training.caption.deleted", null, locale));
         } catch (SecurityException ex) {
-            redirectAttributes.addFlashAttribute("error",
-                    messageSource.getMessage("video.training.accessDenied", null, locale));
+            redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.accessDenied", null, locale));
         }
 
         return "redirect:/videos/" + videoId;
@@ -1032,6 +1108,62 @@ public class VideoTrainingController {
     private void populateNavigationFlags(Model model, String siteId, String userId) {
         model.addAttribute("canManage", videoTrainingService.canManageLibrary(siteId, userId));
         model.addAttribute("canAnalytics", videoTrainingService.canViewAnalytics(siteId, userId));
+        model.addAttribute("canView", videoTrainingService.hasViewPermission(siteId, userId)
+                || videoTrainingService.canManageLibrary(siteId, userId)
+                || videoTrainingService.hasManagePermission(siteId, userId));
+    }
+
+    private String resolveReturnPath(String returnTo, String fallback) {
+        String candidate = StringUtils.trimToEmpty(returnTo);
+        if (StringUtils.isBlank(candidate)) {
+            return fallback;
+        }
+        if (!candidate.startsWith("/") || candidate.startsWith("//")) {
+            return fallback;
+        }
+        return candidate;
+    }
+
+    private void populateVideoPresentationModel(Model model,
+            List<VideoTrainingVideo> videos,
+            String siteId,
+            String userId,
+            Locale locale,
+            boolean isUserSite) {
+
+        Map<String, String> releaseDisplayById = new HashMap<>();
+        Map<String, String> retractDisplayById = new HashMap<>();
+        Map<String, String> thumbnailUrlById = new HashMap<>();
+        Map<String, Boolean> thumbnailIsVideoById = new HashMap<>();
+        Map<String, String> siteNameBySiteId = new HashMap<>();
+
+        for (VideoTrainingVideo video : videos) {
+            releaseDisplayById.put(video.getId(), formatInstantForDisplay(video.getReleaseDate(), locale));
+            retractDisplayById.put(video.getId(), formatInstantForDisplay(video.getRetractDate(), locale));
+            thumbnailUrlById.put(video.getId(), buildThumbnailUrl(video));
+            thumbnailIsVideoById.put(video.getId(), isNativeVideoThumbnail(video));
+            if (isUserSite && !siteNameBySiteId.containsKey(video.getSiteId())) {
+                siteNameBySiteId.put(video.getSiteId(), getSiteName(video.getSiteId()));
+            }
+        }
+
+        Map<String, Boolean> isFavoriteById = new HashMap<>();
+        Map<String, Boolean> isWatchLaterById = new HashMap<>();
+        List<String> videoIds = videos.stream().map(VideoTrainingVideo::getId).toList();
+        videoTrainingService.getUserVideoPreferences(siteId, userId, videoIds)
+                .forEach((videoId, pref) -> {
+                    isFavoriteById.put(videoId, pref.isFavorite());
+                    isWatchLaterById.put(videoId, pref.isWatchLater());
+                });
+
+        model.addAttribute("videos", videos);
+        model.addAttribute("releaseDisplayById", releaseDisplayById);
+        model.addAttribute("retractDisplayById", retractDisplayById);
+        model.addAttribute("thumbnailUrlById", thumbnailUrlById);
+        model.addAttribute("thumbnailIsVideoById", thumbnailIsVideoById);
+        model.addAttribute("isFavoriteById", isFavoriteById);
+        model.addAttribute("isWatchLaterById", isWatchLaterById);
+        model.addAttribute("siteNameBySiteId", siteNameBySiteId);
     }
 
     private String currentSiteId() {

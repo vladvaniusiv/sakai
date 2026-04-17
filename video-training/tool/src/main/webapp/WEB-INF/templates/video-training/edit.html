@@ -3,7 +3,7 @@
 <head th:replace="~{fragments/common :: head(${isEdit} ? #{video.training.edit} : #{video.training.add})}"></head>
 <body>
 <div class="portletBody container-fluid sakai-video-training">
-    <div th:replace="~{fragments/common :: menu('add', ${canManage}, ${canAnalytics})}"></div>
+    <div th:replace="~{fragments/common :: menu('add', ${canManage}, ${canAnalytics}, ${canView})}"></div>
     <div th:replace="~{fragments/common :: messages(${success}, ${error})}"></div>
 
     <h1 class="h3 vt-form-title" th:text="${isEdit} ? #{video.training.edit} : #{video.training.add}">Add video</h1>
@@ -135,9 +135,6 @@
         });
     })();
 </script>
-<style>
-    .vt-readonly { background-color: #e9ecef; }
-</style>
 <div th:replace="~{fragments/common :: jQuery}"></div>
 </body>
 </html>

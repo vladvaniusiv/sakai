@@ -23,7 +23,7 @@
     </script>
 </div>
 
-<div th:fragment="menu(current, canManage, canAnalytics)">
+<div th:fragment="menu(current, canManage, canAnalytics, canView)">
     <ul class="navIntraTool">
         <li>
             <span th:class="${current} == 'list' ? 'current'">
@@ -41,6 +41,12 @@
             <span th:class="${current} == 'analytics' ? 'current'">
                 <span th:if="${current} == 'analytics'" th:text="#{video.training.menu.analytics}">Analytics</span>
                 <a th:unless="${current} == 'analytics'" th:href="@{/analytics}" th:text="#{video.training.menu.analytics}">Analytics</a>
+            </span>
+        </li>
+        <li th:if="${canView}">
+            <span th:class="${current} == 'my-videos' ? 'current'">
+                <span th:if="${current} == 'my-videos'" th:text="#{video.training.menu.myVideos}">My videos</span>
+                <a th:unless="${current} == 'my-videos'" th:href="@{/my-videos}" th:text="#{video.training.menu.myVideos}">My videos</a>
             </span>
         </li>
     </ul>

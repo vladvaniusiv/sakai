@@ -2,6 +2,7 @@ package org.sakaiproject.videotraining.api.service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.sakaiproject.videotraining.api.model.VideoPublicationStatus;
@@ -11,6 +12,7 @@ import org.sakaiproject.videotraining.api.model.VideoTrainingCaption;
 import org.sakaiproject.videotraining.api.model.VideoTrainingCategory;
 import org.sakaiproject.videotraining.api.model.VideoTrainingCourseGroup;
 import org.sakaiproject.videotraining.api.model.VideoTrainingLessonLink;
+import org.sakaiproject.videotraining.api.model.VideoTrainingUserVideoPreference;
 import org.sakaiproject.videotraining.api.model.VideoTrainingVideo;
 
 public interface VideoTrainingService {
@@ -139,6 +141,18 @@ public interface VideoTrainingService {
 
     VideoTrainingVideo promoteLessonResource(String siteId, String lessonPageId, String lessonItemId,
             String resourceReference, String title, String description, Long fileSizeBytes);
+
+        Optional<VideoTrainingUserVideoPreference> getUserVideoPreference(String siteId, String videoId, String userId);
+
+        Map<String, VideoTrainingUserVideoPreference> getUserVideoPreferences(String siteId, String userId, List<String> videoIds);
+
+        void setUserFavorite(String siteId, String videoId, String userId, boolean favorite);
+
+        void setUserWatchLater(String siteId, String videoId, String userId, boolean watchLater);
+
+        List<VideoTrainingVideo> getUserFavoriteVideos(String siteId, String userId, Instant now);
+
+        List<VideoTrainingVideo> getUserWatchLaterVideos(String siteId, String userId, Instant now);
 
     /**
      * Get the publication statuses that are valid transition targets from the given current status.
