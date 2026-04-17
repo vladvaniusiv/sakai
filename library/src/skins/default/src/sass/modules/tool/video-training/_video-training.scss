@@ -57,7 +57,7 @@
   .vt-video-card-link {
     display: block;
     color: inherit;
-    text-decoration: none;
+    text-decoration: none !important;
     margin-bottom: 0.5rem;
   }
 
@@ -118,7 +118,10 @@
 
   .vt-video-card-title {
     margin: 0.75rem 0.75rem 0.25rem;
-    font-weight: 600;
+
+    h2 {
+      margin-right: 0.5rem;
+    }
   }
 
   .vt-video-card-meta {
@@ -195,6 +198,30 @@
 
   .vt-inline-form {
     display: inline-block;
+  }
+
+  .vt-icon-btn {
+    padding: 0 0.15rem;
+    line-height: 1;
+
+    .vt-icon-hover {
+      display: none;
+    }
+
+    &:hover,
+    &:focus-visible {
+      .vt-icon-default {
+        display: none;
+      }
+
+      .vt-icon-hover {
+        display: inline-block;
+      }
+    }
+  }
+
+  .vt-readonly {
+    background-color: #e9ecef;
   }
 
   .vt-form-title {

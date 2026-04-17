@@ -13,6 +13,7 @@
                 <value>org.sakaiproject.videotraining.api.model.VideoTrainingCategory</value>
                 <value>org.sakaiproject.videotraining.api.model.VideoTrainingVideoCategory</value>
                 <value>org.sakaiproject.videotraining.api.model.VideoTrainingLessonLink</value>
+                <value>org.sakaiproject.videotraining.api.model.VideoTrainingUserVideoPreference</value>
             </list>
         </property>
     </bean>
@@ -47,6 +48,11 @@
             <property name="sessionFactory" ref="org.sakaiproject.springframework.orm.hibernate.GlobalSessionFactory"/>
         </bean>
 
+        <bean id="org.sakaiproject.videotraining.api.repository.VideoTrainingUserVideoPreferenceRepository"
+                class="org.sakaiproject.videotraining.impl.repository.VideoTrainingUserVideoPreferenceRepositoryImpl">
+            <property name="sessionFactory" ref="org.sakaiproject.springframework.orm.hibernate.GlobalSessionFactory"/>
+        </bean>
+
     <bean id="org.sakaiproject.videotraining.api.service.VideoTrainingService"
           class="org.sakaiproject.videotraining.impl.service.VideoTrainingServiceImpl"
           init-method="init">
@@ -56,6 +62,7 @@
             <property name="categoryRepository" ref="org.sakaiproject.videotraining.api.repository.VideoTrainingCategoryRepository"/>
             <property name="videoCategoryRepository" ref="org.sakaiproject.videotraining.api.repository.VideoTrainingVideoCategoryRepository"/>
             <property name="lessonLinkRepository" ref="org.sakaiproject.videotraining.api.repository.VideoTrainingLessonLinkRepository"/>
+            <property name="userVideoPreferenceRepository" ref="org.sakaiproject.videotraining.api.repository.VideoTrainingUserVideoPreferenceRepository"/>
             <property name="contentHostingService" ref="org.sakaiproject.content.api.ContentHostingService"/>
             <property name="eventTrackingService" ref="org.sakaiproject.event.api.EventTrackingService"/>
         <property name="functionManager" ref="org.sakaiproject.authz.api.FunctionManager"/>

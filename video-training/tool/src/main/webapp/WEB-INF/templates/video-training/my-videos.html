@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/common :: head(#{video.training.myVideos.title})}"></head>
+<body>
+<div class="portletBody container-fluid sakai-video-training">
+    <div th:replace="~{fragments/common :: menu('my-videos', ${canManage}, ${canAnalytics}, ${canView})}"></div>
+    <div th:replace="~{fragments/common :: messages(${success}, ${error})}"></div>
+
+    <div class="vt-page-header">
+        <h1 class="h3" th:text="#{video.training.myVideos.title}">My videos</h1>
+    </div>
+
+    <div th:replace="~{fragments/video-library :: videoTable}"></div>
+
+    <div class="sak-banner-info" role="status" th:if="${#lists.isEmpty(videos)}" th:text="#{video.training.watchLater.empty}">No videos yet.</div>
+</div>
+<div th:replace="~{fragments/common :: jQuery}"></div>
+</body>
+</html>

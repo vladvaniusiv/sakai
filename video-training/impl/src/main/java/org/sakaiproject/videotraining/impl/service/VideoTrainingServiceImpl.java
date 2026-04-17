@@ -5,8 +5,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,12 +41,14 @@ import org.sakaiproject.videotraining.api.model.VideoTrainingCaption;
 import org.sakaiproject.videotraining.api.model.VideoTrainingCategory;
 import org.sakaiproject.videotraining.api.model.VideoTrainingCourseGroup;
 import org.sakaiproject.videotraining.api.model.VideoTrainingLessonLink;
+import org.sakaiproject.videotraining.api.model.VideoTrainingUserVideoPreference;
 import org.sakaiproject.videotraining.api.model.VideoTrainingVideo;
 import org.sakaiproject.videotraining.api.model.VideoVisibilityScope;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingAnalyticsEventRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingCaptionRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingCategoryRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingLessonLinkRepository;
+import org.sakaiproject.videotraining.api.repository.VideoTrainingUserVideoPreferenceRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingVideoCategoryRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingVideoRepository;
 import org.sakaiproject.videotraining.api.service.VideoTrainingService;
@@ -66,6 +70,7 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
     @Setter private VideoTrainingCategoryRepository categoryRepository;
     @Setter private VideoTrainingVideoCategoryRepository videoCategoryRepository;
     @Setter private VideoTrainingLessonLinkRepository lessonLinkRepository;
+    @Setter private VideoTrainingUserVideoPreferenceRepository userVideoPreferenceRepository;
     @Setter private ContentHostingService contentHostingService;
     @Setter private EventTrackingService eventTrackingService;
     @Setter private FunctionManager functionManager;
@@ -221,6 +226,9 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
 
         videoCategoryRepository.deleteByVideoId(videoId);
         lessonLinkRepository.deleteByVideoId(videoId);
+        if (userVideoPreferenceRepository != null) {
+            userVideoPreferenceRepository.deleteByVideoId(videoId);
+        }
 
         videoRepository.delete(existing);
         registerAudit(existing.getSiteId(), currentUserId, "VIDEO_DELETED", videoId, existing.getTitle());
@@ -1075,6 +1083,124 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
         String userId = sessionManager.getCurrentSessionUserId();
         registerAudit(siteId, userId, "LESSON_RESOURCE_PROMOTED", saved.getId(), resourceReference);
         return saved;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<VideoTrainingUserVideoPreference> getUserVideoPreference(String siteId, String videoId, String userId) {
+        if (StringUtils.isAnyBlank(siteId, videoId, userId) || userVideoPreferenceRepository == null) {
+            return Optional.empty();
+        }
+        return userVideoPreferenceRepository.findBySiteIdAndUserIdAndVideoId(siteId, userId, videoId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, VideoTrainingUserVideoPreference> getUserVideoPreferences(String siteId, String userId, List<String> videoIds) {
+        Map<String, VideoTrainingUserVideoPreference> byVideoId = new HashMap<>();
+        if (StringUtils.isAnyBlank(siteId, userId) || videoIds == null || videoIds.isEmpty() || userVideoPreferenceRepository == null) {
+            return byVideoId;
+        }
+
+        for (VideoTrainingUserVideoPreference preference : userVideoPreferenceRepository.findBySiteIdAndUserIdAndVideoIds(siteId, userId, videoIds)) {
+            byVideoId.put(preference.getVideoId(), preference);
+        }
+        return byVideoId;
+    }
+
+    @Override
+    public void setUserFavorite(String siteId, String videoId, String userId, boolean favorite) {
+        updateUserPreference(siteId, videoId, userId, favorite, null);
+    }
+
+    @Override
+    public void setUserWatchLater(String siteId, String videoId, String userId, boolean watchLater) {
+        updateUserPreference(siteId, videoId, userId, null, watchLater);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VideoTrainingVideo> getUserFavoriteVideos(String siteId, String userId, Instant now) {
+        return getPreferredVideos(siteId, userId, now, true);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VideoTrainingVideo> getUserWatchLaterVideos(String siteId, String userId, Instant now) {
+        return getPreferredVideos(siteId, userId, now, false);
+    }
+
+    private void updateUserPreference(String siteId, String videoId, String userId, Boolean favorite, Boolean watchLater) {
+        if (StringUtils.isAnyBlank(siteId, videoId, userId)) {
+            throw new IllegalArgumentException("siteId, videoId and userId are required");
+        }
+        if (userVideoPreferenceRepository == null) {
+            throw new IllegalStateException("userVideoPreferenceRepository is not available");
+        }
+
+        VideoTrainingVideo video = getVideoById(videoId).orElseThrow(() -> new IllegalArgumentException("Unknown video"));
+        if (!Objects.equals(siteId, video.getSiteId())) {
+            throw new IllegalArgumentException("Video does not belong to site");
+        }
+        if (!canViewVideo(video, userId, Instant.now())) {
+            throw new SecurityException("User cannot set preferences for this video");
+        }
+
+        VideoTrainingUserVideoPreference preference = userVideoPreferenceRepository
+                .findBySiteIdAndUserIdAndVideoId(siteId, userId, videoId)
+                .orElseGet(VideoTrainingUserVideoPreference::new);
+
+        if (preference.getId() == null) {
+            preference.setSiteId(siteId);
+            preference.setUserId(userId);
+            preference.setVideoId(videoId);
+            preference.setCreatedOn(Instant.now());
+        }
+
+        if (favorite != null) {
+            preference.setFavorite(favorite);
+        }
+        if (watchLater != null) {
+            preference.setWatchLater(watchLater);
+        }
+        preference.setModifiedOn(Instant.now());
+
+        if (!preference.isFavorite() && !preference.isWatchLater()) {
+            if (preference.getId() != null) {
+                userVideoPreferenceRepository.delete(preference);
+            }
+            return;
+        }
+
+        userVideoPreferenceRepository.save(preference);
+        registerAudit(siteId, userId, "USER_VIDEO_PREFERENCE_UPDATED", videoId, "favorite=" + preference.isFavorite() + ",watchLater=" + preference.isWatchLater());
+    }
+
+    private List<VideoTrainingVideo> getPreferredVideos(String siteId, String userId, Instant now, boolean favoritesOnly) {
+        if (StringUtils.isAnyBlank(siteId, userId) || userVideoPreferenceRepository == null) {
+            return Collections.emptyList();
+        }
+
+        Instant effectiveNow = now != null ? now : Instant.now();
+        List<VideoTrainingUserVideoPreference> preferences = favoritesOnly
+                ? userVideoPreferenceRepository.findBySiteIdAndUserIdAndFavoriteTrueOrderByModifiedOnDesc(siteId, userId)
+                : userVideoPreferenceRepository.findBySiteIdAndUserIdAndWatchLaterTrueOrderByModifiedOnDesc(siteId, userId);
+
+        List<VideoTrainingVideo> videos = new ArrayList<>();
+        for (VideoTrainingUserVideoPreference preference : preferences) {
+            VideoTrainingVideo video = getVideoById(preference.getVideoId()).orElse(null);
+            if (video == null) {
+                continue;
+            }
+            if (!Objects.equals(video.getSiteId(), siteId)) {
+                continue;
+            }
+            if (canViewVideo(video, userId, effectiveNow)) {
+                videos.add(video);
+            }
+        }
+
+        return videos;
     }
 
     private int sanitizePage(int page) {
