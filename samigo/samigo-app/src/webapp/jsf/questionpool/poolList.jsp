@@ -46,7 +46,10 @@
 <!-- content... -->
 <h:form id="questionpool">
 
-<ul class="navIntraTool actionToolbar" role="menu">
+<div class="dropdown-toggle dropdown-navIntraTool">
+    <h:outputText value="#{generalMessages.toolOptions}" />
+</div>
+<ul class="navIntraTool actionToolbar navIntraToolMobile" role="menu">
     <h:panelGroup rendered="#{authorization.createAssessment eq true or authorization.editAnyAssessment eq true or authorization.editOwnAssessment eq true or authorization.gradeAnyAssessment eq true or authorization.gradeOwnAssessment eq true}">
         <li role="menuitem">
             <h:panelGroup styleClass="menuitem">

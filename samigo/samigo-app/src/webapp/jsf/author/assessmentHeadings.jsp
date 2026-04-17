@@ -20,7 +20,10 @@
 --%>
 -->
 <h:panelGroup>
-    <ul class="navIntraTool actionToolbar" role="menu">
+    <div class="dropdown-toggle dropdown-navIntraTool">
+        <h:outputText value="#{generalMessages.toolOptions}" />
+    </div>
+    <ul class="navIntraTool actionToolbar navIntraToolMobile" role="menu">
         <h:panelGroup rendered="#{authorization.createAssessment or authorization.editAnyAssessment or authorization.editOwnAssessment or authorization.gradeAnyAssessment or authorization.gradeOwnAssessment}">
             <li role="menuitem">
                 <span class="current">

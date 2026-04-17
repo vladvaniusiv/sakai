@@ -2,7 +2,10 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
     <body>
         <div th:fragment="main (current)">
-            <ul class="navIntraTool">
+            <div class="dropdown-toggle dropdown-navIntraTool">
+                <span th:text="#{tool-options}"></span>
+            </div>
+            <ul class="navIntraTool actionToolBar navIntraToolMobile">
                 <li role="presentation">
                     <span th:class="${current} == 'compose' ? 'current'">
                         <span th:if="${current} == 'compose'" th:text="#{compose_toolbar}">Compose</span>

@@ -30,7 +30,8 @@
 
 <div class="portletBody">
 #if ( ${searchModel.hasAdmin()} && ${searchModel.searchServer} )  	
-   <ul class="navIntraTool actionToolBar">
+   <div class="dropdown-toggle dropdown-navIntraTool">${rlb.toolOptions}</div>
+   <ul class="navIntraTool actionToolBar navIntraToolMobile">
    	   <li>
    	   	  <span class="current">${rlb.searchadmin_index_search}</span>
    	   </li>

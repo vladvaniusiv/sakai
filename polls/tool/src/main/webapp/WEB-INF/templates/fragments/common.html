@@ -8,7 +8,10 @@
 </head>
 
 <div th:fragment="menu (current)">
-    <ul class="navIntraTool">
+    <div class="dropdown-toggle dropdown-navIntraTool">
+      <span th:text="#{tool-options}"></span>
+    </div>
+      <ul class="navIntraTool actionToolBar navIntraToolMobile">
         <li>
         <span th:class="${current}=='list' ? 'current'">
           <span th:if="${current}=='list'" th:text="#{action_main}">Polls</span>

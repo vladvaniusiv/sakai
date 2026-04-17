@@ -20,8 +20,10 @@
 -->
 <html xmlns:wicket>
 <wicket:panel>
-
-    <ul class="navIntraTool actionToolbar"> 
+    <div class="dropdown-toggle dropdown-navIntraTool">
+        <wicket:message key="toolOptions">Tool Options</wicket:message>
+    </div>
+    <ul class="navIntraTool actionToolBar navIntraToolMobile">
         <li class="firstToolBarItem"><span wicket:id="siteDisplay">Site: [site]</span></li>
         <li wicket:id="overview">[overview]</li>
         <li wicket:id="reports">[reports]</li>

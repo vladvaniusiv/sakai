@@ -23,8 +23,10 @@
 	            });
 	        });
 	    </script>
-	    
-		<ul class="navIntraTool actionToolbar">
+	    <div class="dropdown-toggle dropdown-navIntraTool">
+			<h:outputText value="#{msgs.toolOptions}" />
+		</div>
+		<ul class="navIntraTool actionToolbar navIntraToolMobile">
 			<li class="firstToolBarItem" role="menuitem"><span>
 				<a
 				class="print-window" href="#">

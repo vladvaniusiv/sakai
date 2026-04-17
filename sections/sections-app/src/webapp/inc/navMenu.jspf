@@ -1,4 +1,7 @@
-<f:verbatim><ul class="navIntraTool actionToolbar"></f:verbatim>
+<div class="dropdown-toggle dropdown-navIntraTool">
+    <h:outputText value="#{msgs.toolOptions}" />
+</div>
+<f:verbatim><ul class="navIntraTool actionToolbar navIntraToolMobile"></f:verbatim>
 	<f:verbatim><li class="firstToolBarItem"></f:verbatim>
 		<h:panelGroup rendered="#{viewName ne 'overview'}">
 			<f:verbatim><span></f:verbatim>

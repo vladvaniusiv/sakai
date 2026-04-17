@@ -15,7 +15,10 @@
 **********************************************************************************/
 --%>
 <h:panelGroup>
-  <ul class="navIntraTool actionToolbar" role="menu">
+  <div class="dropdown-toggle dropdown-navIntraTool">
+    <h:outputText value="#{msgs.toolOptions}" />
+  </div>
+  <ul class="navIntraTool actionToolbar navIntraToolMobile" role="menu">
     <li role="menuitem">
       <span id="signupMainMenuLink">
         <h:commandLink value="#{msgs.main_meetings}" action="listMeetings"/>

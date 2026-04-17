@@ -19,7 +19,7 @@
 		margin: $standard-space $standard-space 0 0;
 		
 		// Define tab styles for both direct anchors and spans with anchors
-		span a, > a{
+		span a, > a, span button, > button{
 			display: inline-block;
 			margin: 0;
 			padding: 7px 16px;
@@ -52,7 +52,7 @@
 		}
 		
 		// Current state styles for spans and direct anchors
-		span.current, span a.current, > a.current {
+		span.current, span a.current, > a.current, span.current a {
 			display: inline-block;
 			margin: 0;
 			padding: 7px 16px;
@@ -154,16 +154,16 @@
 			margin-bottom: 40px;
 		}
 		li{
-			display: block;
+			display: block !important;
 			font-size: $default-font-size;
 			margin: 0;
 			span{
-				a{
-					display: block;
+				a, button{
+					display: block !important;
 					padding: 10px 16px;
-					border: none;
-					border-radius: 0;
-					box-shadow: none;
+					border: none !important;
+					border-radius: 0 !important;
+					box-shadow: none !important;
 					&:hover,
 					&:focus {
 						display: block;

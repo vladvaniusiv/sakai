@@ -35,7 +35,10 @@ Headings for delivery pages, needs to have msg=DeliveryMessages.properties, etc.
 <div id="timerPosition"></div>
 
 <%-- NAV BAR --%>
-  <ul class="navIntraTool actionToolbar" role="menu">
+  <div class="dropdown-toggle dropdown-navIntraTool">
+      <h:outputText value="#{generalMessages.toolOptions}" />
+  </div>
+  <ul class="navIntraTool actionToolbar navIntraToolMobile" role="menu">
   <h:panelGroup rendered="#{delivery.showFeedbackLink}">
     <li role="menuitem" class="firstToolBarItem"><span>
 

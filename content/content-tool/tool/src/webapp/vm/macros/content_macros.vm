@@ -1,6 +1,7 @@
 <!-- start:  content_macros.vm -->
 #macro( contentMenu $current)
-  <ul id="contentMenu" class="navIntraTool actionToolBar">
+  <div class="dropdown-toggle dropdown-navIntraTool">$!tlang.getString( "toolOptions" )</div>
+  <ul id="contentMenu" class="navIntraTool actionToolBar navIntraToolMobile">
       <li>
         <span #if("resources" == $current) class="current" #end>
           #set($linkText = $clang.getString("list.site.dropbox"))

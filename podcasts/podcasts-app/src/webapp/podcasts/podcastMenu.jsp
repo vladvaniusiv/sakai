@@ -15,7 +15,10 @@
 **********************************************************************************/
 --%>
 <h:panelGroup><f:verbatim>
-  <ul class="navIntraTool actionToolbar" role="menu">
+  <div class="dropdown-toggle dropdown-navIntraTool"></f:verbatim>
+    <h:outputText value="#{msgs.toolOptions}" /><f:verbatim>
+  </div>
+  <ul class="navIntraTool actionToolbar navIntraToolMobile" role="menu">
     <li role="menuitem">
       <span id="podcastMainMenuLink"></f:verbatim>
         <h:commandLink value="#{msgs.podcast_home_title}" action="cancel"/><f:verbatim>

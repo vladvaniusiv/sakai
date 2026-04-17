@@ -10,7 +10,10 @@
 <sakai:view  toolCssHref="/messageforums-tool/css/msgcntr.css">
 	<h:form id="msgForum">
 		<!-- discussionForum/statistics/printFriendlyDisplayInThread.jsp-->	
-		<ul class="navIntraTool actionToolBar">
+		<div class="dropdown-toggle dropdown-navIntraTool">
+			<h:outputText value="#{msgs.toolOptions}" />
+		</div>
+		<ul class="navIntraTool actionToolbar navIntraToolMobile">
 			<li class="firstToolBarItem">
 				<span>
 					<span class="bi bi-printer-fill" aria-hidden="true" aria-label="#{msgs.print_friendly}"></span>

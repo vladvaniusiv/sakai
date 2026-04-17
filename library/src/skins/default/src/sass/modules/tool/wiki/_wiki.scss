@@ -1048,3 +1048,17 @@
     text-decoration: underline;
 }
 
+.rwikiMenuWrapper {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+@media (max-width: 768px) {
+    .rwikiMenuWrapper {
+        display: block;
+    }
+    .navIntraToolMobile.dropdown-active {
+        margin-bottom: 20px;
+    }
+}

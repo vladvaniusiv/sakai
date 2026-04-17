@@ -1,7 +1,8 @@
 #header(false ${adminModel.title})
 <script src="/library/js/spinner.js$!{portalCdnQuery}"></script>
 <div class="portletBody">    		
-    <ul class="navIntraTool actionToolBar">
+    <div class="dropdown-toggle dropdown-navIntraTool">${rlb.toolOptions}</div>
+    <ul class="navIntraTool actionToolBar navIntraToolMobile">
         <!-- Home Link -->
         <li>
             <span>

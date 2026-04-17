@@ -10,7 +10,10 @@
 <sakai:view toolCssHref="/messageforums-tool/css/msgcntr.css">
 	<h:form id="msgForum" rendered="#{ForumTool.instructor || mfStatisticsBean.isAuthor}">
 		<!--discussionForum/statistics/printFriendlyAllAuthoredMsg.jsp-->
-		<ul class="navIntraTool actionToolBar">
+		<div class="dropdown-toggle dropdown-navIntraTool">
+			<h:outputText value="#{msgs.toolOptions}" />
+		</div>
+		<ul class="navIntraTool actionToolbar navIntraToolMobile">
 			<li class="firstToolBarItem">
 				<span>
 					<span class="bi bi-printer" aria-hidden="true"></span>

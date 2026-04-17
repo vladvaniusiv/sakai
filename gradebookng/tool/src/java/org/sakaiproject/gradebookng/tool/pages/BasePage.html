@@ -7,7 +7,10 @@
 </head>     
 <body>
 	<div class="portletBody">
-		<ul class="navIntraTool actionToolbar" wicket:id="gradebookPageNav">
+		<div class="dropdown-toggle dropdown-navIntraTool">
+			<wicket:message key="toolOptions" />
+		</div>
+		<ul class="navIntraTool actionToolbar navIntraToolMobile" wicket:id="gradebookPageNav">
 			<li class="firstToolBarItem">
 				<span>
 					<a wicket:id="gradebookPageLink">

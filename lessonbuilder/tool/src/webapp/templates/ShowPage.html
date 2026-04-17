@@ -87,89 +87,93 @@
 
   <div rsf:id="portletBody" class="portletBody">
 
-<div class="row m-0">
-  <div class="column col-12 m-0 p-0 border-0">
-    <span rsf:id="tool-bar:" class="navIntraTool" role="application" aria-labelledby="tool-bar::toolbar-label">
+<!--<div class="row m-0">
+  <div class="column col-12 m-0 p-0 border-0">-->
+    <span rsf:id="tool-bar:" role="application" aria-labelledby="tool-bar::toolbar-label">
+      <div class="dropdown-toggle dropdown-navIntraTool">
+        <span rsf:id="msg=simplepage.tool-options"></span>
+      </div>
       <h2 id="toolbar-label" rsf:id="msg=simplepage.toolbar" class="lb-offscreen"></h2>
-      <ul id="toolbar" class="d-inline">
-        <li class="contentButton">
-            <button class="btn btn-link my-1" type="button" data-bs-toggle="modal" rsf:id="addcontent" id="addcontent" data-bs-target="#addContentDiv" aria-controls="addContentDiv" aria-expanded="false">
+      <ul id="toolbar" class="navIntraTool actionToolBar navIntraToolMobile">
+        <li>
+          <span>
+            <a type="button" data-bs-toggle="modal" rsf:id="addcontent" id="addcontent" data-bs-target="#addContentDiv" aria-controls="addContentDiv" aria-expanded="false">
               <span rsf:id="msg=simplepage.add-content"></span>
-              <i aria-hidden="true" class="bi-plus-lg ms-1"></i>
-            </button>
+            </a>
+          </span>
         </li>
-        <li class="contentButton dropdown" rsf:id="dropdown" id="dropdown">
-            <button class="btn btn-link my-1" type="button" data-bs-toggle="modal" data-bs-target="#moreDiv" aria-controls="moreDiv" aria-expanded="false">
-              <span rsf:id="msg=simplepage.more-tools" class="d-none d-lg-inline-block"></span>
-              <i class="bi-arrow-down-circle-fill ms-1"></i>
-            </button>
+        <li class="dropdown" rsf:id="dropdown" id="dropdown">
+          <span>
+            <a class="" type="button" data-bs-toggle="modal" data-bs-target="#moreDiv" aria-controls="moreDiv" aria-expanded="false">
+              <span rsf:id="msg=simplepage.more-tools"></span>
+            </a>
+          </span>
         </li>
-        <li class="list-group-item m-1 contentButton" rsf:id="remove-student">
-            <button class="btn btn-link my-1" type="button">
+        <li class="list-group-item m-1" rsf:id="remove-student">
+          <span>
+            <a type="button">
               <a class="remove-page" href="#" rsf:id="remove-page-student">
                 <span rsf:id="msg=simplepage.remove-page" role="menuitem"></span>
               </a>
-            </button>
+            </a>
+          </span>
         </li>
-        <li class="contentButton">
-            <button class="btn btn-link my-1" type="button" rsf:id="layout-link" data-bs-toggle="modal" data-bs-target="#layout-dialog" aria-controls="layout-dialog" aria-expanded="false">
-              <span rsf:id="msg=simplepage.layoutlinktext" class="d-none d-xl-inline-block me-1"></span>
-              <i class="bi-grid-1x2"></i>
-            </button>
+        <li>
+          <span>
+            <a type="button" rsf:id="layout-link" data-bs-toggle="modal" data-bs-target="#layout-dialog" aria-controls="layout-dialog">
+              <span rsf:id="msg=simplepage.layoutlinktext" class="d-xl-inline-block me-1"></span>
+            </a>
+          </span>
         </li>
-        <li class="contentButton">
-            <button class="btn btn-link my-1" id="reorder-button">
+        <li>
+            <span>
               <a href="#" rsf:id="reorder" tabindex="-1">
                 <span aria-hidden="true" class="fa-button-text"></span>
               </a>
-            </button>
+            </span>
         </li>
-        <li class="contentButton">
-            <button class="btn btn-link my-1" id="bulk-edit-pages-button">
+        <li>
+            <span>
               <a href="#" rsf:id="bulk-edit-pages" tabindex="-1">
                 <span aria-hidden="true" class="fa-button-text"></span>
               </a>
-            </button>
+            </span>
         </li>
-        <li class="contentButton">
+        <li>
           <span rsf:id="title-descrip">
-            <button class="btn btn-link my-1" rsf:id="edit-title" id="edit-title" type="button" data-bs-toggle="modal" data-bs-target="#edit-title-dialog" aria-controls="edit-title-dialog" aria-expanded="false">
-              <span rsf:id="edit-title-text" class="d-none d-xl-inline-block me-1"></span>
-              <i class="bi-gear-fill"></i>
-            </button>
+            <a class="" rsf:id="edit-title" id="edit-title" type="button" data-bs-toggle="modal" data-bs-target="#edit-title-dialog" aria-controls="edit-title-dialog" aria-expanded="false">
+              <span rsf:id="edit-title-text" class="d-xl-inline-block me-1"></span>
+            </a>
           </span>
         </li>
       </ul>
     </span>
     <!-- /tool-bar -->
     <div id="contentButtonsForAllRoles" class="text-end">
-      <span class="contentButton">
-        <a role="button" href="#" rsf:id="print-view" id="print-view" class="btn btn-link my-1 Mrphs-toolTitleNav__link top-icon">
-          <span rsf:id="msg=simplepage.print_view" class="Mrphs-itemTitle me-1 d-none d-xl-inline-block"></span>
-          <span class="bi-printer" aria-hidden="true"></span>
+      <span class="contentButton"><span>
+        <a role="button" href="#" rsf:id="print-view" id="print-view" class=" Mrphs-toolTitleNav__link top-icon">
+          <span rsf:id="msg=simplepage.print_view" class="Mrphs-itemTitle me-1 d-xl-inline-block"></span>
         </a>
-      </span>
-      <span class="contentButton" rsf:id="show-print-all">
-        <a role="button" href="#" rsf:id="print-all" id="print-all" class="btn btn-link my-1 Mrphs-toolTitleNav__link top-icon">
-          <span rsf:id="msg=simplepage.print_all" class="Mrphs-itemTitle me-1 d-none d-xl-inline-block"></span>
-          <span class="bi-printer-fill" aria-hidden="true"></span>
+      </span></span>
+      <span class="contentButton" rsf:id="show-print-all"><span>
+        <a role="button" href="#" rsf:id="print-all" id="print-all" class=" Mrphs-toolTitleNav__link top-icon">
+          <span rsf:id="msg=simplepage.print_all" class="Mrphs-itemTitle me-1 d-xl-inline-block"></span>
         </a>
-      </span>
-      <span class="contentButton">
-        <a role="button" href="#" rsf:id="show-pages" id="show-pages" class="btn btn-link my-1 Mrphs-toolTitleNav__link top-icon">
-          <span rsf:id="msg=simplepage.showallpages" class="Mrphs-itemTitle me-1 d-none d-lg-inline-block"></span>
-          <span class="bi-list-ol" aria-hidden="true"></span>
+      </span></span>
+      <span class="contentButton"><span>
+        <a role="button" href="#" rsf:id="show-pages" id="show-pages" class=" Mrphs-toolTitleNav__link top-icon">
+          <span rsf:id="msg=simplepage.showallpages" class="Mrphs-itemTitle me-1 "></span>
         </a>
-      </span>
+      </span></span>
     </div>
-  </div>
+  <!--</div>-->
     
   <div rsf:id="gradingSpan" class="gradingarea column col-12 p-2 border-0 text-end">
     <a role="button" href="#" rsf:id="gradingBack" style="margin-right:2px;background:none" class="usebutton grading-nextprev">&#60;</a><img class="statusImg" src="$context/images/no-status.png" id="statusImg" height="16px" width="16px" alt=""></img><span style="*vertical-align:13%"  rsf:id="msg=simplepage.comments-points"></span><span style="display:none" class="uuidBox" rsf:id="commentsUUID"></span><span style="display:none" class="pointsSpan" rsf:id="commentPoints"></span>
     <input rsf:id="studentPointsBox" id="studentPointsBox" type="text" style="font-size:100%" size="3"></input> / <span rsf:id="topmaxpoints"></span>
     <a role="button" class="usebutton" href="#" rsf:id="msg=simplepage.submit" style="background:none; width:auto; *vertical-align:13%;margin-right:.5em" id="submit-grading"></a> <a role="button" style="background:none" href="#" rsf:id="gradingForward" class="usebutton grading-nextprev">&#62;</a>
   </div>
-</div> <!-- /row -->
+<!--</div>  /row -->
 
     <div rsf:id="needPermissions" class="sak-banner-error error-spacingabove error-nospacebelow">
       <p rsf:id="msg=simplepage.needpermissions"></p>
@@ -224,7 +228,11 @@
       if (jQuery(".oldPortal").size() === 0) {
         const toolbar = jQuery("ul#toolbar");
         if (toolbar.length > 0) {
-          toolbar.append(jQuery("#contentButtonsForAllRoles").children(".contentButton").wrapInner('<li class="contentButton"></li>'));
+          jQuery("#contentButtonsForAllRoles .contentButton").each(function() {
+            const buttonContent = jQuery(this).html();
+            toolbar.append('<li>' + buttonContent + '</li>');
+          });
+          jQuery("#contentButtonsForAllRoles").remove(); // Limpiamos el contenedor original
         }
         if (breadcrumbs.size() > 0) {
           jQuery(".subpage-breadcrumb-div").append(jQuery(".breadcrumbs span").slice(1));

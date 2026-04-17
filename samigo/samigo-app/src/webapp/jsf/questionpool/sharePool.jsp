@@ -59,7 +59,10 @@ function checkUpdate()
 <!-- content... -->
 <h:form id="questionpoolshare">
 
-<ul class="navIntraTool actionToolbar" role="menu">
+<div class="dropdown-toggle dropdown-navIntraTool">
+	<h:outputText value="#{generalMessages.toolOptions}" />
+</div>
+<ul class="navIntraTool actionToolbar navIntraToolMobile" role="menu">
     <li role="menuitem">
         <span>
             <h:commandLink title="#{generalMessages.t_assessment}" action="author"  immediate="true">

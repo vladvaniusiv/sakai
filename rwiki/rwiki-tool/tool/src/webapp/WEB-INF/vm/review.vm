@@ -12,7 +12,8 @@
 <div id="rwiki_container">
   <div class="portletBody">
 	  <form action="?#" method="get" class="rwiki_searchForm">
-		<ul class="navIntraTool actionToolBar">	  	
+		<div class="dropdown-toggle dropdown-navIntraTool">${rlb.toolOptions}</div>
+ 		<ul id="contentMenu" class="navIntraTool actionToolBar navIntraToolMobile">
 	    ##  $useHomeLink $usePrinterLink $useViewLink $viewLinkName 
 	    ##  $useEditLink $useInfoLink $useHistoryLink $useWatchLink $withNotification 
 	    ##  $homeBean $viewBean $resourceLoaderBean )

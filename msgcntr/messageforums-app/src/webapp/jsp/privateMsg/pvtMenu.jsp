@@ -15,7 +15,10 @@
 **********************************************************************************/
 --%>
 <h:panelGroup rendered="#{PrivateMessagesTool.messages}">
-  <ul class="navIntraTool actionToolbar" role="menu">
+  <div class="dropdown-toggle dropdown-navIntraTool">
+    <h:outputText value="#{msgs.toolOptions}" />
+  </div>
+  <ul class="navIntraTool actionToolbar navIntraToolMobile" role="menu">
     <li role="menuitem">
       <span id="messagesMainMenuLink">
         <h:commandLink value="#{msgs.cdfm_message_pvtarea}" action="pvtMsgHpView" immediate="true"/>

@@ -1,6 +1,5 @@
 ##{$namespace}sakai-commons {
     #commons-toolbar {
-        margin-top: 0px !important;
         margin-bottom: 10px !important;
     }
         .commons-photo-text-wrapper {
@@ -197,6 +196,7 @@
     .navIntraTool {
       li span.current a {
         background: unset;
+        padding: 0;
       }
     }
 }

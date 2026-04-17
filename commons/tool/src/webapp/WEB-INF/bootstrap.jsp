@@ -32,8 +32,8 @@
         <script src="/commons-tool/js/commons_permissions.js${portalCDNQuery}"></script>
 
         <div id="Mrphs-sakai-commons" class="portletBody commons-portletBody">
-
-            <ul id="commons-toolbar" class="navIntraTool actionToolBar hidden" role="menu"></ul>
+            <div class="dropdown-toggle dropdown-navIntraTool" id="toolOptionsLink"></div>
+            <ul id="commons-toolbar" class="navIntraTool actionToolBar navIntraToolMobile hidden" role="menu"></ul>
             <div id="commons-main-container">
                 <div id="commons-content"></div>
             </div>
@@ -41,6 +41,11 @@
         </div> <!-- /portletBody-->
 
         <script src="/commons-tool/js/commons.js${portalCDNQuery}"></script>
-
+        <script>
+            $(document).ready(function() {
+                var label = commons.i18n.toolOptions || 'Tool Options';
+                $('#toolOptionsLink').text(label);
+            });
+        </script>
     </body>
 </html>

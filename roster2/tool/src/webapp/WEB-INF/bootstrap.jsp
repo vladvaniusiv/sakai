@@ -15,6 +15,9 @@
     limitations under the License.
 
 -->
+<jsp:useBean id="msgs" class="org.sakaiproject.util.ResourceLoader" scope="request">
+   <jsp:setProperty name="msgs" property="baseName" value="roster"/>
+</jsp:useBean>
 <%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
         "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
@@ -62,7 +65,10 @@
 
             <div id="roster-header-loading-image"><img src="/sakai-roster2-tool/images/ajax-loader.gif" /></div>
 
-            <ul id="roster_navbar" class="navIntraTool actionToolBar" role="menu"></ul>
+            <div class="dropdown-toggle dropdown-navIntraTool">
+                <c:out value="${msgs.toolOptions}" />
+            </div>
+            <ul id="roster_navbar" class="navIntraTool actionToolBar navIntraToolMobile" role="menu"></ul>
 
             <div id="rosterMainContainer">
                 <div id="roster_content" class="view_mode_${defaultOverviewMode}"></div>

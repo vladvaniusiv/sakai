@@ -17,7 +17,6 @@
 </script>
 <script>
     $(document).ready(function(){
-        initializePopover("podMainForm\\:popover", "<h:outputText value="#{msgs.popup_text}" />");
         var menuLink = $('#podcastMainMenuLink');
         var menuLinkSpan = menuLink.closest('span');
         menuLinkSpan.addClass('current');

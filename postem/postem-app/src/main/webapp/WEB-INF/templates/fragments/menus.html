@@ -2,7 +2,10 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
 <body>
     <div th:fragment="main (current)">
-        <ul class="navIntraTool" role="menu">
+        <div class="dropdown-toggle dropdown-navIntraTool">
+            <span th:text="#{tool-options}"></span>
+        </div>
+        <ul class="navIntraTool actionToolBar navIntraToolMobile" role="menu">
             <li role="menuitem">
                 <span th:class="${current}=='index' ? 'current'">
                     <span  th:if="${current}=='index'" th:text="#{bar_main}">Postem</span>

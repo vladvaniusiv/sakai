@@ -7,7 +7,10 @@
 </head>
 <body>
 	<wicket:extend>
-		<ul class="navIntraTool" wicket:id="navBar">
+		<div class="dropdown-toggle dropdown-navIntraTool">
+			<wicket:message key="toolOptions">Tool Options</wicket:message>
+		</div>
+		<ul class="navIntraTool actionToolBar navIntraToolMobile" wicket:id="navBar">
 			<span wicket:id="listLink"></span>
 			<span wicket:id="uploadLink"></span>
 		</ul>

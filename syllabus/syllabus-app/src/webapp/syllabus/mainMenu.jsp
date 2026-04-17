@@ -15,7 +15,10 @@
 **********************************************************************************/
 --%>
 <h:panelGroup>
-  <ul class="navIntraTool actionToolbar">
+  <div class="dropdown-toggle dropdown-navIntraTool">
+    <h:outputText value="#{msgs.toolOptions}" />
+  </div>
+  <ul class="navIntraTool actionToolbar navIntraToolMobile">
     <li>
       <span id="syllabusMenuMainLink">
         <h:commandLink action="#{SyllabusTool.processStudentView}" immediate="true">

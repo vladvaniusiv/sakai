@@ -21,23 +21,26 @@
 			menuLinkSpan.html(menuLink.text());
 		})
 	</script>
-	<ul class="navIntraTool actionToolBar">
-	    ##  $useHomeLink $usePrinterLink $useViewLink $viewLinkName 
-	    ##  $useEditLink $useInfoLink $useHistoryLink $useWatchLink $withNotification 
-	    ##  $homeBean $viewBean $resourceLoaderBean )
-	    ##            uhl  upl  uvl  vln    uel   uil  uhl  uwl  wn
-		#if ($renderBean.localisedPageNameLength>255)
-			#commandlinks(true false true ${rlb.jsp_view}  false  false false false ${requestScope.Withnotification}       ${homeBean} ${viewBean} ${rlb} )
-		#else
-			#commandlinks(true true true ${rlb.jsp_view}   true  true true true ${requestScope.Withnotification}   ${homeBean} ${viewBean} ${rlb} )
-		#end
-	    <li class="rwiki_searchBox">
-	      <label for="searchField">${rlb.jsp_search}:</label>
-	      <input type="hidden" name="action" value="${util.escapeHtml($requestScope.SearchTarget)}" />
-	      <input type="hidden" name="panel" value="Main" />
-	      <input type="text" id="searchField" name="search" />
-	    </li>
-	</ul>
+	<div class="rwikiMenuWrapper">
+		<div class="dropdown-toggle dropdown-navIntraTool">${rlb.toolOptions}</div>
+		<ul id="contentMenu" class="navIntraTool actionToolBar navIntraToolMobile">
+			##  $useHomeLink $usePrinterLink $useViewLink $viewLinkName 
+			##  $useEditLink $useInfoLink $useHistoryLink $useWatchLink $withNotification 
+			##  $homeBean $viewBean $resourceLoaderBean )
+			##            uhl  upl  uvl  vln    uel   uil  uhl  uwl  wn
+			#if ($renderBean.localisedPageNameLength>255)
+				#commandlinks(true false true ${rlb.jsp_view}  false  false false false ${requestScope.Withnotification}       ${homeBean} ${viewBean} ${rlb} )
+			#else
+				#commandlinks(true true true ${rlb.jsp_view}   true  true true true ${requestScope.Withnotification}   ${homeBean} ${viewBean} ${rlb} )
+			#end
+		</ul>
+			<div class="rwiki_searchBox">
+				<label for="searchField">${rlb.jsp_search}:</label>
+				<input type="hidden" name="action" value="${util.escapeHtml($requestScope.SearchTarget)}" />
+				<input type="hidden" name="panel" value="Main" />
+				<input type="text" id="searchField" name="search" />
+			</div>
+		</div>
 	  </form>
 
 

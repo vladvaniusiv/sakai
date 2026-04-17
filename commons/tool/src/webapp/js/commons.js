@@ -30,16 +30,41 @@ commons.getSelection = function () {
 
 commons.imageFileExtensions = ['png','jpg','jpeg','gif'];
 
+commons.changeActiveTab = function (state) {
+    commons.utils.renderTemplate('toolbar', {}, 'commons-toolbar');
+
+    $('#commons-main-link>span>a').click(function (e) {
+        commons.switchState(commons.states.POSTS);
+    });
+    $('#commons-permissions-link>span>a').click(function (e) {
+        commons.switchState(commons.states.PERMISSIONS);
+    });
+
+    var activeID = '';
+    if (state === commons.states.POSTS || state === commons.states.POST) {
+        activeID = '#commons-main-link';
+    } else if (state === commons.states.PERMISSIONS) {
+        activeID = '#commons-permissions-link';
+    }
+
+    if (activeID !== '') {
+        var $span = $(activeID + ' > span');
+        $span.addClass('current');
+        var tabText = $span.find('a').text();
+        $span.find('a').remove();
+        $span.text(tabText);
+    }
+};
+
 commons.switchState = function (state, arg) {
 
     commons.currentState = state;
 
+    commons.changeActiveTab(state);
+
     $("#commons-post-editor").toggle(commons.currentUserPermissions.postCreate);
 
     if (commons.states.POSTS === state) {
-        $('#commons-toolbar > li > span').removeClass('current');
-        $('#commons-main-link > span').addClass('current');
-
         const templateData = {
                 currentUserId: commons.userId,
                 isUserSite: commons.isUserSite,
