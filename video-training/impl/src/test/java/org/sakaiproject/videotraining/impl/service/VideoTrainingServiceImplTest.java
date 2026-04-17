@@ -20,7 +20,9 @@ import org.sakaiproject.authz.api.FunctionManager;
 import org.sakaiproject.authz.api.SecurityService;
 import org.sakaiproject.content.api.ContentCollection;
 import org.sakaiproject.content.api.ContentHostingService;
+import org.sakaiproject.event.api.Event;
 import org.sakaiproject.event.api.EventTrackingService;
+import org.sakaiproject.event.api.NotificationService;
 import org.sakaiproject.site.api.SiteService;
 import org.sakaiproject.tool.api.SessionManager;
 import org.sakaiproject.videotraining.api.VideoTrainingConstants;
@@ -423,6 +425,30 @@ public class VideoTrainingServiceImplTest {
         long afterSave = service.countSiteLibrary(SITE_ID, "video");
         assertEquals(4L, afterSave);
         verify(videoRepository, times(2)).countBySiteId(SITE_ID, "video");
+    }
+
+    @Test
+    public void saveVideoShouldRegisterVisibilityScopeChangedEvent() {
+        VideoTrainingVideo existing = baseVideo();
+        existing.setVisibilityScope(VideoVisibilityScope.GLOBAL);
+
+        VideoTrainingVideo update = baseVideo();
+        update.setVisibilityScope(VideoVisibilityScope.COURSE);
+
+        Event mockEvent = Mockito.mock(Event.class);
+        when(securityService.unlock(USER_ID, VideoTrainingConstants.PERMISSION_MANAGE, SITE_REF)).thenReturn(true);
+        when(videoRepository.findById(VIDEO_ID)).thenReturn(Optional.of(existing));
+        when(videoRepository.save(update)).thenReturn(update);
+        when(eventTrackingService.newEvent(Mockito.eq("video.training.visibility.scope.changed"),
+                Mockito.anyString(), Mockito.eq(SITE_ID), Mockito.eq(true),
+                Mockito.eq(NotificationService.NOTI_OPTIONAL))).thenReturn(mockEvent);
+
+        service.saveVideo(update);
+
+        verify(eventTrackingService).newEvent(Mockito.eq("video.training.visibility.scope.changed"),
+                Mockito.anyString(), Mockito.eq(SITE_ID), Mockito.eq(true),
+                Mockito.eq(NotificationService.NOTI_OPTIONAL));
+        verify(eventTrackingService).post(mockEvent);
     }
 
     private VideoTrainingVideo baseVideo() {

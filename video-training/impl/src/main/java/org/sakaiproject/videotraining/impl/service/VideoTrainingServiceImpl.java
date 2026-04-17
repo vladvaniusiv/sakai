@@ -151,6 +151,10 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
             video.setVisibilityScope(VideoVisibilityScope.COURSE);
         }
 
+        VideoVisibilityScope previousVisibilityScope = existing != null && existing.getVisibilityScope() != null
+            ? existing.getVisibilityScope()
+            : VideoVisibilityScope.COURSE;
+
         VideoPublicationStatus requestedStatus = normalizePublicationStatus(video.getPublicationStatus());
         video.setPublicationStatus(requestedStatus);
 
@@ -171,6 +175,10 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
 
         video.setModifiedOn(now);
         VideoTrainingVideo saved = videoRepository.save(video);
+        if (existing != null && previousVisibilityScope != saved.getVisibilityScope()) {
+            String visibilityChangeDetails = previousVisibilityScope.name() + "->" + saved.getVisibilityScope().name();
+            registerAudit(saved.getSiteId(), currentUserId, "VISIBILITY_SCOPE_CHANGED", saved.getId(), visibilityChangeDetails);
+        }
         String action = existing == null ? "VIDEO_CREATED" : "VIDEO_UPDATED";
         registerAudit(saved.getSiteId(), currentUserId, action, saved.getId(), saved.getTitle());
         invalidateListCaches();
