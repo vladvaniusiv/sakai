@@ -36,6 +36,23 @@ sakai-user-photo > div:first-child {
     min-width: 30px;
     max-width: 30px;
     height: 30px;
+    border: 1px solid #BBB;
+    border-radius: 0;
+    background-repeat: no-repeat;
+    @container tool-col (min-width: 31px) {
+        min-width: 100px;
+        max-width: 100px;
+        height: 100px;
+        aspect-ratio: 1 / 1;
+
+        @media (min-width: 768px) {
+          min-width: unset;
+          width: 100cqw;
+          height: 100cqw;
+          max-width: 100%;
+          aspect-ratio: 1 / 1;
+        }
+    }
   }
 
   &.medium-thumbnail {
