@@ -76,7 +76,7 @@
             <tbody>
             <tr th:each="option : ${options}">
               <td><div class="p-1" th:utext="${option.text}">Option text</div></td>
-              <td class="text-nowrap d-flex gap-2">
+              <td>
                 <a class="btn btn-outline-secondary btn-sm" role="button" th:href="@{'/pollOption'(optionId=${option.id})}" th:text="#{new_poll_option_edit}">Edit</a>
                 <a class="btn btn-outline-danger btn-sm" role="button" th:href="@{'/pollOptionDelete'(optionId=${option.id})}" th:text="#{new_poll_option_delete}">Delete</a>
               </td>
