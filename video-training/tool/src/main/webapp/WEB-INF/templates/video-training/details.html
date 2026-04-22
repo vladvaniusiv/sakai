@@ -12,9 +12,17 @@
     </div>
 
     <div class="vt-player-wrap">
-        <video class="vt-player" controls th:if="${!isExternalVideo}">
-            <source th:src="${nativePlaybackUrl}" th:type="${nativeContentType}" />
-        </video>
+        <div th:if="${!isExternalVideo}">
+            <video id="vt-main-player"
+                class="vt-player"
+                playsinline
+                controls
+                preload="auto"
+                th:attr="data-playback-url=${nativePlaybackUrl},data-content-type=${nativeContentType}"
+                th:src="${nativePlaybackUrl}">
+            </video>
+        </div>
+
         <div class="ratio ratio-16x9" th:if="${isExternalVideo}">
             <iframe th:src="${externalEmbedUrl}"
                     title="Video player"
@@ -127,7 +135,18 @@
     <div class="sak-banner-info" role="status" th:if="${#lists.isEmpty(captions)}" th:text="#{video.training.captions.empty}">No captions available yet.</div>
 
     <a class="btn btn-secondary" th:href="@{/videos}" th:text="#{video.training.back}">Back</a>
+
+    <div id="pip-overlay" class="vt-pip-overlay" aria-hidden="true">
+        <div class="vt-pip-overlay-content">
+            <span class="bi bi-box-arrow-up-right vt-pip-overlay-icon" aria-hidden="true"></span>
+            <p class="vt-pip-overlay-message" th:text="#{video.training.pip.overlay.message}">The platform has opened in a new tab.</p>
+            <p class="vt-pip-overlay-warning" th:text="#{video.training.pip.overlay.warning}">Do not close this window to keep the floating video playing. You can continue browsing the platform in the new window.</p>
+            <p id="pip-popup-blocked-warning" class="vt-pip-overlay-warning vt-pip-overlay-popup-warning vt-is-hidden" th:text="#{video.training.pip.overlay.popupBlocked}">Your browser blocked the new tab. To keep browsing the platform while PiP is active, allow pop-ups for this site and try again.</p>
+        </div>
+    </div>
+
 </div>
 <div th:replace="~{fragments/common :: jQuery}"></div>
+<script th:src="@{/js/video-training-details.js}"></script>
 </body>
 </html>
