@@ -142,4 +142,12 @@
 	 		}
 	 	}
 	 }
+
+	.list-group-item {
+		input[type="checkbox"],
+		input[type="radio"]{
+			-webkit-appearance: revert;
+			width: revert;
+		}
+	}
 }
