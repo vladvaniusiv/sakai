@@ -15,7 +15,7 @@
     <form th:action="@{/voteQuestion}" th:object="${voteForm}" method="post" class="d-grid gap-3">
       <input type="hidden" th:field="*{pollId}" />
       <div class="list-group" th:if="${options}">
-        <label th:each="option : ${options}" class="list-group-item d-flex align-items-center gap-3">
+        <div th:each="option : ${options}" class="list-group-item d-flex align-items-center gap-3">
           <input th:type="${multipleChoice} ? 'checkbox' : 'radio'"
                  class="me-2"
                  name="selectedOptionIds"
@@ -23,7 +23,7 @@
                  th:value="${option.id}"
                  th:checked="${#lists.contains(voteForm.selectedOptionIds, option.id)}" />
           <span class="flex-grow-1" th:utext="${option.text}">Option text</span>
-        </label>
+        </div>
       </div>
 
       <div class="act">

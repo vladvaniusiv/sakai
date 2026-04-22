@@ -32,6 +32,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.sakaiproject.authz.api.SecurityService;
 import org.sakaiproject.poll.api.service.PollsService;
+import org.sakaiproject.poll.api.util.PollUtils;
 import org.sakaiproject.poll.api.model.Option;
 import org.sakaiproject.poll.api.model.Poll;
 import org.sakaiproject.poll.api.model.Vote;
@@ -111,11 +112,12 @@ public class ResultsController {
             }
 
             double percentage = calculatePercentage(currentPoll, voteCount, totalVotes, distinctVoters);
+            String chartLabelPrefixed = "(" + (i + 1) + ") " + decorateOptionLabel(option, locale);
             rows.add(new ResultRow(
                     i + 1,
                     decorateOptionText(option, locale),
                     Boolean.TRUE.equals(option.getDeleted()),
-                    decorateOptionLabel(option, locale),
+                    chartLabelPrefixed,
                     voteCount,
                     percentFormat.format(percentage),
                     percentage
@@ -174,8 +176,19 @@ public class ResultsController {
     }
 
     private String decorateOptionLabel(Option option, Locale locale) {
-        return StringUtils.normalizeSpace(formattedText.convertFormattedTextToPlaintext(
-                getEscapedDecoratedOptionText(option, locale)));
+        String text = getOptionLabel(option, locale);
+        if (text == null) return "";
+        String clean = text.replace("&lt;", "<")
+                        .replace("&gt;", ">")
+                        .replace("&amp;", "&")
+                        .replace("&nbsp;", " ")
+                        .replaceAll("<[^>]*>", "");
+
+        if (Boolean.TRUE.equals(option.getDeleted())) {
+            clean += " (" + messageSource.getMessage("deleted_option_tag", null, locale) + ")";
+        }
+
+        return StringUtils.normalizeSpace(clean);
     }
 
     private String getOptionLabel(Option option, Locale locale) {

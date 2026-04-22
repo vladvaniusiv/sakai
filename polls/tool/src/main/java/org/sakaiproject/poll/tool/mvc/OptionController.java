@@ -162,7 +162,16 @@ public class OptionController {
             true,
             true
         );
-        option.setText(org.sakaiproject.poll.api.util.PollUtils.cleanupHtmlPtags(sanitizedText));
+
+        if (sanitizedText != null) {
+            String text = sanitizedText.trim();
+            if (text.toLowerCase().endsWith("<p>&nbsp;</p>")) {
+                text = text.substring(0, text.length() - "<p>&nbsp;</p>".length()).trim();
+            }
+            option.setText(text);
+        } else {
+            option.setText("");
+        }
 
         // Validate after processing
         if (StringUtils.isBlank(option.getText())) {

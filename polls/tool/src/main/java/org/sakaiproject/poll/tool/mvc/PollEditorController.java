@@ -283,7 +283,15 @@ public class PollEditorController {
             null,
                 null
         );
-        poll.setDescription(org.sakaiproject.poll.api.util.PollUtils.cleanupHtmlPtags(sanitizedDescription));
+        if (sanitizedDescription != null) {
+            String desc = sanitizedDescription.trim();
+            if (desc.toLowerCase().endsWith("<p>&nbsp;</p>")) {
+                desc = desc.substring(0, desc.length() - "<p>&nbsp;</p>".length()).trim();
+            }
+            poll.setDescription(desc);
+        } else {
+            poll.setDescription("");
+        }
 
         poll.setPublic(form.isPublic());
         poll.setMinOptions(form.getMinOptions());
