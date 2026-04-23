@@ -105,6 +105,9 @@ export class SakaiAnnouncements extends SakaiPageableElement {
 
   content() {
 
+    if (!this.data || this.data.length === 0) {
+      return html`<span>${this._i18n.no_announcements}</span>`;
+    }
     return html`
       <div id="filter-and-sort-block">
         ${!this.siteId ? html`

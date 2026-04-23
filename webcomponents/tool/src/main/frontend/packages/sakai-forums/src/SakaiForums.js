@@ -105,6 +105,9 @@ export class SakaiForums extends SakaiPageableElement {
   }
 
   content() {
+    if (!this.data || this.data.length === 0) {
+      return html`<span>${this._i18n.no_forums}</span>`;
+    }
 
     return html`
 
