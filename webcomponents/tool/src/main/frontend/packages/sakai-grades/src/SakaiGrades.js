@@ -117,7 +117,7 @@ export class SakaiGrades extends SakaiPageableElement {
   content() {
 
     if (this.dataPage.length === 0) {
-      return html`<div class="sak-banner-info">${this._i18n.no_grades}</div>`;
+      return html`<span>${this._i18n.no_grades}</span>`;
     }
 
     return html`

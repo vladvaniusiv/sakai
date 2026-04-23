@@ -20,4 +20,5 @@ url_tooltip=Click to be taken to the announcement
 view=View
 viewing=(viewing announcements from the last 10 days)
 widget_title=Announcements
+no_announcements=No announcements available
 `;

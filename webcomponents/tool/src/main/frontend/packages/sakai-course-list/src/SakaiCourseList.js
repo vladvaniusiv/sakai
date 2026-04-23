@@ -1,4 +1,4 @@
-import { html, nothing } from "lit";
+import { html } from "lit";
 import { SakaiElement } from "@sakai-ui/sakai-element";
 import "@sakai-ui/sakai-icon/sakai-icon.js";
 import "@sakai-ui/sakai-course-card/sakai-course-card.js";
@@ -157,7 +157,9 @@ export class SakaiCourseList extends SakaiElement {
   }
 
   render() {
-
+    if (this.sites.length === 0) {
+      return html`<span>${this._i18n.no_pinned_sites_message}</span>`;
+    }
     return html`
       <div>
         <select class="w-100 mb-1" aria-label="${this._i18n.course_filter_label}" @change=${this._siteFilterChanged} .value=${this._currentFilter} ?disabled=${this.sites.length === 0}>
@@ -181,9 +183,6 @@ export class SakaiCourseList extends SakaiElement {
         </select>
       </div>
       <div>
-        ${this.sites.length === 0 ? html`
-          <div class="sak-banner-info">${this._i18n.no_pinned_sites_message}</div>
-        ` : nothing}
         ${this._displayedSites.map(card => html`
           <sakai-course-card class="mt-3" .courseData=${card}></sakai-course-card>
         `)}

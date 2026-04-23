@@ -74,8 +74,8 @@ describe("sakai-grades tests", () => {
     await elementUpdated(el);
 
     await waitUntil(() => el.dataPage);
-
-    expect(el.shadowRoot.querySelector(".sak-banner-info")).to.exist;
-    expect(el.shadowRoot.querySelector(".sak-banner-info").innerHTML).to.contain(el._i18n.no_grades);
+    const messageElement = el.shadowRoot.querySelector("span");
+    expect(messageElement).to.exist;
+    expect(messageElement.innerHTML).to.contain(el._i18n.no_grades);
   });
 });

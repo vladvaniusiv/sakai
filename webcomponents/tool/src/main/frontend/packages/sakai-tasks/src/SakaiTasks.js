@@ -266,6 +266,30 @@ export class SakaiTasks extends SakaiPageableElement {
   }
 
   content() {
+    if (!this.dataPage || this.dataPage.filter(t => t.visible).length === 0) {
+      return html`
+        ${this._canAddTask ? html`
+          <div id="add-block" class="mb-3">
+            <lion-dialog id="add-edit-dialog">
+              <sakai-tasks-create-task class="dialog-content"
+                id="create-task" slot="content"
+                site-id="${this.siteId}" user-id="${this.userId}"
+                @task-created=${this.taskCreated}
+                @soft-deleted=${this.softDeleteTask}
+                .groups=${this._groups}
+                ?deliver-tasks=${this._canUpdateSite}>
+              </sakai-tasks-create-task>
+              <div slot="invoker">
+                <button type="button" @click=${this._addTask} class="btn btn-primary btn-sm d-flex align-items-center ms-auto p-1 pe-2" aria-label="${this._i18n.add_new_task}">
+                  <i class="si si-add fs-4"></i>${this._i18n.add_new_task}
+                </button>
+              </div>
+            </lion-dialog>
+          </div>
+        ` : nothing}
+        <span>${this._i18n.no_tasks}</span>
+      `;
+    }
 
     return html`
 
