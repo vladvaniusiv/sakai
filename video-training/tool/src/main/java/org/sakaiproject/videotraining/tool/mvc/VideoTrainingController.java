@@ -23,13 +23,15 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.TimeZone;
 import java.util.UUID;
+import java.util.regex.Matcher;
+
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.youtube.YouTube;
 import com.google.api.services.youtube.model.VideoListResponse;
 import com.google.api.services.youtube.model.Video;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import org.sakaiproject.videotraining.api.util.ExternalMetadataFetcher;
+import org.sakaiproject.videotraining.api.util.ContentResourceHelper;
 
 import org.apache.commons.lang3.StringUtils;
 import org.sakaiproject.authz.api.SecurityService;
@@ -102,14 +104,7 @@ public class VideoTrainingController {
     private static final long BYTES_PER_MB = 1024L * 1024L;
     private static final long DEFAULT_MAX_NATIVE_UPLOAD_MB = 512L;
     private static final Set<String> ALLOWED_NATIVE_VIDEO_EXTENSIONS = Set.of("mp4", "webm", "ogg", "mov", "m4v", "avi", "mkv");
-    private static final Pattern IFRAME_SRC_PATTERN = Pattern.compile("(?is)<iframe[^>]*\\bsrc=[\"']([^\"']+)[\"']");
-    private static final Pattern YOUTUBE_WATCH_PATTERN = Pattern.compile("(?:v=)([A-Za-z0-9_-]{11})");
-    private static final Pattern YOUTUBE_SHORT_PATTERN = Pattern.compile("youtu\\.be/([A-Za-z0-9_-]{11})");
-    private static final Pattern YOUTUBE_EMBED_PATTERN = Pattern.compile("/embed/([A-Za-z0-9_-]{11})");
-    private static final Pattern YOUTUBE_SHORTS_PATTERN = Pattern.compile("/shorts/([A-Za-z0-9_-]{11})");
-    private static final Pattern YOUTUBE_LIVE_PATTERN = Pattern.compile("/live/([A-Za-z0-9_-]{11})");
-    private static final Pattern VIMEO_PLAYER_PATTERN = Pattern.compile("player\\.vimeo\\.com/video/(\\d+)");
-    private static final Pattern VIMEO_PAGE_PATTERN = Pattern.compile("vimeo\\.com/(?:video/)?(\\d+)");
+    
     private static final String CONTENT_REFERENCE_ROOT = ContentHostingService.REFERENCE_ROOT;
         private static final Map<String, String> SORT_FIELD_BY_COLUMN = Map.of(
             "title", "title",
@@ -138,6 +133,7 @@ public class VideoTrainingController {
             SecurityService securityService) {
         this.messageSource = messageSource;
         this.contentHostingService = contentHostingService;
+        ContentResourceHelper.setContentHostingService(contentHostingService);
         this.sessionManager = sessionManager;
         this.siteService = siteService;
         this.toolManager = toolManager;
@@ -469,12 +465,12 @@ public class VideoTrainingController {
                 return "redirect:/videos/new";
             }
             // If user requested inheriting metadata, fetch it (must succeed or return error)
-            boolean wantTitle = StringUtils.isNotBlank(inheritTitleMetadata);
-            boolean wantDescription = StringUtils.isNotBlank(inheritDescriptionMetadata);
-            if (wantTitle || wantDescription) {
-                String videoProvider = retrieveVideoProvider(resolvedSourceReference);
-                try {
-                    MetadataFetchResult meta = fetchExternalMetadata(resolvedSourceReference);
+                boolean wantTitle = StringUtils.isNotBlank(inheritTitleMetadata);
+                boolean wantDescription = StringUtils.isNotBlank(inheritDescriptionMetadata);
+                if (wantTitle || wantDescription) {
+                    String videoProvider = ExternalMetadataFetcher.retrieveVideoProvider(resolvedSourceReference);
+                    try {
+                        ExternalMetadataFetcher.MetadataFetchResult meta = ExternalMetadataFetcher.fetchExternalMetadata(resolvedSourceReference);
 
                     if (wantTitle && StringUtils.isBlank(meta.title)) {
                         redirectAttributes.addFlashAttribute("error", "La API de " + videoProvider + " no devolvió título; introduce los datos manualmente.");
@@ -576,20 +572,22 @@ public class VideoTrainingController {
             return "redirect:/videos/new";
         }
 
-        VideoTrainingVideo video = new VideoTrainingVideo();
-        video.setSiteId(siteId);
-        video.setTitle(StringUtils.trimToEmpty(title));
-        video.setInheritTitleMetadata(StringUtils.isNotBlank(inheritTitleMetadata));
-        video.setInheritDescriptionMetadata(StringUtils.isNotBlank(inheritDescriptionMetadata));
-        video.setDescription(StringUtils.trimToEmpty(description));
-        video.setProviderType(parsedProviderType);
-        video.setSourceReference(resolvedSourceReference);
-        video.setFileSizeBytes(parsedProviderType == VideoProviderType.NATIVE ? resolvedFileSizeBytes : null);
-        video.setVisibilityScope(parsedVisibilityScope);
-        video.setPublicationStatus(parsedPublicationStatus);
-        video.setRequiredViewPermission(VideoTrainingConstants.PERMISSION_VIEW);
-        video.setReleaseDate(parsedReleaseDate);
-        video.setRetractDate(parsedRetractDate);
+        VideoTrainingVideo video = new VideoTrainingVideo(
+            siteId,
+            currentUserId(),
+            StringUtils.trimToEmpty(title),
+            StringUtils.isNotBlank(inheritTitleMetadata),
+            StringUtils.isNotBlank(inheritDescriptionMetadata),
+            StringUtils.trimToEmpty(description),
+            parsedProviderType,
+            resolvedSourceReference,
+            parsedProviderType == VideoProviderType.NATIVE ? resolvedFileSizeBytes : null,
+            parsedVisibilityScope,
+            parsedPublicationStatus,
+            parsedReleaseDate,
+            parsedRetractDate,
+            VideoTrainingConstants.PERMISSION_VIEW
+        );
 
         try {
             videoTrainingService.saveVideo(video);
@@ -654,9 +652,9 @@ public class VideoTrainingController {
             boolean wantTitle = StringUtils.isNotBlank(inheritTitleMetadata);
             boolean wantDescription = StringUtils.isNotBlank(inheritDescriptionMetadata);
             if (wantTitle || wantDescription) {
-                String videoProvider = retrieveVideoProvider(resolvedSourceReference);
+                String videoProvider = ExternalMetadataFetcher.retrieveVideoProvider(resolvedSourceReference);
                 try {
-                    MetadataFetchResult meta = fetchExternalMetadata(resolvedSourceReference);
+                    ExternalMetadataFetcher.MetadataFetchResult meta = ExternalMetadataFetcher.fetchExternalMetadata(resolvedSourceReference);
 
                     if (wantTitle && StringUtils.isBlank(meta.title)) {
                         redirectAttributes.addFlashAttribute("error", "La API de " + videoProvider + " no devolvió título; introduce los datos manualmente.");
@@ -1355,7 +1353,7 @@ public class VideoTrainingController {
         }
 
         try {
-            ContentResource resource = contentHostingService.getResource(toContentResourceId(video.getSourceReference()));
+            ContentResource resource = ContentResourceHelper.getContentResource(video.getSourceReference());
             return StringUtils.defaultIfBlank(resource.getContentType(), "video/mp4");
         } catch (Exception e) {
             return "video/mp4";
@@ -1376,7 +1374,7 @@ public class VideoTrainingController {
         }
 
         try {
-            ContentResource resource = contentHostingService.getResource(toContentResourceId(sourceReference));
+            ContentResource resource = ContentResourceHelper.getContentResource(sourceReference);
             return resource.getContentLength();
         } catch (Exception e) {
             return null;
@@ -1389,7 +1387,7 @@ public class VideoTrainingController {
         }
 
         try {
-            ContentResource resource = contentHostingService.getResource(toContentResourceId(sourceReference));
+            ContentResource resource = ContentResourceHelper.getContentResource(sourceReference);
             ResourceProperties properties = resource.getProperties();
             String managedFlag = properties != null ? properties.getProperty(MANAGED_UPLOAD_PROPERTY) : null;
             if (!"true".equalsIgnoreCase(managedFlag)) {
@@ -1401,19 +1399,12 @@ public class VideoTrainingController {
                 return;
             }
 
-            contentHostingService.removeResource(toContentResourceId(sourceReference));
+            contentHostingService.removeResource(ContentResourceHelper.toContentResourceId(sourceReference));
         } catch (Exception e) {
             // best effort cleanup path
         }
     }
 
-    private String toContentResourceId(String sourceReference) {
-        String normalized = StringUtils.trimToEmpty(sourceReference);
-        if (normalized.startsWith(CONTENT_REFERENCE_ROOT + "/")) {
-            return normalized.substring(CONTENT_REFERENCE_ROOT.length());
-        }
-        return normalized;
-    }
 
     private String resolveEffectiveViewMode(String siteId, boolean canManage, String requestedViewMode) {
         String sessionKey = VIEW_MODE_SESSION_PREFIX + siteId;
@@ -1478,12 +1469,12 @@ public class VideoTrainingController {
         }
 
         String source = normalizeExternalSourceReference(video.getSourceReference());
-        String youtubeVideoId = extractYoutubeVideoId(source);
+        String youtubeVideoId = ExternalMetadataFetcher.extractYoutubeVideoId(source);
         if (StringUtils.isNotBlank(youtubeVideoId)) {
             return "https://img.youtube.com/vi/" + youtubeVideoId + "/hqdefault.jpg";
         }
 
-        String vimeoVideoId = extractVimeoVideoId(source);
+        String vimeoVideoId = ExternalMetadataFetcher.extractVimeoVideoId(source);
         if (StringUtils.isNotBlank(vimeoVideoId)) {
             return "https://vumbnail.com/" + vimeoVideoId + ".jpg";
         }
@@ -1497,7 +1488,7 @@ public class VideoTrainingController {
         }
 
         try {
-            return StringUtils.defaultIfBlank(contentHostingService.getUrl(toContentResourceId(sourceId)), "");
+            return ContentResourceHelper.getContentUrl(sourceId);
         } catch (Exception e) {
             return "";
         }
@@ -1514,75 +1505,19 @@ public class VideoTrainingController {
         if (StringUtils.isBlank(normalized)) {
             return "";
         }
-
-        Matcher iframeMatcher = IFRAME_SRC_PATTERN.matcher(normalized);
-        if (iframeMatcher.find()) {
-            normalized = StringUtils.trimToEmpty(iframeMatcher.group(1));
-        }
         normalized = normalized.replace("&amp;", "&");
 
-        String youtubeVideoId = extractYoutubeVideoId(normalized);
+        String youtubeVideoId = ExternalMetadataFetcher.extractYoutubeVideoId(normalized);
         if (StringUtils.isNotBlank(youtubeVideoId)) {
             return "https://www.youtube.com/embed/" + youtubeVideoId;
         }
 
-        String vimeoVideoId = extractVimeoVideoId(normalized);
+        String vimeoVideoId = ExternalMetadataFetcher.extractVimeoVideoId(normalized);
         if (StringUtils.isNotBlank(vimeoVideoId)) {
             return "https://player.vimeo.com/video/" + vimeoVideoId;
         }
 
         return "";
-    }
-
-    private String extractYoutubeVideoId(String sourceReference) {
-        if (StringUtils.isBlank(sourceReference)) {
-            return null;
-        }
-
-        Matcher watchMatcher = YOUTUBE_WATCH_PATTERN.matcher(sourceReference);
-        if (watchMatcher.find()) {
-            return watchMatcher.group(1);
-        }
-
-        Matcher shortMatcher = YOUTUBE_SHORT_PATTERN.matcher(sourceReference);
-        if (shortMatcher.find()) {
-            return shortMatcher.group(1);
-        }
-
-        Matcher embedMatcher = YOUTUBE_EMBED_PATTERN.matcher(sourceReference);
-        if (embedMatcher.find()) {
-            return embedMatcher.group(1);
-        }
-
-        Matcher shortsMatcher = YOUTUBE_SHORTS_PATTERN.matcher(sourceReference);
-        if (shortsMatcher.find()) {
-            return shortsMatcher.group(1);
-        }
-
-        Matcher liveMatcher = YOUTUBE_LIVE_PATTERN.matcher(sourceReference);
-        if (liveMatcher.find()) {
-            return liveMatcher.group(1);
-        }
-
-        return null;
-    }
-
-    private String extractVimeoVideoId(String sourceReference) {
-        if (StringUtils.isBlank(sourceReference)) {
-            return null;
-        }
-
-        Matcher playerMatcher = VIMEO_PLAYER_PATTERN.matcher(sourceReference);
-        if (playerMatcher.find()) {
-            return playerMatcher.group(1);
-        }
-
-        Matcher pageMatcher = VIMEO_PAGE_PATTERN.matcher(sourceReference);
-        if (pageMatcher.find()) {
-            return pageMatcher.group(1);
-        }
-
-        return null;
     }
 
     private String determineSourceMode(VideoTrainingVideo video, List<ExistingResourceOption> existingResources) {
@@ -1760,96 +1695,4 @@ public class VideoTrainingController {
         return views;
     }
 
-    private static class MetadataFetchResult {
-        public final String title;
-        public final String description;
-
-        MetadataFetchResult(String title, String description) {
-            this.title = title;
-            this.description = description;
-        }
-    }
-
-    private MetadataFetchResult fetchYoutubeMetadata(String sourceReference) throws Exception {
-        String youtubeId = extractYoutubeVideoId(StringUtils.trimToEmpty(sourceReference));
-        if (StringUtils.isBlank(youtubeId)) {
-            throw new IllegalArgumentException("Not a YouTube URL");
-        }
-
-        String apiKey = ServerConfigurationService.getString("video.training.youtube.api.key", "");
-        if (StringUtils.isBlank(apiKey)) {
-            throw new IllegalStateException("YouTube API key not configured");
-        }
-
-        YouTube youtube = new YouTube.Builder(new NetHttpTransport(), JacksonFactory.getDefaultInstance(), request -> {
-        }).setApplicationName("video-training").build();
-
-        YouTube.Videos.List list = youtube.videos().list(Collections.singletonList("snippet")).setId(Collections.singletonList(youtubeId)).setKey(apiKey);
-        VideoListResponse resp = list.execute();
-        if (resp.getItems() == null || resp.getItems().isEmpty() || resp.getItems().get(0).getSnippet() == null) {
-            throw new java.io.IOException("YouTube API returned no snippet metadata");
-        }
-
-        Video v = resp.getItems().get(0);
-        String title = v.getSnippet().getTitle();
-        String description = v.getSnippet().getDescription();
-        return new MetadataFetchResult(title != null ? title : "", description != null ? description : "");
-    }
-
-    private MetadataFetchResult fetchVimeoMetadata(String sourceReference) throws Exception {
-        String vimeoId = extractVimeoVideoId(StringUtils.trimToEmpty(sourceReference));
-        if (StringUtils.isBlank(vimeoId)) {
-            throw new IllegalArgumentException("Not a Vimeo URL");
-        }
-
-        // Use oEmbed endpoint which doesn't require auth
-        String videoUrl = "https://vimeo.com/" + vimeoId;
-        String apiUrl = "https://vimeo.com/api/oembed.json?url=" + URLEncoder.encode(videoUrl, StandardCharsets.UTF_8);
-
-        HttpClient client = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(5))
-            .build();
-
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(apiUrl))
-            .GET()
-            .build();
-
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-        if (response.statusCode() != 200) {
-            throw new IOException("Vimeo oEmbed returned status " + response.statusCode());
-        }
-
-        JsonNode root = new ObjectMapper().readTree(response.body());
-
-        String title = root.path("title").asText("");
-        String description = root.path("description").asText("");
-
-        return new MetadataFetchResult(title, description);
-    }
-
-    private MetadataFetchResult fetchExternalMetadata(String sourceReference) throws Exception {
-        String youtubeId = extractYoutubeVideoId(StringUtils.trimToEmpty(sourceReference));
-        if (StringUtils.isNotBlank(youtubeId)) {
-            return fetchYoutubeMetadata(sourceReference);
-        }
-        String vimeoId = extractVimeoVideoId(StringUtils.trimToEmpty(sourceReference));
-        if (StringUtils.isNotBlank(vimeoId)) {
-            return fetchVimeoMetadata(sourceReference);
-        }
-        throw new IllegalArgumentException("Unsupported external video provider");
-    }
-
-    private String retrieveVideoProvider(String sourceReference) {
-        String youtubeId = extractYoutubeVideoId(StringUtils.trimToEmpty(sourceReference));
-        if (StringUtils.isNotBlank(youtubeId)) {
-            return "YouTube";
-        }
-        String vimeoId = extractVimeoVideoId(StringUtils.trimToEmpty(sourceReference));
-        if (StringUtils.isNotBlank(vimeoId)) {
-            return "Vimeo";
-        }
-        return ("Unsupported");
-    }
 }

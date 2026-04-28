@@ -441,6 +441,34 @@ public class VideoTrainingVideoRepositoryImpl extends SpringCrudRepositoryImpl<V
     }
 
     @Override
+    public List<VideoTrainingVideo> findAll(String searchText, int offset, int size) {
+        if (size <= 0) {
+            return Collections.emptyList();
+        }
+
+        CriteriaBuilder cb = sessionFactory.getCriteriaBuilder();
+        CriteriaQuery<VideoTrainingVideo> query = cb.createQuery(VideoTrainingVideo.class);
+        Root<VideoTrainingVideo> root = query.from(VideoTrainingVideo.class);
+
+        Predicate searchPredicate = buildSearchPredicate(cb, root, searchText);
+
+        query.select(root);
+        if (searchPredicate != null) {
+            query.where(searchPredicate);
+        }
+        query.orderBy(cb.desc(root.get("modifiedOn")));
+
+        TypedQuery<VideoTrainingVideo> typedQuery = sessionFactory.getCurrentSession().createQuery(query);
+        if (offset > 0) {
+            typedQuery.setFirstResult(offset);
+        }
+        if (size > 0) {
+            typedQuery.setMaxResults(size);
+        }
+        return typedQuery.getResultList();
+    }
+
+    @Override
     public long adminCountAllGlobal(String searchText) {
         CriteriaBuilder cb = sessionFactory.getCriteriaBuilder();
         CriteriaQuery<Long> query = cb.createQuery(Long.class);
@@ -452,6 +480,21 @@ public class VideoTrainingVideoRepositoryImpl extends SpringCrudRepositoryImpl<V
         Predicate finalPredicate = searchPredicate == null ? scopePredicate : cb.and(scopePredicate, searchPredicate);
 
         query.select(cb.count(root)).where(finalPredicate);
+        return sessionFactory.getCurrentSession().createQuery(query).getSingleResult();
+    }
+
+    @Override
+    public long countAll(String searchText) {
+        CriteriaBuilder cb = sessionFactory.getCriteriaBuilder();
+        CriteriaQuery<Long> query = cb.createQuery(Long.class);
+        Root<VideoTrainingVideo> root = query.from(VideoTrainingVideo.class);
+
+        Predicate searchPredicate = buildSearchPredicate(cb, root, searchText);
+
+        query.select(cb.count(root));
+        if (searchPredicate != null) {
+            query.where(searchPredicate);
+        }
         return sessionFactory.getCurrentSession().createQuery(query).getSingleResult();
     }
 

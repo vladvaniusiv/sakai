@@ -16,9 +16,11 @@ import org.sakaiproject.springframework.data.PersistableEntity;
 import org.sakaiproject.videotraining.api.VideoTrainingConstants;
 
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Data
+@NoArgsConstructor
 @Table(name = "vtm_video")
 public class VideoTrainingVideo implements PersistableEntity<String> {
 
@@ -82,5 +84,40 @@ public class VideoTrainingVideo implements PersistableEntity<String> {
     @Column(nullable = false)
     @Convert(converter = InstantEpochMillisConverter.class)
     private Instant modifiedOn = Instant.now();
+
+    public VideoTrainingVideo(
+        String siteId,
+        String ownerId,
+        String title,
+        boolean inheritTitleMetadata,
+        boolean inheritDescriptionMetadata,
+        String description,
+        VideoProviderType providerType,
+        String sourceReference,
+        Long fileSizeBytes,
+        VideoVisibilityScope visibilityScope,
+        VideoPublicationStatus publicationStatus,
+        Instant releaseDate,
+        Instant retractDate,
+        String requiredViewPermission
+    ) {
+        this.siteId = siteId;
+        this.ownerId = ownerId;
+        this.title = title;
+        this.inheritTitleMetadata = inheritTitleMetadata;
+        this.inheritDescriptionMetadata = inheritDescriptionMetadata;
+        this.description = description;
+        this.providerType = providerType;
+        this.sourceReference = sourceReference;
+        this.fileSizeBytes = fileSizeBytes;
+        this.visibilityScope = visibilityScope;
+        this.publicationStatus = publicationStatus;
+        this.releaseDate = releaseDate;
+        this.retractDate = retractDate;
+        this.requiredViewPermission = requiredViewPermission;
+
+        this.createdOn = Instant.now();
+        this.modifiedOn = Instant.now();
+    }
 
 }
