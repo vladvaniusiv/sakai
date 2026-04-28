@@ -49,6 +49,17 @@ public interface VideoTrainingVideoRepository extends SpringCrudRepository<Video
 
     List<VideoTrainingVideo> adminFindAllGlobal(String searchText, int offset, int size);
 
+    /**
+     * Count all videos (no visibility/scope restriction). If searchText is empty or null,
+     * returns total count of videos.
+     */
+    long countAll(String searchText);
+
+    /**
+     * Return all videos (no visibility/scope restriction) in a paginated fashion.
+     */
+    List<VideoTrainingVideo> findAll(String searchText, int offset, int size);
+
     List<VideoTrainingVideo> findGlobalPublishedCursor(String searchText, Instant cursorModifiedOn, String cursorVideoId, int limit);
 
     List<VideoTrainingVideo> findGlobalPublishedSorted(String searchText, int offset, int limit,
