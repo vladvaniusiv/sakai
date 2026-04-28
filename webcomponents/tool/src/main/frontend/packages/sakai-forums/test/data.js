@@ -11,6 +11,8 @@ sort_by_site_tooltip=Sort by site title
 syn_site_heading=Site
 syn_hide_tooltip=Hide this site from this forums/messages view
 no_forums=No forum messages available
+filter_sites_label=Sites
+filter_label=Filter
 `;
 
 export const userId = "adrian";

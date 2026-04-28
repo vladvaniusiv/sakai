@@ -265,6 +265,65 @@ export class SakaiTasks extends SakaiPageableElement {
     return this._i18n && this.dataPage;
   }
 
+  firstUpdated() {
+    this.dispatchEvent(new CustomEvent("register-header-action", {
+      detail: () => this._getFiltersTemplate(),
+      bubbles: true,
+      composed: true
+    }));
+  }
+
+  updated(changedProperties) {
+    super.updated(changedProperties);
+    const filterProps = [ "_currentFilter" ];
+    if (filterProps.some(prop => changedProperties.has(prop))) {
+      this.dispatchEvent(new CustomEvent("request-header-update", {
+        bubbles: true,
+        composed: true
+      }));
+    }
+  }
+
+  _getFiltersTemplate() {
+    return html`
+      <lion-dialog id="filters-dialog">
+        <button slot="invoker" type="button" class="btn btn-icon" title="${this._i18n.filter_label}">
+          <i class="bi bi-filter fs-5"></i>
+        </button>
+        <div slot="content" class="p-3 bg-white border rounded shadow-sm" style="min-width: 250px;">
+          <div class="d-flex mb-3 border-bottom pb-2">
+            <button type="button" class="btn-close ms-auto"
+              @click=${e => e.target.closest("lion-dialog").opened = false} aria-label="Close">
+            </button>
+          </div>
+          <label class="form-label small fw-bold">${this._i18n.filter_label}</label>
+          <select class="w-100 mb-2"
+                  .value=${this._currentFilter}
+                  @change=${e => { this._currentFilter = e.target.value; this.filterChanged(e); }}>
+            <option value="current">${this._i18n.filter_current}</option>
+            <option value="${constants.PRIORITY_5}">${this._i18n.filter_priority_5}</option>
+            <option value="${constants.PRIORITY_4}">${this._i18n.filter_priority_4}</option>
+            <option value="${constants.PRIORITY_3}">${this._i18n.filter_priority_3}</option>
+            <option value="${constants.PRIORITY_2}">${this._i18n.filter_priority_2}</option>
+            <option value="${constants.PRIORITY_1}">${this._i18n.filter_priority_1}</option>
+            <option value="${constants.OVERDUE}">${this._i18n.filter_overdue}</option>
+            <option value="${constants.TRASH}">${this._i18n.trash}</option>
+            <option value="${constants.COMPLETE}">${this._i18n.completed}</option>
+          </select>
+
+          <label class="form-label small fw-bold">${this._i18n.sort_label}</label>
+          <select class="w-100" @change=${e => this.sortChanged(e)}>
+            <option value="none">${this._i18n.sort_none}</option>
+            <option value="due_latest_first">${this._i18n.sort_due_latest_first}</option>
+            <option value="due_earliest_first">${this._i18n.sort_due_earliest_first}</option>
+            <option value="priority_lowest_first">${this._i18n.sort_priority_lowest_first}</option>
+            <option value="priority_highest_first">${this._i18n.sort_priority_highest_first}</option>
+          </select>
+        </div>
+      </lion-dialog>
+    `;
+  }
+
   content() {
     if (!this.dataPage || this.dataPage.filter(t => t.visible).length === 0) {
       return html`
@@ -318,30 +377,6 @@ export class SakaiTasks extends SakaiPageableElement {
       </div>
       ` : nothing}
 
-      <div id="controls">
-        <div id="filter">
-          <select class="w-100 mb-1" @change=${this.filterChanged} .value=${this._currentFilter} aria-label="${this._i18n.filter_label}">
-            <option value="current">${this._i18n.filter_current}</option>
-            <option value="${constants.PRIORITY_5}">${this._i18n.filter_priority_5}</option>
-            <option value="${constants.PRIORITY_4}">${this._i18n.filter_priority_4}</option>
-            <option value="${constants.PRIORITY_3}">${this._i18n.filter_priority_3}</option>
-            <option value="${constants.PRIORITY_2}">${this._i18n.filter_priority_2}</option>
-            <option value="${constants.PRIORITY_1}">${this._i18n.filter_priority_1}</option>
-            <option value="${constants.OVERDUE}">${this._i18n.filter_overdue}</option>
-            <option value="${constants.TRASH}">${this._i18n.trash}</option>
-            <option value="${constants.COMPLETE}">${this._i18n.completed}</option>
-          </select>
-        </div>
-        <div id="sort">
-          <select class="w-100 mb-3" @change=${this.sortChanged} aria-label="${this._i18n.sort_label}">
-            <option value="none">${this._i18n.sort_none}</option>
-            <option value="due_latest_first">${this._i18n.sort_due_latest_first}</option>
-            <option value="due_earliest_first">${this._i18n.sort_due_earliest_first}</option>
-            <option value="priority_lowest_first">${this._i18n.sort_priority_lowest_first}</option>
-            <option value="priority_highest_first">${this._i18n.sort_priority_highest_first}</option>
-          </select>
-        </div>
-      </div>
       ${this.dataPage.filter(t => t.visible).length ? html`
         <div id="tasks">
           <div class="priority-block header">${this._i18n.priority}</div>

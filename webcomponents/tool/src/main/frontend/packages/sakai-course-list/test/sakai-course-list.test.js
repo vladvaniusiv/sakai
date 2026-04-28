@@ -33,7 +33,7 @@ describe("sakai-course-list tests", () => {
 
     await expect(el).to.be.accessible();
 
-    expect(el.querySelectorAll("#course-list-term-filter option").length).to.equal(3);
+    expect(el._availableTerms.length).to.equal(2);
     expect(el.querySelectorAll("sakai-course-card").length).to.equal(3);
   });
 });

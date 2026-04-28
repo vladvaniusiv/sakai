@@ -14,4 +14,6 @@ term_filter_none_option=Select a term
 title_a_to_z=Title: A-Z
 title_z_to_a=Title: Z-A
 view_all_sites=View All Sites
+filter_sites_label=Sites
+filter_label=Filter
 `;

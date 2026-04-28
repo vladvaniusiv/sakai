@@ -103,23 +103,40 @@ export class SakaiAnnouncements extends SakaiPageableElement {
     this.repage();
   }
 
-  content() {
-
-    if (!this.data || this.data.length === 0) {
-      return html`<span>${this._i18n.no_announcements}</span>`;
-    }
+  _getFiltersTemplate() {
     return html`
-      <div id="filter-and-sort-block">
-        ${!this.siteId ? html`
-        <div id="site-filter">
-          <sakai-site-picker
-              .sites=${this._sites}
-              @sites-selected=${this._sitesSelected}>
-          </sakai-site-picker>
-        </div>
-        ` : nothing }
-        <div id="sorting">
-          <select class="w-100 mb-3" aria-label="${this._i18n.announcement_sort_label}" @change=${this._sortChanged}>
+      <style>
+        sakai-site-picker {
+          display: block;
+          width: 100%;
+        }
+        sakai-site-picker::part(select) {
+          width: 100% !important;
+        }
+      </style>
+      <lion-dialog id="filters-dialog">
+        <button slot="invoker" type="button" class="btn btn-icon" title="${this._i18n.filter_label}">
+          <i class="bi bi-filter fs-5"></i>
+        </button>
+        <div slot="content" class="p-3 bg-white border rounded shadow-sm" style="min-width: 280px;">
+          <div class="d-flex mb-3 border-bottom pb-2">
+            <button type="button" class="btn-close ms-auto"
+              @click=${e => e.target.closest("lion-dialog").opened = false} aria-label="Close">
+            </button>
+          </div>
+
+          ${!this.siteId ? html`
+            <label class="form-label small fw-bold">${this._i18n.filter_sites_label}</label>
+            <div class="mb-3">
+              <sakai-site-picker
+                  .sites=${this._sites}
+                  @sites-selected=${e => this._sitesSelected(e)}>
+              </sakai-site-picker>
+            </div>
+          ` : nothing}
+
+          <label class="form-label small fw-bold">${this._i18n.announcement_sort_label}</label>
+          <select class="w-100" .value=${this._currentSort} @change=${e => { this._currentSort = e.target.value; this._sortChanged(e); }}>
             <option value="${LATEST_FIRST}">${this._i18n.latest_first}</option>
             <option value="${EARLIEST_FIRST}">${this._i18n.earliest_first}</option>
             <option value="${TITLE_A_TO_Z}">${this._i18n.title_a_to_z}</option>
@@ -131,8 +148,35 @@ export class SakaiAnnouncements extends SakaiPageableElement {
             <option value="${INSTRUCTOR_ORDER}">${this._i18n.instructor_order}</option>
           </select>
         </div>
-      </div>
+      </lion-dialog>
+    `;
+  }
 
+  firstUpdated() {
+    this.dispatchEvent(new CustomEvent("register-header-action", {
+      detail: () => this._getFiltersTemplate(),
+      bubbles: true,
+      composed: true
+    }));
+  }
+
+  updated(changedProperties) {
+    super.updated(changedProperties);
+    const refreshProps = [ "_sites", "_currentSort" ];
+    if (refreshProps.some(prop => changedProperties.has(prop))) {
+      this.dispatchEvent(new CustomEvent("request-header-update", {
+        bubbles: true,
+        composed: true
+      }));
+    }
+  }
+
+  content() {
+
+    if (!this.data || this.data.length === 0) {
+      return html`<span>${this._i18n.no_announcements}</span>`;
+    }
+    return html`
       <div id="viewing">${this._i18n.viewing}</div>
       <div class="announcements ${!this.siteId || this.siteId === "home" ? "home" : "course"}">
         <div class="header">
@@ -192,18 +236,6 @@ export class SakaiAnnouncements extends SakaiPageableElement {
         color: var(--link-visited-color);
       }
 
-      #site-filter {
-        margin-bottom: 0.25rem;
-      }
-      #site-filter sakai-site-picker::part(select) {
-        width: 100%;
-      }
-      #filter {
-        flex: 1;
-      }
-      #sorting {
-        margin-left: auto;
-      }
       #viewing {
         margin-bottom: 20px;
         font-size: var(--sakai-grades-title-font-size, 14px);

@@ -43,48 +43,6 @@ describe("sakai-announcements tests", () => {
 
     expect(el.shadowRoot.querySelector(".title").innerHTML).to.contain(data.announcements[0].subject);
 
-    const sortingSelect = el.shadowRoot.querySelector("#sorting > select");
-    expect(sortingSelect).to.exist;
-
-    // Sort by title
-    sortingSelect.value = TITLE_A_TO_Z;
-    sortingSelect.dispatchEvent(new Event("change"));
-    await elementUpdated(el);
-    expect(el.shadowRoot.querySelector(".title").innerHTML).to.contain("Chips");
-
-    sortingSelect.value = TITLE_Z_TO_A;
-    sortingSelect.dispatchEvent(new Event("change"));
-    await elementUpdated(el);
-    expect(el.shadowRoot.querySelector(".title").innerHTML).to.contain(data.vavavoom);
-
-    // Sort by site
-    sortingSelect.value = SITE_A_TO_Z;
-    sortingSelect.dispatchEvent(new Event("change"));
-    await elementUpdated(el);
-    expect(el.shadowRoot.querySelector(".site").innerHTML).to.contain(data.vavavoomSite);
-
-    sortingSelect.value = SITE_Z_TO_A;
-    sortingSelect.dispatchEvent(new Event("change"));
-    await elementUpdated(el);
-    expect(el.shadowRoot.querySelector(".site").innerHTML).to.contain(data.siteTitle);
-
-    // Instructor ordering
-    sortingSelect.value = INSTRUCTOR_ORDER;
-    sortingSelect.dispatchEvent(new Event("change"));
-    await elementUpdated(el);
-    // This makes no sense really. The order seems to be flipped in Sakai, so that's what we need to test.
-    expect(el.shadowRoot.querySelector(".title").innerHTML).to.contain(data.announcements.filter(a => a.order === 3)[0].subject);
-
-    // Select a site
-    const siteSelect = el.shadowRoot.querySelector("#site-filter > sakai-site-picker");
-    expect(siteSelect).to.exist;
-
-    // We don't need to test the site picker here, it should have its own tests. So let's just fire
-    // the event that would come from that component
-    siteSelect.dispatchEvent(new CustomEvent("sites-selected", { detail: { value: data.vavavoom }, bubbles: true }));
-    await elementUpdated(el);
-    expect(el.shadowRoot.querySelectorAll("div.title").length).to.equal(1);
-
     await expect(el).to.be.accessible();
   });
 

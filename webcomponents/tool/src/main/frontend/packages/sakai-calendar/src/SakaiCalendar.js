@@ -132,18 +132,67 @@ export class SakaiCalendar extends LionCalendar {
     `;
   }
 
+  _getFiltersTemplate() {
+    return html`
+      <style>
+        sakai-site-picker {
+          display: block;
+          width: 100%;
+        }
+        sakai-site-picker::part(select) {
+          width: 100% !important;
+        }
+      </style>
+      <lion-dialog id="filters-dialog">
+        <button slot="invoker" type="button" class="btn btn-icon" title="${this._i18n.filter_label}">
+          <i class="bi bi-filter fs-5"></i>
+        </button>
+        <div slot="content" class="p-3 bg-white border rounded shadow-sm" style="min-width: 280px;">
+          <div class="d-flex mb-3 border-bottom pb-2">
+            <button type="button" class="btn-close ms-auto"
+              @click=${e => e.target.closest("lion-dialog").opened = false} aria-label="Close">
+            </button>
+          </div>
+
+          ${!this.siteId ? html`
+            <label class="form-label small fw-bold">${this._i18n.filter_sites_label}</label>
+            <div class="mb-3">
+              <sakai-site-picker
+                  .sites=${this._sites}
+                  @sites-selected=${e => this._siteSelected(e)}>
+              </sakai-site-picker>
+            </div>
+          ` : nothing}
+          <div class="text-muted small">
+            ${this._i18n?.filter_instructions || "Select a site to filter calendar events."}
+          </div>
+        </div>
+      </lion-dialog>
+    `;
+  }
+
+  firstUpdated(changedProperties) {
+    super.firstUpdated(changedProperties);
+    this.dispatchEvent(new CustomEvent("register-header-action", {
+      detail: () => this._getFiltersTemplate(),
+      bubbles: true,
+      composed: true
+    }));
+  }
+
+  updated(changedProperties) {
+    super.updated(changedProperties);
+    if (changedProperties.has("_sites")) {
+      this.dispatchEvent(new CustomEvent("request-header-update", {
+        bubbles: true,
+        composed: true
+      }));
+    }
+  }
+
   render() {
 
     return html`
-      ${!this.siteId && this._sites ? html`
-      <div id="site-filter">
-        <sakai-site-picker
-            .sites=${this._sites}
-            @sites-selected=${this._siteSelected}>
-        </sakai-site-picker>
-      </div>
-      ` : nothing}
-
       ${!this.siteId ? html`
       <div class="calendar-msg">${this._i18n?.pinned_sites_message}</div>
       ` : nothing}

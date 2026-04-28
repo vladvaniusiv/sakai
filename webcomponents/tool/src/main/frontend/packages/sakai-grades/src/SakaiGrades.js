@@ -12,6 +12,7 @@ export class SakaiGrades extends SakaiPageableElement {
   static properties = {
     secret: { type: Boolean },
     _canGradeAny: { state: true },
+    _currentSort: { state: true },
   };
 
   constructor() {
@@ -19,6 +20,7 @@ export class SakaiGrades extends SakaiPageableElement {
     super();
 
     this.showPager = true;
+    this._currentSort = UNGRADED_LEAST_TO_MOST;
     this.loadTranslations("grades");
   }
 
@@ -103,6 +105,12 @@ export class SakaiGrades extends SakaiPageableElement {
 
   firstUpdated() {
 
+    super.firstUpdated();
+    this.dispatchEvent(new CustomEvent("register-header-action", {
+      detail: () => this._getFiltersTemplate(),
+      bubbles: true,
+      composed: true
+    }));
     if (this.dataPage.length === 0 || !this.secret) return;
 
     this.shadowRoot.getElementById("grades").addEventListener("click", () => {
@@ -110,30 +118,55 @@ export class SakaiGrades extends SakaiPageableElement {
     }, { once: true });
   }
 
+  updated(changedProperties) {
+    super.updated(changedProperties);
+    const refreshProps = [ "sites", "_canGradeAny", "_currentSort" ];
+    if (refreshProps.some(prop => changedProperties.has(prop))) {
+      this.dispatchEvent(new CustomEvent("request-header-update", {
+        bubbles: true,
+        composed: true
+      }));
+    }
+  }
+
   shouldUpdate(changedProperties) {
     return this._i18n && super.shouldUpdate(changedProperties);
   }
 
-  content() {
-
-    if (this.dataPage.length === 0) {
-      return html`<span>${this._i18n.no_grades}</span>`;
-    }
-
+  _getFiltersTemplate() {
     return html`
-      ${!this.siteId ? html`
-      <div id="site-filter">
-        <sakai-site-picker
-            .sites=${this.sites}
-            @sites-selected=${this._sitesSelected}>
-        </sakai-site-picker>
-      </div>
-      ` : nothing}
-      <div id="topbar" class="mt-0 mb-3">
-        <div id="filter">
-          <select class="w-100" @change=${this.sortChanged}
-              title="${this._i18n.sort_tooltip}"
-              aria-label="${this._i18n.sort_tooltip}">
+       <style>
+        sakai-site-picker {
+          display: block;
+          width: 100%;
+        }
+        sakai-site-picker::part(select) {
+          width: 100% !important;
+        }
+      </style>
+      <lion-dialog id="filters-dialog">
+        <button slot="invoker" type="button" class="btn btn-icon" title="${this._i18n.filter_label}">
+          <i class="bi bi-filter fs-5"></i>
+        </button>
+        <div slot="content" class="p-3 bg-white border rounded shadow-sm" style="min-width: 280px;">
+          <div class="d-flex mb-3 border-bottom pb-2">
+            <button type="button" class="btn-close ms-auto"
+              @click=${e => e.target.closest("lion-dialog").opened = false} aria-label="Close">
+            </button>
+          </div>
+
+          ${!this.siteId ? html`
+            <label class="form-label small fw-bold">${this._i18n.filter_sites_label}</label>
+            <div class="mb-3">
+              <sakai-site-picker
+                  .sites=${this.sites}
+                  @sites-selected=${e => this._sitesSelected(e)}>
+              </sakai-site-picker>
+            </div>
+          ` : nothing}
+
+          <label class="form-label small fw-bold">${this._i18n.sort_tooltip}</label>
+          <select class="w-100" .value=${this._currentSort} @change=${e => { this._currentSort = e.target.value; this.sortChanged(e); }}>
             ${this._canGradeAny ? html`
             <option value="${UNGRADED_LEAST_TO_MOST}">${this._i18n.sort_ungraded_least_to_most}</option>
             <option value="${UNGRADED_MOST_TO_LEAST}">${this._i18n.sort_ungraded_most_to_least}</option>
@@ -148,7 +181,17 @@ export class SakaiGrades extends SakaiPageableElement {
             `}
           </select>
         </div>
-      </div>
+      </lion-dialog>
+    `;
+  }
+
+  content() {
+
+    if (this.dataPage.length === 0) {
+      return html`<span>${this._i18n.no_grades}</span>`;
+    }
+
+    return html`
       ${this.secret ? html `
         <div class="score-msg mb-3 p-2">${this._i18n.score_reveal_msg}</div>
       ` : nothing}
@@ -209,17 +252,6 @@ export class SakaiGrades extends SakaiPageableElement {
         font-weight: bold;
         font-size: var(--sakai-grades-title-font-size, 12px);
         margin-left: 18px;
-      }
-      #filter {
-        flex: 1;
-        text-align: right;
-      }
-
-      #site-filter {
-        margin-bottom: 0.25rem;
-      }
-      #site-filter sakai-site-picker::part(select) {
-        width: 100%;
       }
 
       #grades {

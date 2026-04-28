@@ -104,22 +104,69 @@ export class SakaiForums extends SakaiPageableElement {
     return this._i18n && super.shouldUpdate(changedProperties);
   }
 
+  _getFiltersTemplate() {
+    return html`
+      <style>
+        sakai-site-picker {
+          display: block;
+          width: 100%;
+        }
+        sakai-site-picker::part(select) {
+          width: 100% !important;
+        }
+      </style>
+      <lion-dialog id="filters-dialog">
+        <button slot="invoker" type="button" class="btn btn-icon" title="${this._i18n.filter_label}">
+          <i class="bi bi-filter fs-5"></i>
+        </button>
+        <div slot="content" class="p-3 bg-white border rounded shadow-sm" style="min-width: 280px;">
+          <div class="d-flex mb-3 border-bottom pb-2">
+            <button type="button" class="btn-close ms-auto"
+              @click=${e => e.target.closest("lion-dialog").opened = false} aria-label="Close">
+            </button>
+          </div>
+
+          ${!this.siteId ? html`
+            <label class="form-label small fw-bold">${this._i18n.filter_sites_label}</label>
+            <div class="mb-3">
+              <sakai-site-picker
+                  .sites=${this.sites}
+                  @sites-selected=${e => this._sitesSelected(e)}>
+              </sakai-site-picker>
+            </div>
+          ` : nothing}
+          <div class="text-muted small">
+            ${this._i18n.filter_instructions || "Use column headers to sort the data."}
+          </div>
+        </div>
+      </lion-dialog>
+    `;
+  }
+
+  firstUpdated() {
+    this.dispatchEvent(new CustomEvent("register-header-action", {
+      detail: () => this._getFiltersTemplate(),
+      bubbles: true,
+      composed: true
+    }));
+  }
+
+  updated(changedProperties) {
+    super.updated(changedProperties);
+    if (changedProperties.has("sites")) {
+      this.dispatchEvent(new CustomEvent("request-header-update", {
+        bubbles: true,
+        composed: true
+      }));
+    }
+  }
+
   content() {
     if (!this.data || this.data.length === 0) {
       return html`<span>${this._i18n.no_forums}</span>`;
     }
 
     return html`
-
-      ${!this.siteId ? html`
-      <div id="site-filter">
-        <sakai-site-picker
-            .sites=${this.sites}
-            @sites-selected=${this._sitesSelected}>
-        </sakai-site-picker>
-      </div>
-      ` : nothing}
-
       <div class="messages ${this.messagesClass}">
         <div class="header">
           <a href="javascript:;"
@@ -172,12 +219,6 @@ export class SakaiForums extends SakaiPageableElement {
       }
       a:visited {
         color: var(--link-visited-color);
-      }
-      #site-filter {
-        margin-bottom: 0.25rem;
-      }
-      #site-filter sakai-site-picker::part(select) {
-        width: 100%;
       }
       .messages {
         display: grid;

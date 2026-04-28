@@ -16,6 +16,8 @@ export class SakaiDashboardWidget extends SakaiShadowElement {
     disableLeftAndUp: { attribute: "disable-left-and-up", type: Boolean },
     disableRightAndDown: { attribute: "disable-right-and-down", type: Boolean },
     _baseI18n: { state: true },
+    _headerAction: { state: true },
+    _headerActionRenderer: { state: true },
   };
 
   constructor() {
@@ -25,7 +27,13 @@ export class SakaiDashboardWidget extends SakaiShadowElement {
     this.state = "view";
     this.editing = false;
     this.hasOptions = true;
+    this._headerAction = null;
+    this._headerActionRenderer = null;
     loadProperties("dashboard-widget").then(r => this._baseI18n = r);
+    this.addEventListener("register-header-action", e => {
+      this._headerActionRenderer = e.detail;
+    });
+    this.addEventListener("request-header-update", () => this.requestUpdate());
   }
 
   set widgetId(value) {
@@ -64,6 +72,9 @@ export class SakaiDashboardWidget extends SakaiShadowElement {
       <div id="container">
         <div id="title-bar" class="d-flex align-items-center p-3">
           <div id="title">${this.title}</div>
+          <div class="ms-auto">
+            ${(!this.editing && this._headerActionRenderer) ? this._headerActionRenderer() : ""}
+          </div>
           ${this.editing ? html`
             <div id="widget-mover" class="ms-auto">
               <div class="${ifDefined(this.disableLeftAndUp ? "d-none" : undefined)}">

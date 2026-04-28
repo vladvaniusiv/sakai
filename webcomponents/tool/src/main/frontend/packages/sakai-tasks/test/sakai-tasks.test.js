@@ -43,8 +43,6 @@ describe("sakai-tasks tests", () => {
 
     await expect(el).to.be.accessible({ ignoredRules: [ "aria-allowed-attr" ] });
 
-    await waitUntil(() => el.shadowRoot.getElementById("controls"), "controls not created", { timeout: 3000 });
-    expect(el.shadowRoot.getElementById("controls")).to.exist;
     expect(el.shadowRoot.getElementById("add-block")).to.exist;
     expect(el.shadowRoot.getElementById("add-edit-dialog")).to.exist;
 

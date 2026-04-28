@@ -21,6 +21,8 @@ view=View
 widget_title=Grades
 url_tooltip=Click to be taken to the grades
 course_assignment=Course/Assignment
+filter_sites_label=Sites
+filter_label=Filter
 `;
 
 export const userId = "adrian";

@@ -102,6 +102,7 @@ export class SakaiCourseList extends SakaiElement {
     }
 
     this._displayedSites = [ ...filteredSites ];
+    this.requestUpdate();
   }
 
   _siteFilterChanged(e) {
@@ -156,33 +157,68 @@ export class SakaiCourseList extends SakaiElement {
     return this._i18n;
   }
 
+  updated(changedProperties) {
+    super.updated(changedProperties);
+    const filterProps = [ "sites", "_currentFilter", "_availableTerms", "_currentTermFilter" ];
+    if (filterProps.some(prop => changedProperties.has(prop))) {
+      this.dispatchEvent(new CustomEvent("request-header-update", {
+        bubbles: true,
+        composed: true
+      }));
+    }
+  }
+
+  _getFiltersTemplate() {
+    return html`
+        <lion-dialog id="filters-dialog">
+          <button slot="invoker" type="button" class="btn btn-icon"
+              title="${this._i18n.filter_label || "Filter"}">
+            <i class="bi bi-filter fs-5"></i>
+          </button>
+          <div slot="content" class="p-3 bg-white border rounded shadow-sm" style="min-width: 250px;">
+            <div class="d-flex mb-3 border-bottom pb-2">
+              <button type="button" class="btn-close ms-auto"
+                @click=${e => e.target.closest("lion-dialog").opened = false} aria-label="Close">
+              </button>
+            </div>
+            <label class="form-label small fw-bold">${this._i18n.course_filter_label}</label>
+            <select class="w-100 mb-1" aria-label="${this._i18n.course_filter_label}" @change="${e => { this._currentFilter = e.target.value; this._filter(); }}" .value=${this._currentFilter} ?disabled=${this.sites.length === 0}>
+              <option value="pinned">${this._i18n.all_pinned_sites}</option>
+              <option value="projects">${this._i18n.pinned_projects}</option>
+              <option value="courses">${this._i18n.pinned_courses}</option>
+              <option value="active">${this._i18n.pinned_activity}</option>
+            </select>
+            <select class="w-100 mb-1" id="course-list-term-filter"
+                aria-label="${this._i18n.term_filter_label}" @change="${e => { this._currentTermFilter = e.target.value; this._filter(); }}" .value=${this._currentTermFilter} ?disabled=${this._availableTerms.length === 0}>
+              <option value="none">${this._i18n.term_filter_none_option}</option>
+              ${this._availableTerms.map(term => html`
+                <option value="${term.id}">${term.name}</option>
+              `)}
+            </select>
+            <select class="w-100" aria-label="${this._i18n.course_sort_label}" @change=${e => this._siteSortChanged(e)} ?disabled=${this.sites.length === 0}>
+              <option value="title_a_to_z">${this._i18n.title_a_to_z}</option>
+              <option value="title_z_to_a">${this._i18n.title_z_to_a}</option>
+              <option value="description_a_to_z">${this._i18n.description_a_to_z}</option>
+              <option value="description_z_to_a">${this._i18n.description_z_to_a}</option>
+            </select>
+          </div>
+        </lion-dialog>`;
+  }
+
+  firstUpdated() {
+    this.dispatchEvent(new CustomEvent("register-header-action", {
+      detail: () => this._getFiltersTemplate(),
+      bubbles: true,
+      composed: true
+    }));
+  }
+
   render() {
     if (this.sites.length === 0) {
       return html`<span>${this._i18n.no_pinned_sites_message}</span>`;
     }
     return html`
-      <div>
-        <select class="w-100 mb-1" aria-label="${this._i18n.course_filter_label}" @change=${this._siteFilterChanged} .value=${this._currentFilter} ?disabled=${this.sites.length === 0}>
-          <option value="pinned">${this._i18n.all_pinned_sites}</option>
-          <option value="projects">${this._i18n.pinned_projects}</option>
-          <option value="courses">${this._i18n.pinned_courses}</option>
-          <option value="active">${this._i18n.pinned_activity}</option>
-        </select>
-        <select class="w-100 mb-1" id="course-list-term-filter"
-            aria-label="${this._i18n.term_filter_label}" @change=${this._termSelected} .value=${this._currentTermFilter} ?disabled=${this._availableTerms.length === 0}>
-          <option value="none">${this._i18n.term_filter_none_option}</option>
-          ${this._availableTerms.map(term => html`
-            <option value="${term.id}">${term.name}</option>
-          `)}
-        </select>
-        <select class="w-100" aria-label="${this._i18n.course_sort_label}" @change=${this._siteSortChanged} ?disabled=${this.sites.length === 0}>
-          <option value="title_a_to_z">${this._i18n.title_a_to_z}</option>
-          <option value="title_z_to_a">${this._i18n.title_z_to_a}</option>
-          <option value="description_a_to_z">${this._i18n.description_a_to_z}</option>
-          <option value="description_z_to_a">${this._i18n.description_z_to_a}</option>
-        </select>
-      </div>
-      <div>
+      <div id="course-cards-container">
         ${this._displayedSites.map(card => html`
           <sakai-course-card class="mt-3" .courseData=${card}></sakai-course-card>
         `)}
