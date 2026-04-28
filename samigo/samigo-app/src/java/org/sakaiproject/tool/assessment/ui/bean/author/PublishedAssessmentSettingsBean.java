@@ -1925,7 +1925,10 @@ public void setFeedbackComponentOption(String feedbackComponentOption) {
   public void addExtendedTime() {
       ExtendedTime entry = this.extendedTime;
       FacesContext context = FacesContext.getCurrentInstance();
-      if (new ExtendedTimeValidator().validateEntry(entry, context, this)) {
+      //check for duplicate users/groups
+      List<ExtendedTime> extendedTimesTempList = new ArrayList<ExtendedTime>(extendedTimes);
+      extendedTimesTempList.add(entry);
+      if (new ExtendedTimeValidator().validateEntries(extendedTimesTempList, context, this)) {
           AssessmentAccessControlIfc accessControl = new AssessmentAccessControl();
           accessControl.setStartDate(this.startDate);
           accessControl.setDueDate(this.dueDate);
