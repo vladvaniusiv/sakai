@@ -45,9 +45,15 @@
             </span>
         </li>
         <li th:if="${canView}">
-            <span th:class="${current} == 'my-videos' ? 'current'">
-                <span th:if="${current} == 'my-videos'" th:text="#{video.training.menu.myVideos}">My videos</span>
-                <a th:unless="${current} == 'my-videos'" th:href="@{/my-videos}" th:text="#{video.training.menu.myVideos}">My videos</a>
+            <span th:class="${current} == 'favorites' ? 'current'">
+                <span th:if="${current} == 'favorites'" th:text="#{video.training.favorites}">Favorites</span>
+                <a th:unless="${current} == 'favorites'" th:href="@{/favorites}" th:text="#{video.training.favorites}">Favorites</a>
+            </span>
+        </li>
+        <li th:if="${canView}">
+            <span th:class="${current} == 'watch-later' ? 'current'">
+                <span th:if="${current} == 'watch-later'" th:text="#{video.training.watchLater}">Watch later</span>
+                <a th:unless="${current} == 'watch-later'" th:href="@{/watch-later}" th:text="#{video.training.watchLater}">Watch later</a>
             </span>
         </li>
     </ul>

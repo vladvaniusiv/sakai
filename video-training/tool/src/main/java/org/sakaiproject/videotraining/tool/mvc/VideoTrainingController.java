@@ -87,6 +87,8 @@ public class VideoTrainingController {
     private static final String VIEWABLE_LIST_PATH = "/videos-viewable";
     private static final String ACCESS_MODE_MANAGEABLE = "manageable";
     private static final String ACCESS_MODE_VIEWABLE = "viewable";
+    private static final String FAVORITES_PATH = "/favorites";
+    private static final String WATCH_LATER_PATH = "/watch-later";
     private static final String MANAGED_UPLOAD_PROPERTY = "video.training.managed";
     private static final String MANAGED_UPLOAD_SITE_PROPERTY = "video.training.siteId";
     private static final String MANAGED_BASE_FOLDER_PROPERTY = "video.training.basefolder";
@@ -1006,44 +1008,36 @@ public class VideoTrainingController {
         return "redirect:" + resolveReturnPath(returnTo, "/videos/" + videoId);
     }
 
-    @GetMapping("/my-videos")
-    public String myVideos(RedirectAttributes redirectAttributes, Locale locale, Model model) {
-        String siteId = currentSiteId();
-        String userId = currentUserId();
+    @GetMapping(FAVORITES_PATH)
+    public String favorites(@RequestParam(name = "viewMode", required = false) String viewMode,
+            @RequestParam(name = "q", required = false) String query,
+            @RequestParam(name = "size", required = false, defaultValue = "15") int size,
+            @RequestParam(name = "batchSize", required = false) Integer batchSize,
+            @RequestParam(name = "offset", required = false) Integer offset,
+            @RequestParam(name = "sortBy", required = false) String sortBy,
+            @RequestParam(name = "sortDir", required = false) String sortDir,
+            Locale locale,
+            RedirectAttributes redirectAttributes,
+            Model model) {
+        return renderPreferredVideosList(true, FAVORITES_PATH, "favorites", "video.training.favorites.title",
+                "video.training.favorites.empty", viewMode, query, size, batchSize, offset, sortBy, sortDir,
+                locale, redirectAttributes, model);
+    }
 
-        if (!videoTrainingService.hasViewPermission(siteId, userId)
-            && !videoTrainingService.canManageLibrary(siteId, userId)
-            && !videoTrainingService.hasManagePermission(siteId, userId)) {
-            redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.accessDenied", null, locale));
-            return "redirect:/videos";
-        }
-
-        Locale effectiveLocale = locale != null ? locale : Locale.getDefault();
-        List<VideoTrainingVideo> favorites = videoTrainingService.getUserFavoriteVideos(siteId, userId, Instant.now());
-        List<VideoTrainingVideo> watchLater = videoTrainingService.getUserWatchLaterVideos(siteId, userId, Instant.now());
-        Map<String, VideoTrainingVideo> mergedById = new LinkedHashMap<>();
-        for (VideoTrainingVideo video : favorites) {
-            mergedById.put(video.getId(), video);
-        }
-        for (VideoTrainingVideo video : watchLater) {
-            mergedById.putIfAbsent(video.getId(), video);
-        }
-        List<VideoTrainingVideo> videos = new ArrayList<>(mergedById.values());
-
-        populateNavigationFlags(model, siteId, userId);
-        populateVideoPresentationModel(model, videos, siteId, userId, effectiveLocale, siteService.isUserSite(siteId));
-        model.addAttribute("videos", videos);
-        model.addAttribute("isUserSite", siteService.isUserSite(siteId));
-        model.addAttribute("viewMode", VIEW_MODE_TABLE);
-        model.addAttribute("isCardsView", false);
-        model.addAttribute("isTableView", true);
-        model.addAttribute("q", "");
-        model.addAttribute("size", videos.size());
-        model.addAttribute("batchSize", videos.size());
-        model.addAttribute("sortBy", "modified");
-        model.addAttribute("sortDir", "desc");
-        model.addAttribute("currentPath", "/my-videos");
-        return "video-training/my-videos";
+    @GetMapping(WATCH_LATER_PATH)
+    public String watchLater(@RequestParam(name = "viewMode", required = false) String viewMode,
+            @RequestParam(name = "q", required = false) String query,
+            @RequestParam(name = "size", required = false, defaultValue = "15") int size,
+            @RequestParam(name = "batchSize", required = false) Integer batchSize,
+            @RequestParam(name = "offset", required = false) Integer offset,
+            @RequestParam(name = "sortBy", required = false) String sortBy,
+            @RequestParam(name = "sortDir", required = false) String sortDir,
+            Locale locale,
+            RedirectAttributes redirectAttributes,
+            Model model) {
+        return renderPreferredVideosList(false, WATCH_LATER_PATH, "watch-later", "video.training.watchLater.title",
+                "video.training.watchLater.empty", viewMode, query, size, batchSize, offset, sortBy, sortDir,
+                locale, redirectAttributes, model);
     }
 
     @GetMapping("/analytics")
@@ -1132,6 +1126,165 @@ public class VideoTrainingController {
         model.addAttribute("canView", videoTrainingService.hasViewPermission(siteId, userId)
                 || canManageAll
                 || canManageOwn);
+    }
+
+    private String renderPreferredVideosList(boolean favoritesOnly, String listPath, String menuCurrent,
+            String titleMessageKey, String emptyMessageKey,
+            String viewMode, String query, int size, Integer batchSize, Integer offset, String sortBy, String sortDir,
+            Locale locale, RedirectAttributes redirectAttributes, Model model) {
+        String siteId = currentSiteId();
+        String userId = currentUserId();
+        Locale effectiveLocale = locale != null ? locale : Locale.getDefault();
+
+        if (!videoTrainingService.hasViewPermission(siteId, userId)
+            && !videoTrainingService.canManageLibrary(siteId, userId)
+            && !videoTrainingService.hasManagePermission(siteId, userId)) {
+            redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.accessDenied", null, effectiveLocale));
+            return "redirect:/videos";
+        }
+
+        boolean isUserSite = siteService.isUserSite(siteId);
+        boolean canManage = videoTrainingService.canManageLibrary(siteId, userId)
+                || videoTrainingService.hasManagePermission(siteId, userId);
+        String normalizedQuery = StringUtils.trimToEmpty(query);
+        int safeSize = normalizePageSize(size);
+        int safeBatchSize = normalizePageSize(batchSize != null ? batchSize : safeSize);
+        int safeOffset = Math.max(0, offset != null ? offset : 0);
+        String normalizedSortBy = normalizeSortBy(sortBy);
+        String normalizedSortDir = normalizeSortDir(sortDir);
+        String sortField = mapSortField(normalizedSortBy, isUserSite);
+        boolean ascending = "asc".equals(normalizedSortDir);
+        String effectiveViewMode = resolveEffectiveViewMode(siteId, canManage, viewMode);
+
+        List<VideoTrainingVideo> preferredVideos = favoritesOnly
+                ? videoTrainingService.getUserFavoriteVideos(siteId, userId, Instant.now())
+                : videoTrainingService.getUserWatchLaterVideos(siteId, userId, Instant.now());
+        List<VideoTrainingVideo> filteredVideos = new ArrayList<>();
+        for (VideoTrainingVideo video : preferredVideos) {
+            if (matchesSearchText(video, normalizedQuery)) {
+                filteredVideos.add(video);
+            }
+        }
+        filteredVideos.sort((left, right) -> comparePreferredVideos(left, right, sortField, ascending));
+
+        int fetchSize = safeOffset > 0 ? safeBatchSize : safeSize;
+        int endIndex = Math.min(filteredVideos.size(), safeOffset + fetchSize);
+        boolean hasMore = endIndex < filteredVideos.size();
+        List<VideoTrainingVideo> videos = safeOffset >= filteredVideos.size()
+                ? new ArrayList<>()
+                : new ArrayList<>(filteredVideos.subList(safeOffset, endIndex));
+        int nextOffset = safeOffset + videos.size();
+
+        populateNavigationFlags(model, siteId, userId);
+        populateVideoPresentationModel(model, videos, siteId, userId, effectiveLocale, isUserSite);
+        model.addAttribute("videos", videos);
+        model.addAttribute("isUserSite", isUserSite);
+        model.addAttribute("viewMode", effectiveViewMode);
+        model.addAttribute("isCardsView", VIEW_MODE_CARDS.equals(effectiveViewMode));
+        model.addAttribute("isTableView", VIEW_MODE_TABLE.equals(effectiveViewMode));
+        model.addAttribute("q", normalizedQuery);
+        model.addAttribute("size", safeSize);
+        model.addAttribute("batchSize", safeBatchSize);
+        model.addAttribute("offset", safeOffset);
+        model.addAttribute("nextOffset", nextOffset);
+        model.addAttribute("sortBy", normalizedSortBy);
+        model.addAttribute("sortDir", normalizedSortDir);
+        model.addAttribute("hasMore", hasMore);
+        model.addAttribute("siteId", siteId);
+        model.addAttribute("siteRef", siteService.siteReference(siteId));
+        model.addAttribute("currentPath", listPath);
+        model.addAttribute("listPath", listPath);
+        model.addAttribute("currentMenu", menuCurrent);
+        model.addAttribute("showManageColumns", true);
+        model.addAttribute("showManageButtons", false);
+        model.addAttribute("showAccessModeSwitch", false);
+        model.addAttribute("isManageableList", false);
+        model.addAttribute("isViewableList", false);
+        model.addAttribute("accessMode", menuCurrent);
+        model.addAttribute("title", messageSource.getMessage(titleMessageKey, null, effectiveLocale));
+        model.addAttribute("emptyMessage", messageSource.getMessage(emptyMessageKey, null, effectiveLocale));
+        return favoritesOnly ? "video-training/favorites" : "video-training/watch-later";
+    }
+
+    private boolean matchesSearchText(VideoTrainingVideo video, String searchText) {
+        if (video == null || StringUtils.isBlank(searchText)) {
+            return true;
+        }
+
+        String normalized = StringUtils.lowerCase(StringUtils.trimToEmpty(searchText));
+        return StringUtils.contains(StringUtils.lowerCase(StringUtils.defaultString(video.getTitle())), normalized)
+                || StringUtils.contains(StringUtils.lowerCase(StringUtils.defaultString(video.getDescription())), normalized)
+                || StringUtils.contains(StringUtils.lowerCase(StringUtils.defaultString(video.getSourceReference())), normalized);
+    }
+
+    private int comparePreferredVideos(VideoTrainingVideo left, VideoTrainingVideo right, String sortField, boolean ascending) {
+        int primaryComparison = comparePreferredVideoField(left, right, sortField, ascending);
+        if (primaryComparison != 0) {
+            return primaryComparison;
+        }
+
+        int modifiedComparison = compareNullable(left.getModifiedOn(), right.getModifiedOn(), false);
+        if (modifiedComparison != 0) {
+            return modifiedComparison;
+        }
+
+        return compareNullable(left.getId(), right.getId(), false);
+    }
+
+    private int comparePreferredVideoField(VideoTrainingVideo left, VideoTrainingVideo right, String sortField, boolean ascending) {
+        switch (sortField) {
+            case "title":
+                return compareNullable(left.getTitle(), right.getTitle(), ascending);
+            case "siteId":
+                return compareNullable(left.getSiteId(), right.getSiteId(), ascending);
+            case "providerType":
+                return compareNullable(enumName(left.getProviderType()), enumName(right.getProviderType()), ascending);
+            case "visibilityScope":
+                return compareNullable(enumName(left.getVisibilityScope()), enumName(right.getVisibilityScope()), ascending);
+            case "publicationStatus":
+                return compareNullable(enumName(left.getPublicationStatus()), enumName(right.getPublicationStatus()), ascending);
+            case "releaseDate":
+                return compareNullable(left.getReleaseDate(), right.getReleaseDate(), ascending);
+            case "retractDate":
+                return compareNullable(left.getRetractDate(), right.getRetractDate(), ascending);
+            case "modifiedOn":
+            default:
+                return compareNullable(left.getModifiedOn(), right.getModifiedOn(), ascending);
+        }
+    }
+
+    private int compareNullable(String left, String right, boolean ascending) {
+        if (left == right) {
+            return 0;
+        }
+        if (left == null) {
+            return 1;
+        }
+        if (right == null) {
+            return -1;
+        }
+
+        int comparison = String.CASE_INSENSITIVE_ORDER.compare(left, right);
+        return ascending ? comparison : -comparison;
+    }
+
+    private <T extends Comparable<? super T>> int compareNullable(T left, T right, boolean ascending) {
+        if (left == right) {
+            return 0;
+        }
+        if (left == null) {
+            return 1;
+        }
+        if (right == null) {
+            return -1;
+        }
+
+        int comparison = left.compareTo(right);
+        return ascending ? comparison : -comparison;
+    }
+
+    private String enumName(Enum<?> value) {
+        return value != null ? value.name() : null;
     }
 
     private String resolveReturnPath(String returnTo, String fallback) {
