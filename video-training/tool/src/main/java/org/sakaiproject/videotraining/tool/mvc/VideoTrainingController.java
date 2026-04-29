@@ -286,16 +286,14 @@ public class VideoTrainingController {
         String sortField = mapSortField(normalizedSortBy, isUserSite);
         boolean ascending = "asc".equals(normalizedSortDir);
         int requested = fetchSize + 1;
-        if (manageableList && canManageAll) {
+        if (isUserSite) {
+            fetched = videoTrainingService.getGlobalVideosSorted(normalizedQuery, safeOffset, requested, sortField, ascending);
+        } else if (manageableList && canManageAll) {
             fetched = videoTrainingService.getSiteLibrarySorted(siteId, normalizedQuery, safeOffset, requested, sortField, ascending);
         } else if (manageableList && canManageOwn) {
             fetched = videoTrainingService.getSiteLibrarySortedForOwner(siteId, userId, normalizedQuery, safeOffset, requested, sortField, ascending);
         } else {
-            if (isUserSite) {
-                fetched = videoTrainingService.getGlobalVideosSorted(normalizedQuery, safeOffset, requested, sortField, ascending);
-            } else {
-                fetched = videoTrainingService.getVisibleVideosForUserSorted(siteId, userId, Instant.now(), normalizedQuery, safeOffset, requested, sortField, ascending);
-            }
+            fetched = videoTrainingService.getVisibleVideosForUserSorted(siteId, userId, Instant.now(), normalizedQuery, safeOffset, requested, sortField, ascending);
         }
 
         if (fetched.size() > fetchSize) {
