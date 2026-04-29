@@ -445,7 +445,7 @@ $(window).load( function() {
               <f:param name="itemid" value="#{question.itemData.itemIdString}"/>
             </h:commandLink>
             <h:outputText value=" #{authorMessages.separator} " rendered="#{author.isEditPendingAssessmentFlow}"/>
-            <h:commandLink title="#{authorMessages.t_editQ}" id="modify" action="#{itemauthor.doit}" immediate="true" rendered="#{author.isEditPendingAssessmentFlow || (question.itemData.typeId!= 3 && question.itemData.typeId!= 13 && question.itemData.typeId!= 15) || !assessmentBean.hasGradingData}">
+            <h:commandLink title="#{authorMessages.t_editQ}" id="modify" action="#{itemauthor.doit}" immediate="true" rendered="#{author.isEditPendingAssessmentFlow || authorization.superUser || (question.itemData.typeId!= 3 && question.itemData.typeId!= 13 && question.itemData.typeId!= 15) || !assessmentBean.hasGradingData}">
               <h:outputText value="#{commonMessages.edit_action}" />
               <f:actionListener
                   type="org.sakaiproject.tool.assessment.ui.listener.author.ItemModifyListener" />
