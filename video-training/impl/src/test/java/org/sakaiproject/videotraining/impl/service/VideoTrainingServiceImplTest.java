@@ -1,4 +1,4 @@
-package java.org.sakaiproject.videotraining.impl.service;
+package org.sakaiproject.videotraining.impl.service;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -38,7 +38,6 @@ import org.sakaiproject.videotraining.api.repository.VideoTrainingCategoryReposi
 import org.sakaiproject.videotraining.api.repository.VideoTrainingLessonLinkRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingVideoCategoryRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingVideoRepository;
-import org.sakaiproject.videotraining.impl.service.VideoTrainingServiceImpl;
 
 public class VideoTrainingServiceImplTest {
 
@@ -167,6 +166,19 @@ public class VideoTrainingServiceImplTest {
         boolean result = service.canViewVideo(video, USER_ID, Instant.now());
 
         assertFalse(result);
+        verify(securityService, never()).unlock(USER_ID, VideoTrainingConstants.PERMISSION_VIEW, SITE_REF);
+    }
+
+    @Test
+    public void canViewVideoShouldAllowGlobalWithoutSiteViewPermission() {
+        VideoTrainingVideo video = baseVideo();
+        video.setVisibilityScope(VideoVisibilityScope.GLOBAL);
+        when(securityService.unlock(USER_ID, VideoTrainingConstants.PERMISSION_MANAGE_ALL, SITE_REF)).thenReturn(false);
+        when(securityService.unlock(USER_ID, VideoTrainingConstants.PERMISSION_MANAGE, SITE_REF)).thenReturn(false);
+
+        boolean result = service.canViewVideo(video, USER_ID, Instant.now());
+
+        assertTrue(result);
         verify(securityService, never()).unlock(USER_ID, VideoTrainingConstants.PERMISSION_VIEW, SITE_REF);
     }
 

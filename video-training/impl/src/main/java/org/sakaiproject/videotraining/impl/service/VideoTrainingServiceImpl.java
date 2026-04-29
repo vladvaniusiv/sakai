@@ -760,7 +760,6 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
             return false;
         }
 
-        String siteRef = siteService.siteReference(video.getSiteId());
         if (canManageLibrary(video.getSiteId(), userId)) {
             return true;
         }
@@ -781,6 +780,12 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
         if (video.getRetractDate() != null && !effectiveNow.isBefore(video.getRetractDate())) {
             return false;
         }
+
+        if (video.getVisibilityScope() == VideoVisibilityScope.GLOBAL) {
+            return true;
+        }
+
+        String siteRef = siteService.siteReference(video.getSiteId());
 
         if (!securityService.unlock(userId, PERMISSION_VIEW, siteRef)) {
             return false;

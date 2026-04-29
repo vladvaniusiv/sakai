@@ -33,7 +33,7 @@
         </div>
     </div>
 
-    <div class="mb-4 gap-1" th:if="${canManage || canManageAll}" th:with="status=${video.publicationStatus != null ? video.publicationStatus.name() : 'DRAFT'}, moderationEnabledSafe=${moderationEnabled != null ? moderationEnabled : false}, moderationRequired=${moderationEnabledSafe && video.visibilityScope != null && video.visibilityScope.name() == 'GLOBAL'}">
+    <div class="mb-4 gap-1" th:if="${canManage == true || canManageAll == true}" th:with="status=${video.publicationStatus != null ? video.publicationStatus.name() : 'DRAFT'}, moderationEnabledSafe=${moderationEnabled != null ? moderationEnabled : false}, moderationRequired=${moderationEnabledSafe && video.visibilityScope != null && video.visibilityScope.name() == 'GLOBAL'}">
         <form class="vt-inline-form" method="post" th:if="${status == 'DRAFT' && !moderationRequired}" th:action="@{/videos/{id}/publish(id=${video.id})}">
             <button class="btn btn-primary" type="submit" th:text="#{video.training.publish}">Publish</button>
         </form>

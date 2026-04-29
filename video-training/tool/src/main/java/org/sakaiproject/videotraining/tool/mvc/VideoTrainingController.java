@@ -91,9 +91,17 @@ public class VideoTrainingController {
     private static final String WATCH_LATER_PATH = "/watch-later";
     private static final String MANAGED_UPLOAD_PROPERTY = "video.training.managed";
     private static final String MANAGED_UPLOAD_SITE_PROPERTY = "video.training.siteId";
+    private static final String MANAGED_UPLOAD_OWNER_PROPERTY = "video.training.ownerId";
+    private static final String MANAGED_UPLOAD_SCOPE_PROPERTY = "video.training.visibilityScope";
     private static final String MANAGED_BASE_FOLDER_PROPERTY = "video.training.basefolder";
+    private static final String MANAGED_GLOBAL_ROOT_BASE_FOLDER_PROPERTY = "video.training.global.root.basefolder";
+    private static final String MANAGED_LESSON_BASE_FOLDER_PROPERTY = "lessonbuilder.basefolder";
+    private static final String MANAGED_GLOBAL_ROOT_PROPERTY = "video.training.global.root";
     private static final String MANAGED_FOLDER_HIDDEN_WITH_ACCESS_PROPERTY = "video.training.folder.hidden.withaccess";
-    private static final String DEFAULT_MANAGED_BASE_FOLDER = "Video Training";
+    private static final String DEFAULT_MANAGED_BASE_FOLDER = "Video Training";    
+    private static final String DEFAULT_MANAGED_GLOBAL_ROOT_BASE_FOLDER_PROPERTY = "videoTraining";
+    private static final String DEFAULT_MANAGED_GLOBAL_ROOT = "/public/video-training/";
+    private static final String DEFAULT_LESSON_FOLDER_FALLBACK = "Lessons";
     private static final String VIEW_MODE_CARDS = "cards";
     private static final String VIEW_MODE_TABLE = "table";
     private static final String VIEW_MODE_SESSION_PREFIX = "video-training.list.view-mode.";
@@ -451,6 +459,16 @@ public class VideoTrainingController {
 
         String effectiveSourceMode = resolveSourceMode(sourceMode, providerType);
         VideoProviderType parsedProviderType = providerTypeForSourceMode(effectiveSourceMode);
+        VideoVisibilityScope parsedVisibilityScope;
+        VideoPublicationStatus parsedPublicationStatus;
+        try {
+            parsedVisibilityScope = parseVisibilityScope(visibilityScope);
+            parsedPublicationStatus = parsePublicationStatus(publicationStatus);
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("error",
+                    messageSource.getMessage("video.training.invalidInput", null, locale));
+            return "redirect:/videos/new";
+        }
 
         String siteId = currentSiteId();
         String uploadedSourceReference = null;
@@ -492,6 +510,11 @@ public class VideoTrainingController {
                 }
             }
         } else if (SOURCE_MODE_RESOURCES.equals(effectiveSourceMode)) {
+            if (parsedVisibilityScope == VideoVisibilityScope.GLOBAL) {
+                redirectAttributes.addFlashAttribute("error",
+                        messageSource.getMessage("video.training.invalidGlobalResourceScope", null, locale));
+                return "redirect:/videos/new";
+            }
             resolvedSourceReference = StringUtils.trimToEmpty(existingResourceReference);
             if (StringUtils.isBlank(resolvedSourceReference)
                     || !isExistingSiteVideoResourceReference(siteId, resolvedSourceReference)) {
@@ -520,7 +543,7 @@ public class VideoTrainingController {
                 return "redirect:/videos/new";
             }
             try {
-                uploadedSourceReference = uploadNativeVideo(siteId, nativeFile);
+                uploadedSourceReference = uploadNativeVideo(siteId, currentUserId(), parsedVisibilityScope, nativeFile);
                 resolvedSourceReference = uploadedSourceReference;
                 resolvedFileSizeBytes = nativeFile.getSize();
                 } catch (OverQuotaException ex) {
@@ -557,18 +580,6 @@ public class VideoTrainingController {
         if (!isValidVisibilityWindow(parsedReleaseDate, parsedRetractDate)) {
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage("video.training.invalidVisibilityWindow", null, locale));
-            return "redirect:/videos/new";
-        }
-
-        VideoVisibilityScope parsedVisibilityScope;
-        VideoPublicationStatus parsedPublicationStatus;
-        try {
-            parsedVisibilityScope = parseVisibilityScope(visibilityScope);
-            parsedPublicationStatus = parsePublicationStatus(publicationStatus);
-        } catch (IllegalArgumentException ex) {
-            cleanupManagedNativeResource(uploadedSourceReference);
-            redirectAttributes.addFlashAttribute("error",
-                    messageSource.getMessage("video.training.invalidInput", null, locale));
             return "redirect:/videos/new";
         }
 
@@ -635,6 +646,16 @@ public class VideoTrainingController {
 
         String effectiveSourceMode = resolveSourceMode(sourceMode, providerType);
         VideoProviderType parsedProviderType = providerTypeForSourceMode(effectiveSourceMode);
+        VideoVisibilityScope parsedVisibilityScope;
+        VideoPublicationStatus parsedPublicationStatus;
+        try {
+            parsedVisibilityScope = parseVisibilityScope(visibilityScope);
+            parsedPublicationStatus = parsePublicationStatus(publicationStatus);
+        } catch (IllegalArgumentException ex) {
+            redirectAttributes.addFlashAttribute("error",
+                    messageSource.getMessage("video.training.invalidInput", null, locale));
+            return "redirect:/videos/" + videoId + "/edit";
+        }
         String previousSourceReference = StringUtils.trimToEmpty(existing.getSourceReference());
         VideoProviderType previousProviderType = existing.getProviderType();
 
@@ -676,6 +697,11 @@ public class VideoTrainingController {
                 }
             }
         } else if (SOURCE_MODE_RESOURCES.equals(effectiveSourceMode)) {
+            if (parsedVisibilityScope == VideoVisibilityScope.GLOBAL) {
+                redirectAttributes.addFlashAttribute("error",
+                        messageSource.getMessage("video.training.invalidGlobalResourceScope", null, locale));
+                return "redirect:/videos/" + videoId + "/edit";
+            }
             resolvedSourceReference = StringUtils.trimToEmpty(existingResourceReference);
             if (StringUtils.isBlank(resolvedSourceReference)
                     || !isExistingSiteVideoResourceReference(existing.getSiteId(), resolvedSourceReference)) {
@@ -700,7 +726,7 @@ public class VideoTrainingController {
                     return "redirect:/videos/" + videoId + "/edit";
                 }
                 try {
-                    uploadedSourceReference = uploadNativeVideo(existing.getSiteId(), nativeFile);
+                    uploadedSourceReference = uploadNativeVideo(existing.getSiteId(), currentUserId(), parsedVisibilityScope, nativeFile);
                     resolvedSourceReference = uploadedSourceReference;
                     resolvedFileSizeBytes = nativeFile.getSize();
                 } catch (OverQuotaException ex) {
@@ -716,6 +742,19 @@ public class VideoTrainingController {
                 resolvedSourceReference = previousSourceReference;
                 if (resolvedFileSizeBytes == null) {
                     resolvedFileSizeBytes = resolveNativeResourceSizeBytes(previousSourceReference);
+                }
+
+                String relocatedSourceReference = relocateManagedNativeResourceIfNeeded(
+                        previousSourceReference,
+                        existing.getSiteId(),
+                    StringUtils.defaultIfBlank(existing.getOwnerId(), currentUserId()),
+                        parsedVisibilityScope);
+                if (!StringUtils.equals(relocatedSourceReference, previousSourceReference)) {
+                    uploadedSourceReference = relocatedSourceReference;
+                    resolvedSourceReference = relocatedSourceReference;
+                    if (resolvedFileSizeBytes == null) {
+                        resolvedFileSizeBytes = resolveNativeResourceSizeBytes(relocatedSourceReference);
+                    }
                 }
             } else {
                 redirectAttributes.addFlashAttribute("error",
@@ -747,18 +786,6 @@ public class VideoTrainingController {
         if (!isValidVisibilityWindow(parsedReleaseDate, parsedRetractDate)) {
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage("video.training.invalidVisibilityWindow", null, locale));
-            return "redirect:/videos/" + videoId + "/edit";
-        }
-
-        VideoVisibilityScope parsedVisibilityScope;
-        VideoPublicationStatus parsedPublicationStatus;
-        try {
-            parsedVisibilityScope = parseVisibilityScope(visibilityScope);
-            parsedPublicationStatus = parsePublicationStatus(publicationStatus);
-        } catch (IllegalArgumentException ex) {
-            cleanupManagedNativeResource(uploadedSourceReference);
-            redirectAttributes.addFlashAttribute("error",
-                    messageSource.getMessage("video.training.invalidInput", null, locale));
             return "redirect:/videos/" + videoId + "/edit";
         }
 
@@ -1545,14 +1572,79 @@ public class VideoTrainingController {
                 return;
             }
 
-            String managedSiteId = properties != null ? properties.getProperty(MANAGED_UPLOAD_SITE_PROPERTY) : null;
-            if (StringUtils.isNotBlank(managedSiteId) && !StringUtils.equals(managedSiteId, currentSiteId())) {
-                return;
-            }
-
             contentHostingService.removeResource(ContentResourceHelper.toContentResourceId(sourceReference));
         } catch (Exception e) {
             // best effort cleanup path
+        }
+    }
+
+    private String relocateManagedNativeResourceIfNeeded(String sourceReference,
+            String siteId,
+            String ownerId,
+            VideoVisibilityScope visibilityScope) {
+        if (StringUtils.isBlank(sourceReference) || visibilityScope == null) {
+            return sourceReference;
+        }
+
+        try {
+            ContentResource resource = ContentResourceHelper.getContentResource(sourceReference);
+            ResourceProperties properties = resource.getProperties();
+            String managedFlag = properties != null ? properties.getProperty(MANAGED_UPLOAD_PROPERTY) : null;
+            if (!"true".equalsIgnoreCase(managedFlag)) {
+                return sourceReference;
+            }
+
+            if (visibilityScope == VideoVisibilityScope.GLOBAL) {
+                return sourceReference;
+            }
+
+            String targetCollectionId = resolveManagedUploadCollectionId(siteId, ownerId, visibilityScope);
+            String currentResourceId = ContentResourceHelper.toContentResourceId(sourceReference);
+            if (StringUtils.startsWith(currentResourceId, targetCollectionId)) {
+                return sourceReference;
+            }
+
+            String originalFilename = properties != null
+                    ? properties.getProperty(ResourceProperties.PROP_DISPLAY_NAME)
+                    : null;
+            String resolvedFilename = StringUtils.defaultIfBlank(originalFilename, resource.getId());
+            String extension = "";
+            String baseName = resolvedFilename;
+            int extensionIndex = resolvedFilename.lastIndexOf('.');
+            if (extensionIndex > 0 && extensionIndex < resolvedFilename.length() - 1) {
+                extension = resolvedFilename.substring(extensionIndex);
+                baseName = resolvedFilename.substring(0, extensionIndex);
+            }
+
+            String safeBaseName = StringUtils.defaultIfBlank(StringUtils.trimToEmpty(baseName), "video")
+                    + "-"
+                    + UUID.randomUUID();
+
+            ContentResourceEdit edit = contentHostingService.addResource(targetCollectionId, safeBaseName, extension, 1);
+            boolean committed = false;
+            try {
+                edit.setContent(resource.getContent());
+                edit.setContentLength(resource.getContentLength());
+                edit.setContentType(StringUtils.defaultIfBlank(resource.getContentType(), "application/octet-stream"));
+                edit.setAvailability(resource.isHidden(), resource.getReleaseDate(), resource.getRetractDate());
+                edit.getPropertiesEdit().addProperty(ResourceProperties.PROP_DISPLAY_NAME, resolvedFilename);
+                edit.getPropertiesEdit().addProperty(MANAGED_UPLOAD_PROPERTY, "true");
+                edit.getPropertiesEdit().addProperty(MANAGED_UPLOAD_SITE_PROPERTY, siteId);
+                edit.getPropertiesEdit().addProperty(MANAGED_UPLOAD_OWNER_PROPERTY, ownerId);
+                edit.getPropertiesEdit().addProperty(MANAGED_UPLOAD_SCOPE_PROPERTY, visibilityScope.name());
+                contentHostingService.commitResource(edit, NotificationService.NOTI_NONE);
+                committed = true;
+                return edit.getId();
+            } finally {
+                if (!committed) {
+                    try {
+                        contentHostingService.cancelResource(edit);
+                    } catch (Exception ignored) {
+                    }
+                }
+            }
+        } catch (Exception e) {
+            return sourceReference;
         }
     }
 
@@ -1741,8 +1833,11 @@ public class VideoTrainingController {
         }
     }
 
-    private String uploadNativeVideo(String siteId, MultipartFile nativeFile) throws Exception {
-        String collectionId = resolveManagedUploadCollectionId(siteId);
+    private String uploadNativeVideo(String siteId,
+            String ownerId,
+            VideoVisibilityScope visibilityScope,
+            MultipartFile nativeFile) throws Exception {
+        String collectionId = resolveManagedUploadCollectionId(siteId, ownerId, visibilityScope);
 
         String originalFilename = StringUtils.defaultIfBlank(nativeFile.getOriginalFilename(), "video");
         String extension = "";
@@ -1766,6 +1861,9 @@ public class VideoTrainingController {
             edit.getPropertiesEdit().addProperty(ResourceProperties.PROP_DISPLAY_NAME, originalFilename);
             edit.getPropertiesEdit().addProperty(MANAGED_UPLOAD_PROPERTY, "true");
             edit.getPropertiesEdit().addProperty(MANAGED_UPLOAD_SITE_PROPERTY, siteId);
+                edit.getPropertiesEdit().addProperty(MANAGED_UPLOAD_OWNER_PROPERTY, ownerId);
+                edit.getPropertiesEdit().addProperty(MANAGED_UPLOAD_SCOPE_PROPERTY,
+                    visibilityScope != null ? visibilityScope.name() : VideoVisibilityScope.COURSE.name());
             contentHostingService.commitResource(edit, NotificationService.NOTI_NONE);
             committed = true;
             return edit.getId();
@@ -1779,33 +1877,64 @@ public class VideoTrainingController {
         }
     }
 
-    private String resolveManagedUploadCollectionId(String siteId) throws Exception {
+    private String resolveManagedUploadCollectionId(String siteId,
+            String ownerId,
+            VideoVisibilityScope visibilityScope) throws Exception {
+        String collectionId;
+        VideoVisibilityScope effectiveScope = visibilityScope != null ? visibilityScope : VideoVisibilityScope.COURSE;
+
+        if (effectiveScope == VideoVisibilityScope.GLOBAL) {
+            String globalRoot = StringUtils.trimToEmpty(ServerConfigurationService.getString(MANAGED_GLOBAL_ROOT_PROPERTY, DEFAULT_MANAGED_GLOBAL_ROOT));
+            if (!globalRoot.startsWith("/")) {
+                globalRoot = "/" + globalRoot;
+            }
+            if (!globalRoot.endsWith("/")) {
+                globalRoot = globalRoot + "/";
+            }
+
+            String normalizedOwner = Validator.escapeResourceName(StringUtils.defaultIfBlank(ownerId, currentUserId()));
+            if (StringUtils.isBlank(normalizedOwner)) {
+                normalizedOwner = "owner";
+            }
+            collectionId = globalRoot + normalizedOwner + "/";
+            ensureManagedCollectionPath(globalRoot, StringUtils.trimToEmpty(ServerConfigurationService.getString(MANAGED_GLOBAL_ROOT_BASE_FOLDER_PROPERTY , DEFAULT_MANAGED_GLOBAL_ROOT_BASE_FOLDER_PROPERTY)), true);
+            ensureManagedCollectionPath(collectionId, normalizedOwner, true);
+            return collectionId;
+        }
+
         String siteCollectionId = contentHostingService.getSiteCollection(siteId);
-        String baseFolder = StringUtils.trimToEmpty(ServerConfigurationService.getString(
-                MANAGED_BASE_FOLDER_PROPERTY,
-                DEFAULT_MANAGED_BASE_FOLDER));
+        String baseFolderProperty = effectiveScope == VideoVisibilityScope.LESSON
+                ? MANAGED_LESSON_BASE_FOLDER_PROPERTY
+                : MANAGED_BASE_FOLDER_PROPERTY;
+        String baseFolderDefault = effectiveScope == VideoVisibilityScope.LESSON
+                ? DEFAULT_LESSON_FOLDER_FALLBACK
+                : DEFAULT_MANAGED_BASE_FOLDER;
+        String baseFolder = StringUtils.trimToEmpty(ServerConfigurationService.getString(baseFolderProperty, baseFolderDefault));
 
         String normalizedBaseFolder = Validator.escapeResourceName(baseFolder);
         if (StringUtils.isBlank(normalizedBaseFolder)) {
-            normalizedBaseFolder = DEFAULT_MANAGED_BASE_FOLDER;
+            normalizedBaseFolder = baseFolderDefault;
         }
 
-        String collectionId = siteCollectionId + normalizedBaseFolder + "/";
-        boolean hiddenWithAccessibleContent = ServerConfigurationService.getBoolean(
-                MANAGED_FOLDER_HIDDEN_WITH_ACCESS_PROPERTY,
-                true);
+        collectionId = siteCollectionId + normalizedBaseFolder + "/";
+        ensureManagedCollectionPath(collectionId, normalizedBaseFolder, false);
+        return collectionId;
+    }
+
+    private void ensureManagedCollectionPath(String collectionId, String displayName, boolean forceVisible) throws Exception {
+        boolean hiddenWithAccessibleContent = !forceVisible && ServerConfigurationService.getBoolean(MANAGED_FOLDER_HIDDEN_WITH_ACCESS_PROPERTY, true);
 
         try {
             contentHostingService.checkCollection(collectionId);
         } catch (IdUnusedException idUnusedException) {
             ContentCollectionEdit edit = contentHostingService.addCollection(collectionId);
-            edit.getPropertiesEdit().addProperty(ResourceProperties.PROP_DISPLAY_NAME, normalizedBaseFolder);
+            if (StringUtils.isNotBlank(displayName)) {
+                edit.getPropertiesEdit().addProperty(ResourceProperties.PROP_DISPLAY_NAME, displayName);
+            }
             edit.getPropertiesEdit().addProperty(ResourceProperties.PROP_HIDDEN_WITH_ACCESSIBLE_CONTENT,
                     String.valueOf(hiddenWithAccessibleContent));
             contentHostingService.commitCollection(edit);
         }
-
-        return collectionId;
     }
 
     private String getSiteName(String siteId) {
