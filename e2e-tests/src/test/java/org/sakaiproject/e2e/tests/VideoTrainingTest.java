@@ -103,6 +103,49 @@ class VideoTrainingTest extends SakaiUiTestBase {
 
     @Test
     @Order(4)
+    void studentCanUseFavoritesAndWatchLaterViews() {
+        Assumptions.assumeTrue(sakaiUrl != null && !sakaiUrl.isBlank(), "Video Training site URL not available");
+
+        sakai.login("student0011");
+        sakai.gotoPath(sakaiUrl);
+        sakai.toolClick("Video Training");
+
+        Locator viewModeSelect = page.locator("#viewMode").first();
+        if (viewModeSelect.count() > 0) {
+            viewModeSelect.selectOption("cards");
+            page.waitForLoadState();
+        }
+
+        Locator videoCard = page.locator(".vt-video-card").filter(new Locator.FilterOptions().setHasText(VIDEO_TITLE)).first();
+        assertThat(videoCard).isVisible();
+
+        Locator favoriteButton = videoCard.locator("button[aria-label='Add to favorites']");
+        if (favoriteButton.count() > 0) {
+            favoriteButton.first().click(new Locator.ClickOptions().setForce(true));
+        }
+
+        Locator watchLaterButton = videoCard.locator("button[aria-label='Add to watch later']");
+        if (watchLaterButton.count() > 0) {
+            watchLaterButton.first().click(new Locator.ClickOptions().setForce(true));
+        }
+
+        page.getByRole(AriaRole.LINK,
+            new Page.GetByRoleOptions().setName(Pattern.compile("Favorites", Pattern.CASE_INSENSITIVE))).first()
+            .click(new Locator.ClickOptions().setForce(true));
+
+        assertThat(page.locator("#viewMode")).isVisible();
+        assertThat(page.locator("body")).containsText(Pattern.compile(VIDEO_TITLE, Pattern.CASE_INSENSITIVE));
+
+        page.getByRole(AriaRole.LINK,
+            new Page.GetByRoleOptions().setName(Pattern.compile("Watch later", Pattern.CASE_INSENSITIVE))).first()
+            .click(new Locator.ClickOptions().setForce(true));
+
+        assertThat(page.locator("#viewMode")).isVisible();
+        assertThat(page.locator("body")).containsText(Pattern.compile(VIDEO_TITLE, Pattern.CASE_INSENSITIVE));
+    }
+
+    @Test
+    @Order(5)
     void instructorCanUseAllSourceModesInForm() {
         Assumptions.assumeTrue(sakaiUrl != null && !sakaiUrl.isBlank(), "Video Training site URL not available");
 
@@ -137,7 +180,7 @@ class VideoTrainingTest extends SakaiUiTestBase {
     }
 
     @Test
-    @Order(5)
+    @Order(6)
     void instructorCanSearchAndUseCursorMode() {
         Assumptions.assumeTrue(sakaiUrl != null && !sakaiUrl.isBlank(), "Video Training site URL not available");
 
@@ -164,7 +207,7 @@ class VideoTrainingTest extends SakaiUiTestBase {
     }
 
     @Test
-    @Order(6)
+    @Order(7)
     void analyticsMenuRespectsPermissions() {
         Assumptions.assumeTrue(sakaiUrl != null && !sakaiUrl.isBlank(), "Video Training site URL not available");
 

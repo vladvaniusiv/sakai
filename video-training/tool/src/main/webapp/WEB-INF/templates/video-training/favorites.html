@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/common :: head(${title})}"></head>
+<body>
+<div th:replace="~{fragments/preferred-videos-list :: preferredVideosPage}"></div>
+<div th:replace="~{fragments/common :: jQuery}"></div>
+<script>includeWebjarLibrary('datatables');</script>
+<script th:src="@{/js/video-training-list.js}"></script>
+</body>
+</html>

@@ -37,11 +37,12 @@
 </div>
 
 <div id="vt-video-grid" class="vt-video-grid" th:fragment="videoCards" th:if="${!#lists.isEmpty(videos) && isCardsView}"
-    th:with="showManageActions=${canManage and (isManageableList != null ? isManageableList : false)}">
+    th:with="showManageColumns=${showManageColumns != null ? showManageColumns : (canManage and (isManageableList != null ? isManageableList : false))},
+             showManageButtons=${showManageButtons != null ? showManageButtons : (canManage and (isManageableList != null ? isManageableList : false))}">
     <article class="vt-video-card" th:each="video : ${videos}">
         <a class="vt-video-card-link" th:href="@{/videos/{id}(id=${video.id})}">
             <div class="vt-video-thumb-wrap">
-                <div class="vt-card-badges" th:if="${showManageActions}">
+                <div class="vt-card-badges" th:if="${showManageColumns}">
                     <span class="vt-card-badge"
                         th:if="${video.visibilityScope != null && video.visibilityScope.name() == 'GLOBAL'}"
                         data-bs-toggle="tooltip"
@@ -127,7 +128,7 @@
             <p class="vt-video-card-meta" th:if="${isUserSite}" th:text="${siteNameBySiteId[video.siteId]}">Site name</p>
             <p class="vt-video-card-meta" th:if="${!isUserSite && !#strings.isEmpty(retractDisplayById[video.id]) && retractDisplayById[video.id] != '-'}"><span th:text="#{video.training.form.retractDate}">Retract</span>: <span th:text="${retractDisplayById[video.id]}">date</span></p>
         </a>
-        <div class="vt-card-actions btn-group-sm" th:if="${showManageActions}" th:with="status=${video.publicationStatus != null ? video.publicationStatus.name() : 'DRAFT'}, moderationEnabledSafe=${moderationEnabled != null ? moderationEnabled : false}, moderationRequired=${moderationEnabledSafe && video.visibilityScope != null && video.visibilityScope.name() == 'GLOBAL'}">
+        <div class="vt-card-actions btn-group-sm" th:if="${showManageButtons}" th:with="status=${video.publicationStatus != null ? video.publicationStatus.name() : 'DRAFT'}, moderationEnabledSafe=${moderationEnabled != null ? moderationEnabled : false}, moderationRequired=${moderationEnabledSafe && video.visibilityScope != null && video.visibilityScope.name() == 'GLOBAL'}">
             <a class="btn btn-sm" th:href="@{/videos/{id}/edit(id=${video.id})}" th:aria-label="#{video.training.edit}">
                 <span class="bi bi-pencil-fill" aria-hidden="true"></span>
             </a>
@@ -166,15 +167,16 @@
 </div>
 
 <div class="table-responsive" th:fragment="videoTable" th:if="${!#lists.isEmpty(videos) && isTableView}"
-    th:with="showManageActions=${canManage and (isManageableList != null ? isManageableList : false)}">
+    th:with="showManageColumns=${showManageColumns != null ? showManageColumns : (canManage and (isManageableList != null ? isManageableList : false))},
+             showManageButtons=${showManageButtons != null ? showManageButtons : (canManage and (isManageableList != null ? isManageableList : false))}">
     <table id="vt-video-table"
         class="table table-striped table-hover align-middle vt-video-table"
         th:attr="data-sort-by=${sortBy},data-sort-dir=${sortDir},data-size=${size},data-batch-size=${batchSize},data-view-mode=${viewMode},data-query=${q}">
     <thead>
     <tr>
         <th scope="col" th:text="#{video.training.form.title}">Title</th>
-        <th scope="col" th:if="${showManageActions}" th:text="#{video.training.form.visibilityScope}">Visibility scope</th>
-        <th scope="col" th:if="${showManageActions}" th:text="#{video.training.form.publicationStatus}">Publication status</th>
+        <th scope="col" th:if="${showManageColumns}" th:text="#{video.training.form.visibilityScope}">Visibility scope</th>
+        <th scope="col" th:if="${showManageColumns}" th:text="#{video.training.form.publicationStatus}">Publication status</th>
         <th scope="col" th:text="#{video.training.form.releaseDate}">Release date</th>
         <th scope="col" th:text="#{video.training.form.retractDate}">Retract date</th>
     </tr>
@@ -210,7 +212,7 @@
                     <div th:if="${video.providerType.name() == 'EXTERNAL'}">
                         <span class="text-muted small" th:text="${video.sourceReference}">reference</span>
                     </div>
-                    <div th:if="${showManageActions}" class="vt-actions-row btn-group-sm" th:with="status=${video.publicationStatus != null ? video.publicationStatus.name() : 'DRAFT'}, moderationEnabledSafe=${moderationEnabled != null ? moderationEnabled : false}, visibilityScopeName=${video.visibilityScope != null ? video.visibilityScope.name() : null}, moderationRequired=${moderationEnabledSafe && visibilityScopeName == 'GLOBAL'}">
+                    <div th:if="${showManageButtons}" class="vt-actions-row btn-group-sm" th:with="status=${video.publicationStatus != null ? video.publicationStatus.name() : 'DRAFT'}, moderationEnabledSafe=${moderationEnabled != null ? moderationEnabled : false}, visibilityScopeName=${video.visibilityScope != null ? video.visibilityScope.name() : null}, moderationRequired=${moderationEnabledSafe && visibilityScopeName == 'GLOBAL'}">
                         <a class="btn btn-sm" th:href="@{/videos/{id}/edit(id=${video.id})}" th:aria-label="#{video.training.edit}">
                             <span class="bi bi-pencil-fill" aria-hidden="true"></span>
                         </a>
@@ -248,8 +250,8 @@
                 </div>
             </div>
         </td>
-        <td th:if="${showManageActions}" th:text="${video.visibilityScope != null ? video.visibilityScope : 'COURSE'}">COURSE</td>
-        <td th:if="${showManageActions}"
+        <td th:if="${showManageColumns}" th:text="${video.visibilityScope != null ? video.visibilityScope : 'COURSE'}">COURSE</td>
+        <td th:if="${showManageColumns}"
             th:title="${video.publicationStatus != null && video.publicationStatus.name() == 'PENDING_APPROVAL'} ? #{video.training.status.PENDING_APPROVAL} : (${video.publicationStatus != null && video.publicationStatus.name() == 'PUBLISHED'} ? #{video.training.status.PUBLISHED} : (${video.publicationStatus != null && video.publicationStatus.name() == 'WITHDRAWN'} ? #{video.training.status.WITHDRAWN} : (${video.publicationStatus != null && video.publicationStatus.name() == 'ARCHIVED'} ? #{video.training.status.ARCHIVED} : #{video.training.status.DRAFT})))"
             th:text="${video.publicationStatus != null ? video.publicationStatus : 'DRAFT'}">DRAFT</td>
         <td th:text="${releaseDisplayById[video.id]}">-</td>
