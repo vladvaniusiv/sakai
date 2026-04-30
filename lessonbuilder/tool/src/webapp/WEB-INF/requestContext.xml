@@ -49,6 +49,7 @@
  		<property name="bltiEntity" ref="org.sakaiproject.lessonbuildertool.service.BltiEntity"/>
 		<property name="assignmentEntity" ref="org.sakaiproject.lessonbuildertool.service.AssignmentEntity"/>
 		<property name="scormEntity" ref="org.sakaiproject.lessonbuildertool.service.ScormEntity"/>
+		<property name="videoTrainingEntity" ref="org.sakaiproject.lessonbuildertool.service.VideoTrainingEntity"/>
 		<property name="userTimeService" ref="org.sakaiproject.time.api.UserTimeService" />
 		<property name="localeGetter" ref="requestLocaleProxy" />
 		<property name="httpServletResponse" ref="httpServletResponse" />
@@ -256,6 +257,7 @@
       <property name="bltiEntity" ref="org.sakaiproject.lessonbuildertool.service.BltiEntity"/>
       <property name="assignmentEntity" ref="org.sakaiproject.lessonbuildertool.service.AssignmentEntity"/>
       <property name="scormEntity" ref="org.sakaiproject.lessonbuildertool.service.ScormEntity"/>
+		<property name="videoTrainingEntity" ref="org.sakaiproject.lessonbuildertool.service.VideoTrainingEntity"/>
       <property name="httpServletRequest" ref="httpServletRequest" />
       <property name="localeGetter" ref="requestLocaleProxy" />
     </bean>

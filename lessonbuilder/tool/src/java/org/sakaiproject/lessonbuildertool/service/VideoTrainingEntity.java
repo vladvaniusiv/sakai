@@ -39,6 +39,9 @@ import org.sakaiproject.memory.api.MemoryService;
 import org.sakaiproject.site.api.SiteService;
 import org.sakaiproject.tool.api.ToolManager;
 import org.sakaiproject.util.ResourceLoader;
+import org.sakaiproject.util.api.FormattedText;
+import org.sakaiproject.videotraining.api.model.VideoTrainingVideo;
+import org.sakaiproject.videotraining.api.service.VideoTrainingService;
 
 /**
  * Interface to Video Training Module Videos for Lessons
@@ -55,7 +58,8 @@ public class VideoTrainingEntity implements LessonEntity {
     private SimplePageBean simplePageBean;
     private LessonEntity nextEntity = null;
 
-    protected static Object videoTrainingService = null;
+    protected static VideoTrainingService videoTrainingService = null;
+
     protected static MemoryService memoryService = null;
     protected static ToolManager toolManager = null;
     protected static SiteService siteService = null;
@@ -63,7 +67,7 @@ public class VideoTrainingEntity implements LessonEntity {
     // Entity state
     protected String id;  // Video UUID
     protected int type;
-    protected Object video = null;
+    protected VideoTrainingVideo video = null;
     protected String siteId = null;
 
     /**
@@ -107,29 +111,16 @@ public class VideoTrainingEntity implements LessonEntity {
         if (siteService == null) siteService = sm;
     }
 
+    public void setVideoTrainingService(VideoTrainingService vts) {
+        if (videoTrainingService == null) videoTrainingService = vts;
+    }
+
     public void init() {
         log.info("VideoTrainingEntity.init()");
-        if (videoTrainingService == null) {
-            Object service = ComponentManager.get("org.sakaiproject.videotraining.api.service.VideoTrainingService");
-            if (service == null) {
-                // Backward compatibility in case bean id differs across branches.
-                service = ComponentManager.get("org.sakaiproject.videotraining.api.VideoTrainingService");
-            }
-            if (service == null) {
-                log.info("Video Training Service not available -- disabling VTM support");
-                return;
-            }
-            videoTrainingService = service;
-            log.info("Video Training Service initialized");
-        }
     }
 
     public void destroy() {
         log.info("VideoTrainingEntity.destroy()");
-    }
-
-    public boolean servicePresent() {
-        return videoTrainingService != null;
     }
 
     // ============ LessonEntity Interface Implementation ============
@@ -141,7 +132,7 @@ public class VideoTrainingEntity implements LessonEntity {
 
     @Override
     public String getToolId() {
-        return "sakai.video-training";
+        return "sakai.video.training";
     }
 
     @Override
@@ -184,26 +175,26 @@ public class VideoTrainingEntity implements LessonEntity {
     @Override
     public List<LessonEntity> getEntitiesInSite(SimplePageBean bean) {
         List<LessonEntity> ret = new ArrayList<>();
-        
+
         if (videoTrainingService == null || bean == null) {
             return ret;
         }
 
         try {
             String currentSiteId = bean.getCurrentSiteId();
-            Object videos = invoke(videoTrainingService, "getVisibleVideos", new Class[] { String.class }, new Object[] { currentSiteId });
-            if (videos instanceof Iterable) {
-                for (Object videoObject : (Iterable<?>) videos) {
-                    String videoId = invokeString(videoObject, "getId");
-                    if (StringUtils.isBlank(videoId)) {
-                        continue;
-                    }
-
-                    VideoTrainingEntity entity = new VideoTrainingEntity(videoId, currentSiteId);
-                    entity.video = videoObject;
-                    entity.setSimplePageBean(bean);
-                    ret.add(entity);
+            String userId = bean.getCurrentUserId();
+            Long totalCount = videoTrainingService.countSiteVideosForUser(currentSiteId, userId, null);
+            List<VideoTrainingVideo> videos = videoTrainingService.getSiteVideosForUserPage(currentSiteId, userId, "", 0, totalCount.intValue());
+            for (VideoTrainingVideo video : videos) {
+                String videoId = video.getId();
+                if (StringUtils.isBlank(videoId)) {
+                    continue;
                 }
+
+                VideoTrainingEntity entity = new VideoTrainingEntity(videoId, currentSiteId);
+                entity.video = video;
+                entity.setSimplePageBean(bean);
+                ret.add(entity);
             }
         } catch (Exception e) {
             log.warn("Error retrieving VTM videos for site: {}", e.getMessage());
@@ -212,12 +203,28 @@ public class VideoTrainingEntity implements LessonEntity {
         return ret;
     }
 
-    @Override
     public LessonEntity getEntity(String ref, SimplePageBean o) {
-        return getEntity(ref);
+        if (!ref.startsWith("/" + LessonEntity.VIDEO_TRAINING + "/")) {
+            return getEntity(ref);
+        }
+
+        try {
+            String idString = ref.substring(("/" + LessonEntity.VIDEO_TRAINING + "/").length());
+            VideoTrainingEntity entity = new VideoTrainingEntity(idString, o != null ? o.getCurrentSiteId() : null);
+            entity.setSimplePageBean(o);
+            VideoTrainingVideo video = videoTrainingService.getVideoById(idString).orElse(null);
+            entity.video = video;
+
+            return entity;
+        } catch (Exception e) {
+            log.warn("Error parsing video reference: {}", ref);
+            if (nextEntity != null) {
+                return nextEntity.getEntity(ref);
+            }
+            return null;
+        }
     }
 
-    @Override
     public LessonEntity getEntity(String ref) {
         if (!ref.startsWith("/" + LessonEntity.VIDEO_TRAINING + "/")) {
             if (nextEntity != null) {
@@ -241,12 +248,12 @@ public class VideoTrainingEntity implements LessonEntity {
     // ============ Video Loading ============
 
     protected void loadVideo() {
-        if (video != null || id == null || videoTrainingService == null) {
+        if (video != null || id == null) {
             return;
         }
 
         try {
-            video = invoke(videoTrainingService, "getVideo", new Class[] { String.class }, new Object[] { id });
+            video = videoTrainingService.getVideoById(id).orElse(null);
         } catch (Exception e) {
             log.warn("Error loading video {}: {}", id, e.getMessage());
             video = null;
@@ -255,19 +262,21 @@ public class VideoTrainingEntity implements LessonEntity {
 
     // ============ Video Properties ============
 
-    @Override
     public String getTitle() {
         loadVideo();
-        return invokeString(video, "getTitle");
+
+        if (video == null) {
+            return null;
+        }
+
+        return ComponentManager.get(FormattedText.class).convertFormattedTextToPlaintext(video.getTitle());
     }
 
-    @Override
     public String getDescription() {
         loadVideo();
         return invokeString(video, "getDescription");
     }
 
-    @Override
     public String getUrl() {
         // Generate URL for embedded video player
         loadVideo();
@@ -275,9 +284,17 @@ public class VideoTrainingEntity implements LessonEntity {
             return null;
         }
 
-        // Construct the URL to the video details page in VTM tool
-        // This will be used to embed/display the video
         String baseUrl = ServerConfigurationService.getServerUrl();
+        
+        if (simplePageBean != null) {
+            String toolId = simplePageBean.getCurrentTool(getToolId());
+            String siteId = simplePageBean.getCurrentSiteId();
+            if (toolId != null && siteId != null) {
+                // Return tool inline URL using getToolUrl to match how AssignmentEntity handles it
+                return ServerConfigurationService.getToolUrl() + "/" + toolId + "/videos/" + id + "?panel=Main";
+            }
+        }
+
         String sourceReference = invokeString(video, "getSourceReference");
         if (StringUtils.isNotBlank(sourceReference)) {
             return sourceReference;
@@ -285,7 +302,6 @@ public class VideoTrainingEntity implements LessonEntity {
         return baseUrl + "/direct/video-training/" + id + "/view";
     }
 
-    @Override
     public String getEditNote() {
         loadVideo();
         if (video == null) {
