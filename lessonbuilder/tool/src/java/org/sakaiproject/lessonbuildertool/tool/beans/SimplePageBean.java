@@ -398,6 +398,8 @@ public class SimplePageBean {
 	private String pageColorScheme;
 	private boolean pageTaskClosed;
 	private String layoutColorScheme;
+	public boolean questionMultiple;
+	public String[] questionResponses;
 
 	public static final String NewColors[] = {
 			"none",
@@ -490,6 +492,9 @@ public class SimplePageBean {
     @Setter private ConditionService conditionService;
     @Getter @Setter private TaskService taskService;
     @Getter @Setter private ArchiveService archiveService;
+
+	public boolean isQuestionMultiple() { return questionMultiple; }
+	public void setQuestionMultiple(boolean questionMultiple) { this.questionMultiple = questionMultiple; }
 
     private LessonEntity forumEntity = null;
     	public void setForumEntity(Object e) {
@@ -8084,6 +8089,7 @@ public class SimplePageBean {
 		}else if(questionType.equals("multipleChoice")) {
 			Long max = simplePageToolDao.maxQuestionAnswer(item);
 			simplePageToolDao.clearQuestionAnswers(item);
+			int correctCount = 0;
 
 			for(int i = 0; questionAnswers.get(i) != null; i++) {
 				// get data sent from post operation for this answer
@@ -8099,12 +8105,17 @@ public class SimplePageBean {
 				if (answerId <= 0L)
 				    answerId = ++max;
 				Boolean correct = fields[1].equals("true");
+				if (correct) {
+					correctCount++;
+				}
 				String text = fields[2];
 				if (text != null && !text.trim().equals(""))
 				    simplePageToolDao.addQuestionAnswer(item, answerId, text, correct);
 
 			}
 			
+			this.questionMultiple = (correctCount > 1);
+    		item.setAttribute("multiple", questionMultiple ? "true" : "false");
 			item.setAttribute("questionShowPoll", String.valueOf(questionShowPoll));
 
 
@@ -8289,6 +8300,37 @@ public class SimplePageBean {
 			correct = response.isCorrect();
 			gradebookPoints = response.getPoints();
 		}else if(question.getAttribute("questionType") != null && question.getAttribute("questionType").equals("multipleChoice")) {
+            boolean isMultiple = "true".equals(question.getJsonAttribute("multiple"));
+            if (isMultiple) {
+                String selectedIdsAttr = response.getShortanswer();
+                List<String> selectedIds = (selectedIdsAttr != null && !selectedIdsAttr.isEmpty())
+                    ? Arrays.asList(selectedIdsAttr.split(","))
+                    : Collections.singletonList(String.valueOf(response.getMultipleChoiceId()));
+                List<SimplePageQuestionAnswer> allAnswers = simplePageToolDao.findAnswerChoices(question);
+                correct = true;
+                boolean atLeastOneCorrect = false;
+                for (SimplePageQuestionAnswer ans : allAnswers) {
+                    boolean studentSelectedIt = selectedIds.contains(String.valueOf(ans.getId()));
+                    if (ans.isCorrect()) {
+                        atLeastOneCorrect = true;
+                        if (!studentSelectedIt) {
+                            correct = false;
+                            break;
+                        }
+                    } else {
+                        if (studentSelectedIt) {
+                            correct = false;
+                            break;
+                        }
+                    }
+                }
+                if (!atLeastOneCorrect) {
+                    correct = !questionGraded;
+                    gradebookPoints = null;
+                } else if (!correct) {
+                    gradebookPoints = 0.0;
+                }
+            } else {
 			SimplePageQuestionAnswer answer = simplePageToolDao.findAnswerChoice(question, response.getMultipleChoiceId());
 			if(answer != null && answer.isCorrect()) {
 				correct = true;
@@ -8305,6 +8347,7 @@ public class SimplePageBean {
 				// The answer no longer exists, so we'll just leave everything the way it was last time it was graded.
 				correct = response.isCorrect();
 				gradebookPoints = response.getPoints();
+			}
 			}
 		}else if(question.getAttribute("questionType") != null && question.getAttribute("questionType").equals("shortanswer")) {
 			String correctAnswer = question.getAttribute("questionAnswer");
@@ -8365,6 +8408,7 @@ public class SimplePageBean {
 
 		SimplePageItem question = findItem(questionId);
 
+		boolean isMultiple = "true".equals(question.getJsonAttribute("multiple"));
 		SimplePageQuestionResponse response = simplePageToolDao.findQuestionResponse(questionId, userId); 
 		if(response != null) {
 			if(!canEditPage()) {
@@ -8376,12 +8420,31 @@ public class SimplePageBean {
 			response = simplePageToolDao.makeQuestionResponse(userId, questionId);
 		}
 		
-		long responseId = Long.valueOf(questionResponse);
-		response.setMultipleChoiceId(responseId);
-		simplePageToolDao.incrementQRCount(questionId, responseId);
-		
-		SimplePageQuestionAnswer answer = simplePageToolDao.findAnswerChoice(question, response.getMultipleChoiceId());
-		response.setOriginalText(answer.getText());
+		if (isMultiple) {
+			if (questionResponses == null || questionResponses.length == 0) {
+				return "failure";
+			}
+			long firstResponseId = Long.valueOf(questionResponses[0]);
+			response.setMultipleChoiceId(firstResponseId);
+			String joinedResponses = String.join(",", questionResponses);
+			response.setShortanswer(joinedResponses);
+			for (String rId : questionResponses) {
+				simplePageToolDao.incrementQRCount(questionId, Long.valueOf(rId));
+			}
+			StringBuilder originalTexts = new StringBuilder();
+			for (String rId : questionResponses) {
+				SimplePageQuestionAnswer ans = simplePageToolDao.findAnswerChoice(question, Long.valueOf(rId));
+				if (originalTexts.length() > 0) originalTexts.append(", ");
+				originalTexts.append(ans.getText());
+			}
+			response.setOriginalText(originalTexts.toString());
+		} else {
+			long responseId = Long.valueOf(questionResponse);
+			response.setMultipleChoiceId(responseId);
+			simplePageToolDao.incrementQRCount(questionId, responseId);
+			SimplePageQuestionAnswer answer = simplePageToolDao.findAnswerChoice(question, response.getMultipleChoiceId());
+			response.setOriginalText(answer.getText());
+		}
 		
 		gradeQuestionResponse(response);
 

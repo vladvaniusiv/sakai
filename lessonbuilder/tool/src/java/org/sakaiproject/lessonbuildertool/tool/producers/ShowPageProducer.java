@@ -3166,6 +3166,7 @@ public class ShowPageProducer implements ViewComponentProducer, DefaultView, Nav
 					List<SimplePageQuestionAnswer> answers = new ArrayList<SimplePageQuestionAnswer>();
 					if("multipleChoice".equals(i.getAttribute("questionType"))) {
 						answers = simplePageToolDao.findAnswerChoices(i);
+						boolean isMultiple = "true".equals(String.valueOf(i.getJsonAttribute("multiple")));
 						UIOutput.make(tableRow, "multipleChoiceDiv");
 						UIForm questionForm = UIForm.make(tableRow, "multipleChoiceForm");
 						makeCsrf(questionForm, "csrf4");
@@ -3181,30 +3182,30 @@ public class ShowPageProducer implements ViewComponentProducer, DefaultView, Nav
 								initValue = String.valueOf(answers.get(j).getId());
 							}
 						}
-						
-						UISelect multipleChoiceSelect = UISelect.make(questionForm, "multipleChoiceSelect:", options, "#{simplePageBean.questionResponse}", initValue);
-
-						// allow instructor to answer again, for testing
-						if(!isAvailable || response != null) {
-						    if (canSeeAll)
-							fakeDisableLink(multipleChoiceSelect, messageLocator);
-						    else
-							multipleChoiceSelect.decorate(new UIDisabledDecorator());
+						UISelect multipleChoiceSelect;
+						if (isMultiple) {
+							String[] initValues = (response != null && response.getShortanswer() != null)
+												? response.getShortanswer().split(",")
+												: (initValue != null ? new String[]{initValue} : new String[0]);
+							multipleChoiceSelect = UISelect.makeMultiple(questionForm, "multipleChoiceSelect:", options, "#{simplePageBean.questionResponses}", initValues);
+						} else {
+							multipleChoiceSelect = UISelect.make(questionForm, "multipleChoiceSelect:", options, "#{simplePageBean.questionResponse}", initValue);
+						}
+						if (!isAvailable || response != null) {
+							if (!canSeeAll) multipleChoiceSelect.decorate(new UIDisabledDecorator());
 						}
 						 
 						for(int j = 0; j < answers.size(); j++) {
 							UIBranchContainer answerContainer = UIBranchContainer.make(questionForm, "multipleChoiceAnswer:", String.valueOf(j));
-							UISelectChoice multipleChoiceInput = UISelectChoice.make(answerContainer, "multipleChoiceAnswerRadio", multipleChoiceSelect.getFullID(), j);
+							String componentId = isMultiple ? "multipleChoiceAnswerCheckbox" : "multipleChoiceAnswerRadio";
+        					UISelectChoice multipleChoiceInput = UISelectChoice.make(answerContainer, componentId, multipleChoiceSelect.getFullID(), j);
 							multipleChoiceInput.decorate(new UIFreeAttributeDecorator("id", multipleChoiceInput.getFullID()));
-							char answerOption = (char) (j + 65); // 65 Corresponds to A
-							UIOutput.make(answerContainer, "multipleChoiceAnswerText", answerOption + " : " + answers.get(j).getText())
-								.decorate(new UIFreeAttributeDecorator("for", multipleChoiceInput.getFullID()));
-							
-							if(!isAvailable || response != null) {
-							    if (canSeeAll)
-								fakeDisableLink(multipleChoiceInput, messageLocator);
-							    else
-								multipleChoiceInput.decorate(new UIDisabledDecorator());
+							char answerOption = (char) (j + 65);
+							UIOutput label = UIOutput.make(answerContainer, "multipleChoiceAnswerText", answerOption + " : " + answers.get(j).getText());
+							label.decorate(new UIFreeAttributeDecorator("for", multipleChoiceInput.getFullID()));
+							if (!isAvailable || response != null) {
+								if (canSeeAll) fakeDisableLink(multipleChoiceInput, messageLocator);
+								else multipleChoiceInput.decorate(new UIDisabledDecorator());
 							}
 						}
 						 
