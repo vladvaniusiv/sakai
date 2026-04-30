@@ -186,6 +186,7 @@ public class ShowPageProducer implements ViewComponentProducer, DefaultView, Nav
 	private static LessonEntity forumEntity;
 	private static LessonEntity quizEntity;
 	private static LessonEntity assignmentEntity;
+	private static LessonEntity videoTrainingEntity;
 	private static LessonEntity bltiEntity;
 	private static LessonEntity scormEntity;
 	public MessageLocator messageLocator;
@@ -3996,6 +3997,29 @@ public class ShowPageProducer implements ViewComponentProducer, DefaultView, Nav
 				}
             }
 		}
+		else if (i.getType() == SimplePageItem.VIDEO_TRAINING) {
+		    if (usable && i.isPrerequisite()) {
+		        simplePageBean.checkItemPermissions(i, true);
+		    }
+		    LessonEntity lessonEntity = videoTrainingEntity.getEntity(i.getSakaiId(), simplePageBean);
+		    if (usable && lessonEntity != null && (canEditPage || !lessonEntity.notPublished())) {
+		        if (i.isPrerequisite()) {
+		            simplePageBean.checkItemPermissions(i, true);
+		        }
+		        GeneralViewParameters view = new GeneralViewParameters(ShowItemProducer.VIEW_ID);
+		        view.setSendingPage(currentPage.getPageId());
+		        view.setItemId(i.getId());
+		        UILink link = UIInternalLink.make(container, "link", view);
+		        link.decorate(new UIFreeAttributeDecorator("lessonbuilderitem", itemString));
+		        if (! available)
+		            fakeDisableLink(link, messageLocator);
+		    } else {
+		        if (i.isPrerequisite()) {
+		            simplePageBean.checkItemPermissions(i, false);
+		        }
+		        fake = true; // need to set this in case it's available for missing entity
+		    }
+		}
 
 		String note = null;
 		if (status == Status.COMPLETED) {
@@ -4220,6 +4244,11 @@ public class ShowPageProducer implements ViewComponentProducer, DefaultView, Nav
 	public void setScormEntity(LessonEntity e) {
 		if (scormEntity == null)
 			scormEntity = e;
+	}
+
+	public void setVideoTrainingEntity(LessonEntity e) {
+		if (videoTrainingEntity == null)
+			videoTrainingEntity = e;
 	}
 
 	//Create a latest forum conversations dialog where user can enter other settings for the forum summary div
