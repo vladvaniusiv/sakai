@@ -338,6 +338,7 @@ public class DiscussionForumTool {
   private static final String MULTI_GRADEBOOK_GROUP_ITEMS_ERROR = "group_sitegradebook_group_items_error";
   private static final String MULTI_GRADEBOOK_GROUP_FORUM_ITEMS_ERROR = "group_sitegradebook_forum_group_item_error";
 
+  private static final String FORUM_EVENT_TYPE = "Class section - Discussion";
 
   private static final String FROM_PAGE = "msgForum:mainOrForumOrTopic";
   /**
@@ -2504,7 +2505,7 @@ public class DiscussionForumTool {
           if (openDate != null) {
             begin.setDisplayName(openingTitle);
             begin.setDescription(getResourceBundleString("sendOpenCloseToCalendar.description.assembly",new Object[]{openingTitle,openDate.toString()}));
-            begin.setType(getResourceBundleString("sendOpenCloseToCalendar.type"));
+            begin.setType(FORUM_EVENT_TYPE);
             begin.setGroupAccess(allowedGroups, false);
             begin.setRange(this.timeService.newTimeRange(openDate.getTime(), 0));
             begin.setField(CalendarConstants.EVENT_OWNED_BY_TOOL_ID, FORUMS_TOOL_ID);
@@ -2517,7 +2518,7 @@ public class DiscussionForumTool {
           begin = targetCalendar.addEvent();
           begin.setDisplayName(openingTitle);
           begin.setDescription(getResourceBundleString("sendOpenCloseToCalendar.description.assembly",new Object[]{openingTitle,openDate.toString()}));
-          begin.setType(getResourceBundleString("sendOpenCloseToCalendar.type"));
+          begin.setType(FORUM_EVENT_TYPE);
           begin.setGroupAccess(allowedGroups, false);
           begin.setRange(this.timeService.newTimeRange(openDate.getTime(), 0));
           begin.setField(CalendarConstants.EVENT_OWNED_BY_TOOL_ID, FORUMS_TOOL_ID);
@@ -2534,7 +2535,7 @@ public class DiscussionForumTool {
           if (closeDate != null) {
             end.setDisplayName(closingTitle);
             end.setDescription(getResourceBundleString("sendOpenCloseToCalendar.description.assembly",new Object[]{closingTitle,closeDate.toString()}));
-            end.setType(getResourceBundleString("sendOpenCloseToCalendar.type"));
+            end.setType(FORUM_EVENT_TYPE);
             end.setGroupAccess(allowedGroups, false);
             end.setRange(this.timeService.newTimeRange(closeDate.getTime(), 0));
             end.setField(CalendarConstants.EVENT_OWNED_BY_TOOL_ID, FORUMS_TOOL_ID);
@@ -2547,7 +2548,7 @@ public class DiscussionForumTool {
           end = targetCalendar.addEvent();
           end.setDisplayName(closingTitle);
           end.setDescription(getResourceBundleString("sendOpenCloseToCalendar.description.assembly",new Object[]{closingTitle,closeDate.toString()}));
-          end.setType(getResourceBundleString("sendOpenCloseToCalendar.type"));
+          end.setType(FORUM_EVENT_TYPE);
           end.setGroupAccess(allowedGroups, false);
           end.setRange(this.timeService.newTimeRange(closeDate.getTime(), 0));
           end.setField(CalendarConstants.EVENT_OWNED_BY_TOOL_ID, FORUMS_TOOL_ID);

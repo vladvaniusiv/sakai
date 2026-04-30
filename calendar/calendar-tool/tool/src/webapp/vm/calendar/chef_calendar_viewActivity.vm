@@ -138,8 +138,12 @@
 			<tr>
 				<th>$tlang.getString("new.itemtype")</th>
 				<td>
-					<span class="icon $eventIconMap.get($event.getType()) " title="$localizedEventTypes.get($event.getType())"></span>
+					#if($localizedEventTypes && $localizedEventTypes.get($event.getType()))
+						<span class="icon $eventIconMap.get($event.getType()) " title="$localizedEventTypes.get($event.getType())"></span>
 						$localizedEventTypes.get($event.getType())
+					#else
+						$event.getType()
+					#end
 				</td>	
 			</tr>
 			#if($owner_name && $owner_name !="")

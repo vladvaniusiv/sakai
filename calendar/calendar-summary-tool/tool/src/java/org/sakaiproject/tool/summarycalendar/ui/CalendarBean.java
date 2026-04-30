@@ -369,7 +369,13 @@ public class CalendarBean {
 			EventSummary es = new EventSummary();
 			es.setDisplayName(e.getDisplayName());
 			es.setType(e.getType());
-			es.setTypeLocalized(calendarUtil.getLocalizedEventType(e.getType()));
+			String type = e.getType();
+			String localized = calendarUtil.getLocalizedEventType(type);
+			if (localized == null || localized.contains("missing key") || localized.equals(type)) {
+				es.setTypeLocalized(type);
+			} else {
+				es.setTypeLocalized(localized);
+			}
 			es.setCalendarRef(e.getCalendarReference());
 			es.setEventRef(e.getId());
 			es.setUrl(e.getUrl());
