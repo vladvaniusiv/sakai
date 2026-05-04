@@ -68,23 +68,25 @@
     }
 
     const dtSortByToIndex = {
-        title: 0,
-        context: 1,
-        scope: 2,
-        status: 3,
-        lesson: 4,
-        release: 5,
-        retract: 6
+        counter: 0,
+        title: 1,
+        context: 2,
+        scope: 3,
+        status: 4,
+        lesson: 5,
+        release: 6,
+        retract: 7
     };
 
     const dtIndexToSortBy = {
-        0: 'title',
-        1: 'context',
-        2: 'scope',
-        3: 'status',
-        4: 'lesson',
-        5: 'release',
-        6: 'retract'
+        0: 'counter',
+        1: 'title',
+        2: 'context',
+        3: 'scope',
+        4: 'status',
+        5: 'lesson',
+        6: 'release',
+        7: 'retract'
     };
 
     function getPageSize() {
@@ -136,7 +138,10 @@
             searching: false,
             info: false,
             order: initialOrder,
-            retrieve: true
+            retrieve: true,
+            columnDefs: [
+                { orderable: true, targets: 0 }
+            ]
         });
 
         window.jQuery(tableElement).on('order.dt', function () {
