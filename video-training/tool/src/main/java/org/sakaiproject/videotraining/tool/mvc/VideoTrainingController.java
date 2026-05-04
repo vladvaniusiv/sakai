@@ -117,6 +117,7 @@ public class VideoTrainingController {
     
     private static final String CONTENT_REFERENCE_ROOT = ContentHostingService.REFERENCE_ROOT;
         private static final Map<String, String> SORT_FIELD_BY_COLUMN = Map.of(
+            "counter", "createdOn",
             "title", "title",
             "scope", "visibilityScope",
             "status", "publicationStatus",
