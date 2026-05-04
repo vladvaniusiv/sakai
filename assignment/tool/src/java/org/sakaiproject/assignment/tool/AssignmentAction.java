@@ -5837,7 +5837,13 @@ public class AssignmentAction extends PagedResourceActionII {
                     context.put("display_grade", "");
                 }
                 context.put("item_removed", peerAssessmentItem.getRemoved());
-                context.put("value_feedback_comment", peerAssessmentItem.getComment());
+                String feedback = (String) state.getAttribute("peer_assessment_temp_feedback");
+                if (feedback == null) {
+                    feedback = peerAssessmentItem.getComment();
+                } else {
+                    state.removeAttribute("peer_assessment_temp_feedback");
+                }
+                context.put("value_feedback_comment", feedback);
 
                 //set previous/next values
                 List<SubmitterSubmission> userSubmissionsState = state.getAttribute(STATE_PAGEING_TOTAL_ITEMS) != null ? (List<SubmitterSubmission>) state.getAttribute(STATE_PAGEING_TOTAL_ITEMS) : null;
@@ -12531,6 +12537,8 @@ public class AssignmentAction extends PagedResourceActionII {
                     if ("submit".equals(gradeOption)) {
                         String scoreReqProp = assignment.getProperties().get("peerAssessmentScoreRequired");
                         if ("true".equalsIgnoreCase(scoreReqProp) && StringUtils.isEmpty(g)) {
+                            String currentFeedback = params.getCleanString(GRADE_SUBMISSION_FEEDBACK_COMMENT);
+                            state.setAttribute("peer_assessment_temp_feedback", currentFeedback);
                             addAlert(state, rb.getString("peerassessment.error.scoreRequired"));
                             return false;
                         }
