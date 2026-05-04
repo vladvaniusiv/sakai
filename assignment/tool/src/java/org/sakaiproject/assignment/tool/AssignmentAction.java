@@ -3441,6 +3441,7 @@ public class AssignmentAction extends PagedResourceActionII {
         context.put("value_PeerAssessmentStudentViewReviews", state.getAttribute(NEW_ASSIGNMENT_PEER_ASSESSMENT_STUDENT_VIEW_REVIEWS));
         context.put("value_PeerAssessmentNumReviews", state.getAttribute(NEW_ASSIGNMENT_PEER_ASSESSMENT_NUM_REVIEWS));
         context.put("value_PeerAssessmentInstructions", state.getAttribute(NEW_ASSIGNMENT_PEER_ASSESSMENT_INSTRUCTIONS));
+        context.put("value_PeerAssessmentScoreRequired", state.getAttribute("peerAssessmentScoreRequired") != null ? state.getAttribute("peerAssessmentScoreRequired").toString() : "false");
         putTimePropertiesInContext(context, state, "PeerPeriod", NEW_ASSIGNMENT_PEERPERIOD_MONTH, NEW_ASSIGNMENT_PEERPERIOD_DAY, NEW_ASSIGNMENT_PEERPERIOD_YEAR, NEW_ASSIGNMENT_PEERPERIOD_HOUR, NEW_ASSIGNMENT_PEERPERIOD_MIN);
 
         // Keep the use review service setting
@@ -5686,6 +5687,8 @@ public class AssignmentAction extends PagedResourceActionII {
             dec = (int) Math.log10(factor);
             context.put("peerAssessmentInstructions", StringUtils.isEmpty(assignment.getPeerAssessmentInstructions()) ? "" : assignment.getPeerAssessmentInstructions());
 
+            String scoreReq = assignment.getProperties().get("peerAssessmentScoreRequired");
+            context.put("value_PeerAssessmentScoreRequired", scoreReq);
             Map<String, Reference> assignmentAttachmentReferences = new HashMap<>();
             assignment.getAttachments().forEach(r -> assignmentAttachmentReferences.put(r, entityManager.newReference(r)));
             context.put("assignmentAttachmentReferences", assignmentAttachmentReferences);
@@ -8294,6 +8297,7 @@ public class AssignmentAction extends PagedResourceActionII {
 
         state.setAttribute(NEW_ASSIGNMENT_PEER_ASSESSMENT_ANON_EVAL, params.getBoolean(NEW_ASSIGNMENT_PEER_ASSESSMENT_ANON_EVAL));
         state.setAttribute(NEW_ASSIGNMENT_PEER_ASSESSMENT_STUDENT_VIEW_REVIEWS, params.getBoolean(NEW_ASSIGNMENT_PEER_ASSESSMENT_STUDENT_VIEW_REVIEWS));
+        state.setAttribute("peerAssessmentScoreRequired", params.getBoolean("peerAssessmentScoreRequired"));
         if (peerAssessment) {
             if (params.get(NEW_ASSIGNMENT_PEER_ASSESSMENT_NUM_REVIEWS) != null && !"".equals(params.get(NEW_ASSIGNMENT_PEER_ASSESSMENT_NUM_REVIEWS))) {
                 try {
@@ -10474,6 +10478,12 @@ public class AssignmentAction extends PagedResourceActionII {
 
         Map<String, String> p = a.getProperties();
         p.put("s_view_report", Boolean.toString(allowStudentViewReport));
+        Boolean scoreReq = (Boolean) state.getAttribute("peerAssessmentScoreRequired");
+        if (scoreReq != null) {
+            p.put("peerAssessmentScoreRequired", scoreReq.toString());
+        } else {
+            p.remove("peerAssessmentScoreRequired");
+        }
         p.put(AssignmentConstants.NEW_ASSIGNMENT_REVIEW_SERVICE_SUBMIT_RADIO, submitReviewRepo);
         p.put(AssignmentConstants.NEW_ASSIGNMENT_REVIEW_SERVICE_REPORT_RADIO, generateOriginalityReport);
         p.put(AssignmentConstants.NEW_ASSIGNMENT_REVIEW_SERVICE_CHECK_INSTITUTION, Boolean.toString(checkInstitution));
@@ -11079,6 +11089,8 @@ public class AssignmentAction extends PagedResourceActionII {
                     state.setAttribute(NEW_ASSIGNMENT_PEER_ASSESSMENT_STUDENT_VIEW_REVIEWS, a.getPeerAssessmentStudentReview());
                     state.setAttribute(NEW_ASSIGNMENT_PEER_ASSESSMENT_NUM_REVIEWS, a.getPeerAssessmentNumberReviews());
                     state.setAttribute(NEW_ASSIGNMENT_PEER_ASSESSMENT_INSTRUCTIONS, a.getPeerAssessmentInstructions());
+                    String scoreReq = a.getProperties().get("peerAssessmentScoreRequired");
+                    state.setAttribute("peerAssessmentScoreRequired", Boolean.valueOf(scoreReq));
                 }
                 if (!serverConfigurationService.getBoolean("assignment.usePeerAssessment", true)) {
                     state.setAttribute(NEW_ASSIGNMENT_USE_PEER_ASSESSMENT, Boolean.FALSE.toString());
@@ -12516,6 +12528,13 @@ public class AssignmentAction extends PagedResourceActionII {
                     //Grade
                     String g = StringUtils.trimToNull(params.getCleanString(GRADE_SUBMISSION_GRADE));
                     Integer score = item.getScore();
+                    if ("submit".equals(gradeOption)) {
+                        String scoreReqProp = assignment.getProperties().get("peerAssessmentScoreRequired");
+                        if ("true".equalsIgnoreCase(scoreReqProp) && StringUtils.isEmpty(g)) {
+                            addAlert(state, rb.getString("peerassessment.error.scoreRequired"));
+                            return false;
+                        }
+                    }
                     if (StringUtils.isNotEmpty(g)) {
                         try {
                             String assignmentId = (String) state.getAttribute(VIEW_ASSIGNMENT_ID);
@@ -13424,6 +13443,7 @@ public class AssignmentAction extends PagedResourceActionII {
         state.setAttribute(ResourceProperties.NEW_ASSIGNMENT_CHECK_ADD_DUE_DATE, Boolean.toString(checkAddDueDate));
         state.setAttribute(ResourceProperties.NEW_ASSIGNMENT_CHECK_AUTO_ANNOUNCE, Boolean.FALSE.toString());
 
+        state.setAttribute("peerAssessmentScoreRequired", Boolean.FALSE);
         String defaultNotification = serverConfigurationService.getString("announcement.default.notification", "n");
         if (defaultNotification.equalsIgnoreCase("r")) {
             state.setAttribute(AssignmentConstants.ASSIGNMENT_OPENDATE_NOTIFICATION, AssignmentConstants.ASSIGNMENT_OPENDATE_NOTIFICATION_HIGH);

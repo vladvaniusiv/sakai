@@ -203,6 +203,13 @@ This section contains the options for grading this assignment, including rubrics
 							add-hidden-fields>
 						</sakai-date-picker>
 					</div>
+					##Score Required
+					<input id="peerAssessmentScoreRequired" name="peerAssessmentScoreRequired" type="checkbox" value="true"
+						#if($!value_PeerAssessmentScoreRequired == "true") checked="checked" #end />
+					<label for="peerAssessmentScoreRequired">
+						$tlang.getString("peerassessment.scoreRequired")
+					</label>
+					<br/>
 					##Anonymous Eval
 					#if ($!value_PeerAssessmentAnonEval)
 						<input id="$name_PeerAssessmentAnonEval" name="$name_PeerAssessmentAnonEval" type="checkbox" value="true" checked="checked"/>

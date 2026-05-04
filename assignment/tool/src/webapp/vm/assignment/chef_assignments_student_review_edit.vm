@@ -216,7 +216,10 @@
 							<div class="highlightPanel" style="width:80%">
 								#set ($gradeType = $assignment.TypeOfGrade.ordinal())
 								<p class="shorttext">
-									<label for="grade">$tlang.getString("gen.gra2")</label>
+									<label for="grade">$tlang.getString("gen.gra2")
+									#if($!value_PeerAssessmentScoreRequired == "true")
+										<span class="reqStar">*</span>
+									#end</label>
 									#if($view_only)
 										#if($!display_grade.length() > 0)
 											<span class="highlight">$!display_grade</span>
