@@ -2206,7 +2206,8 @@ public class LessonBuilderEntityProducer extends AbstractEntityProvider
 			})
 			.map(p -> {
 				String title = p.getTitle() != null ? p.getTitle() : "";
-				return Map.of("id", Long.toString(p.getPageId()), "title", title);
+				String parentId = (p.getParent() != null) ? Long.toString(p.getParent()) : "0";
+				return Map.of("id", Long.toString(p.getPageId()), "title", title, "parentId", parentId);
 			})
 			.collect(Collectors.toList());
 	}
