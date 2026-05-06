@@ -30,9 +30,9 @@ const sakaiCalendar = {
       allDaySlot: false,
       themeSystem: 'bootstrap5',
       headerToolbar: {
-        left: 'prev,next today',
-        center: 'title',
-        right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+        left: 'prev,title,next',
+        center: 'today,dayGridMonth,timeGridWeek,timeGridDay,listWeek',
+        right: ''
       },
       datesSet: (dateInfo) => {
         // This event fires when the calendar is fully rendered and ready
@@ -40,8 +40,8 @@ const sakaiCalendar = {
       },
       buttonIcons: {
         /*Use of bootstrap5 as themeSystem will expect bootstrap icons and prepend bi bi-*/
-        prev: 'caret-left',
-        next: 'caret-right',
+        prev: 'chevron-left',
+        next: 'chevron-right',
       },
       eventSources: [{
         events: function(event, successCallback, failureCallback) {

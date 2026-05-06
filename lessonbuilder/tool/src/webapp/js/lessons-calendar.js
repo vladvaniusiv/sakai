@@ -14,9 +14,9 @@ $(function(){
                 themeSystem: 'bootstrap5',
                 locale: userLanguage,
                 headerToolbar: {
-                    left: 'prev,next today',
-                    center: 'title',
-                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
+                    left: 'prev,title,next',
+                    center: 'today,timeGridDay,timeGridWeek,dayGridMonth',
+                    right: ''
                 },
                 buttonIcons: {
                     /*Use of bootstrap5 as themeSystem will expect bootstrap icons and prepend bi bi-*/

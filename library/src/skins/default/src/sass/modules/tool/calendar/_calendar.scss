@@ -641,6 +641,62 @@
 			}
 		}
 	}
+
+	.fc-header-toolbar {
+		flex-direction: column;
+	}
+
+	.fc-toolbar-chunk:nth-child(1) {
+		width: 100%;
+	}
+
+	.fc-toolbar-chunk:nth-child(1) > div {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+	}
+
+	.fc-toolbar-chunk:nth-child(2) {
+		width: 100%;
+	}
+
+	.fc-toolbar-chunk:nth-child(2) .btn-group {
+		width: 100%;
+		gap: 5px;
+	}
+
+	.fc-toolbar-chunk:nth-child(2) .btn-group .btn{
+		background: var(--sakai-background-color-1);
+		color: var(--sakai-text-color-1);
+		border: 1px solid var(--button-border-color);
+		border-radius: 4px;
+		font-size: 0.85rem;
+		padding: 6px 2px;
+		width: stretch;
+	}
+
+	.fc-toolbar-chunk:nth-child(2) .btn-group .btn.active{
+		opacity: var(--bs-btn-disabled-opacity);
+		box-shadow: var(--button-disabled-shadow);
+		cursor: not-allowed;
+	}
+
+	.fc-prev-button, .fc-next-button,
+	.fc-prev-button:hover, .fc-next-button:hover,
+	.fc-prev-button:focus, .fc-next-button:focus {
+		background: transparent;
+		border: none;
+		box-shadow: none;
+		color: var(--sakai-text-color-1);
+	}
+
+	.fc-toolbar-title {
+		font-size: 1.2rem !important;
+	}
+
+	.fc-toolbar-chunk:empty {
+		display: none;
+	}
 }
 
 // Icons used in more than one tool so not restricted by a specific namespace.
