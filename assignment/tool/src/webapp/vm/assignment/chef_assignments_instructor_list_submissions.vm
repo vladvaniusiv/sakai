@@ -213,6 +213,11 @@ function printView(url) {
 						#end
 					</a>
 				</p>
+				#if ($!savedResubmission)
+					<div class="sak-banner-success">
+						$tlang.getString("allowResubmission.saved")
+					</div>
+				#end
 				<div id="allowResubmissionPanelContent" style="display:none; overflow: hidden;">
 				<p>
 				#if ($assignment.IsGroup)

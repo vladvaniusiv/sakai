@@ -16132,6 +16132,7 @@ public class AssignmentAction extends PagedResourceActionII {
                     log.warn(this + ":doSave_resubmission_option error getting user with id " + userId + " " + userException.getMessage());
                 }
             }
+            state.setAttribute("savedResubmission", Boolean.TRUE);
         }
 
     }
