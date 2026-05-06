@@ -697,6 +697,14 @@
 	.fc-toolbar-chunk:empty {
 		display: none;
 	}
+
+	.fc-theme-bootstrap5-shaded {
+		background-color: var(--sakai-background-color-3);
+	}
+
+	.fc-list-event-dot{
+		border-color: --var(--bs-primary) !important;
+	}
 }
 
 // Icons used in more than one tool so not restricted by a specific namespace.
