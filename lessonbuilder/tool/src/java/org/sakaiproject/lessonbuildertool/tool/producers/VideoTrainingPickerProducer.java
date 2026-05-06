@@ -136,12 +136,37 @@ public class VideoTrainingPickerProducer implements ViewComponentProducer, Navig
 				return;
 			}
 
+			// If addVideoTraining set duplicatedSakaiId and return to the list,
+			// show a warning message in the picker page instead of an error.
+			if (simplePageBean.isSkipDuplicateCheck()) {
+				UIOutput.make(tofill, "warning-div");
+
+				String duplicatedId = simplePageBean.getDuplicatedSakaiId();
+				String duplicatedTitle = videos.stream()
+					.filter(v -> v.getReference().equals(duplicatedId))
+					.map(LessonEntity::getTitle)
+					.findFirst()
+					.orElse(duplicatedId);
+
+				String msg = messageLocator.getMessage("simplepage.duplicate.item",
+					new Object[] {duplicatedTitle});
+
+				UIOutput.make(tofill, "warning", msg);
+			}
+
 			ArrayList<String> values = new ArrayList<String>();
 			for (LessonEntity video : videos) {
 				values.add(video.getReference());
 			}
 
-			if (currentItem == null) {
+			if (simplePageBean != null && simplePageBean.isSkipDuplicateCheck() && simplePageBean.getDuplicatedSakaiId() != null) {
+				String dup = simplePageBean.getDuplicatedSakaiId();
+				if (values.contains(dup)) {
+					currentItem = dup;
+				}
+			}
+
+			if (currentItem == null && !values.isEmpty()) {
 				currentItem = values.get(0);
 			}
 
@@ -158,7 +183,7 @@ public class VideoTrainingPickerProducer implements ViewComponentProducer, Navig
 			UIInput.make(form, "add-before", "#{simplePageBean.addBefore}", ((GeneralViewParameters) viewparams).getAddBefore());
 
 			UICommand.make(form, "submit", messageLocator.getMessage("simplepage.chooser.select"), "#{simplePageBean.addVideoTraining}");
-			UICommand.make(form, "cancel", messageLocator.getMessage("simplepage.cancel"), "#{simplePageBean.cancel}");
+			UICommand.make(form, "cancel", messageLocator.getMessage("simplepage.cancel"), "#{simplePageBean.cancelVideoTraining}");
 		} else {
 			UIOutput.make(tofill, "error-div");
 			UIOutput.make(tofill, "error", messageLocator.getMessage("simplepage.permissions.general")).
