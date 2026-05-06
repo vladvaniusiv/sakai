@@ -259,6 +259,29 @@ public class SimplePageBean {
 	private String currentUserId = null;
 	private long previousPageId = -1;
 
+	public String getDuplicatedSakaiId() {
+		Object duplicatedSakaiId = sessionManager.getCurrentToolSession().getAttribute("lessonbuilder.duplicatedSakaiId");
+		return duplicatedSakaiId != null ? duplicatedSakaiId.toString() : null;
+	}
+
+	public boolean isSkipDuplicateCheck() {
+		Object skipDuplicateCheck = sessionManager.getCurrentToolSession().getAttribute("lessonbuilder.skipDuplicateCheck");
+		return BooleanUtils.toBoolean(skipDuplicateCheck != null ? skipDuplicateCheck.toString() : "false");
+	}
+
+	public void setDuplicatedSakaiId(String v) {
+		sessionManager.getCurrentToolSession().setAttribute("lessonbuilder.duplicatedSakaiId", v);
+	}
+
+	public void setSkipDuplicateCheck(boolean v) {
+		sessionManager.getCurrentToolSession().setAttribute("lessonbuilder.skipDuplicateCheck", Boolean.toString(v));
+	}
+
+	public void resetDuplicateCheck() {
+		setDuplicatedSakaiId(null);
+		setSkipDuplicateCheck(false);
+	}
+
     // Item-specific variables. These are set by setters which are called
     // by the various edit dialogs. So they're basically inputs to the
     // methods used to make changes to items. The way it works is that
@@ -1691,6 +1714,11 @@ public class SimplePageBean {
 	}
 
 	public String cancel() {
+		return "cancel";
+	}
+
+	public String cancelVideoTraining() {
+		resetDuplicateCheck();
 		return "cancel";
 	}
 
@@ -3789,6 +3817,22 @@ public class SimplePageBean {
 			if (selectedObject == null) {
 				return "failure";
 			}
+
+			if (!StringUtils.equals(selectedEntity, getDuplicatedSakaiId())) {
+				resetDuplicateCheck();
+			}
+
+			if (!isSkipDuplicateCheck()) {
+				List<SimplePageItem> existingItems = simplePageToolDao.findItemsBySakaiId(selectedEntity);
+
+				if (!existingItems.isEmpty()) {
+					setDuplicatedSakaiId(selectedEntity);
+					setSkipDuplicateCheck(true);
+					return "failure";
+				}
+			}
+
+			resetDuplicateCheck();
 
 			SimplePageItem i;
 			if (itemId != null && itemId != -1) {
