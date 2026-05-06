@@ -2075,8 +2075,8 @@ public class AssignmentAction extends PagedResourceActionII {
 
 
                 // There is no real place for due date in the variables most tools treat close date as due date
-                content_json.put(SakaiLTIUtil.SAKAI_LTI_SUBSTITUTION_DUE_DATE, assignmentDueDate);
-                content_json.put(SakaiLTIUtil.SAKAI_LTI_SUBSTITUTION_ACCEPT_UNTIL, assignmentResubmissionAcceptUntil);
+                //content_json.put(SakaiLTIUtil.SAKAI_LTI_SUBSTITUTION_DUE_DATE, assignmentDueDate);
+                //content_json.put(SakaiLTIUtil.SAKAI_LTI_SUBSTITUTION_ACCEPT_UNTIL, assignmentResubmissionAcceptUntil);
 
                 content_json.put(LTICustomVars.COURSEGROUP_ID, courseGroupId);
                 String content_settings = content_json.toString();
@@ -16122,6 +16122,9 @@ public class AssignmentAction extends PagedResourceActionII {
                             properties.remove(AssignmentConstants.ALLOW_RESUBMIT_CLOSETIME);
                         }
 
+                        submission.setReturned(true);
+                        submission.setDateReturned(Instant.now());
+                        submission.setGraded(true);
                         // save
                         assignmentService.updateSubmission(submission);
                     }
