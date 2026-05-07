@@ -76,7 +76,21 @@
 
 			showOverlay();
 
-			const popupWindow = window.open(window.location.href, "_blank");
+            let targetUrl = window.location.href;
+            if (videoElement.dataset.portalUrl) {
+                targetUrl = videoElement.dataset.portalUrl;
+            } else if (window.self !== window.top) {
+                try {
+                    const parentUrl = window.parent.location.href;
+                    if (parentUrl.includes('/portal/site/')) {
+                        targetUrl = parentUrl;
+                    }
+                } catch (e) {
+                    console.warn("VTM: The parent portal URL could not be accessed.");
+                }
+            }
+
+            const popupWindow = window.open(targetUrl, "_blank");
 			const popupBlocked =
 				!popupWindow || popupWindow.closed || typeof popupWindow.closed === "undefined";
 

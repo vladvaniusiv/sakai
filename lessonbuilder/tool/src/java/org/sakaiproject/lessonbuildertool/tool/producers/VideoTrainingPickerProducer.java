@@ -177,8 +177,11 @@ public class VideoTrainingPickerProducer implements ViewComponentProducer, Navig
 				UIBranchContainer row = UIBranchContainer.make(form, "video:", String.valueOf(index));
 				UISelectChoice.make(row, "select", select.getFullID(), index);
 
+				String finalUrl = video.getUrl();
+
 				if (video instanceof VideoTrainingEntity) {
 					VideoTrainingEntity videoTraining = (VideoTrainingEntity) video;
+					finalUrl = videoTraining.getPortalUrl();
 					String thumbnailUrl = videoTraining.getThumbnailUrl();
 					if (thumbnailUrl != null && !thumbnailUrl.isEmpty()) {
 						if (videoTraining.isThumbnailVideo()) {
@@ -193,7 +196,7 @@ public class VideoTrainingPickerProducer implements ViewComponentProducer, Navig
 					}
 				}
 
-				UILink.make(row, "link", video.getTitle(), video.getUrl());
+				UILink.make(row, "link", video.getTitle(), finalUrl);
 			}
 
 			UIInput.make(form, "item-id", "#{simplePageBean.itemId}");

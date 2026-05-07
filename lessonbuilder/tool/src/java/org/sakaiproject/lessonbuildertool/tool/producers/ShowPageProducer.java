@@ -70,6 +70,7 @@ import org.sakaiproject.lessonbuildertool.service.BltiInterface;
 import org.sakaiproject.lessonbuildertool.service.GradebookIfc;
 import org.sakaiproject.lessonbuildertool.service.LessonBuilderAccessService;
 import org.sakaiproject.lessonbuildertool.service.LessonEntity;
+import org.sakaiproject.lessonbuildertool.service.VideoTrainingEntity;
 import org.sakaiproject.lessonbuildertool.tool.beans.SimplePageBean;
 import org.sakaiproject.lessonbuildertool.tool.beans.SimplePageBean.BltiTool;
 import org.sakaiproject.lessonbuildertool.tool.beans.SimplePageBean.GroupEntry;
@@ -4001,8 +4002,12 @@ public class ShowPageProducer implements ViewComponentProducer, DefaultView, Nav
 		    if (usable && i.isPrerequisite()) {
 		        simplePageBean.checkItemPermissions(i, true);
 		    }
+			VideoTrainingEntity vtEntity = null;
 		    LessonEntity lessonEntity = videoTrainingEntity.getEntity(i.getSakaiId(), simplePageBean);
-		    if (usable && lessonEntity != null && (canEditPage || !lessonEntity.notPublished())) {
+			if (lessonEntity instanceof VideoTrainingEntity) {
+                vtEntity = (VideoTrainingEntity) lessonEntity;
+            }
+		    if (usable && vtEntity != null && (canEditPage || !vtEntity.notPublished())) {
 		        if (i.isPrerequisite()) {
 		            simplePageBean.checkItemPermissions(i, true);
 		        }
@@ -4011,6 +4016,7 @@ public class ShowPageProducer implements ViewComponentProducer, DefaultView, Nav
 		        view.setItemId(i.getId());
 		        UILink link = UIInternalLink.make(container, "link", view);
 		        link.decorate(new UIFreeAttributeDecorator("lessonbuilderitem", itemString));
+				link.decorate(new UIFreeAttributeDecorator("data-full-url", vtEntity.getPortalUrl()));
 		        if (! available)
 		            fakeDisableLink(link, messageLocator);
 		    } else {
