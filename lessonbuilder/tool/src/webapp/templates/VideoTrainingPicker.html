@@ -31,10 +31,16 @@
 
 			<span rsf:id="video-span"/>
 			<div role="list" class="listHier" style="width:auto">
-				<div rsf:id="video:" role="listitem">
-					<div>
-						<input type="radio" rsf:id="select" /> <a href="#" rsf:id="link" target="_blank"></a>
+				<div rsf:id="video:" role="listitem" class="d-flex align-items-center gap-3 py-2 border-bottom">
+					<input type="radio" rsf:id="select" class="form-check-input mt-0" />
+					<div class="flex-shrink-0 rounded border bg-light overflow-hidden" style="width:80px;height:45px;">
+						<video rsf:id="thumbnail-video" class="w-100 h-auto object-fit-cover" muted="muted" preload="metadata" playsinline="playsinline" aria-hidden="true" style="display:none"></video>
+						<img rsf:id="thumbnail-image" class="w-100 h-auto object-fit-cover" alt="" style="display:none" />
+						<div rsf:id="thumbnail-placeholder" class="w-100 h-auto d-flex align-items-center justify-content-center text-secondary" aria-hidden="true">
+							<span class="bi bi-play-btn-fill" style="font-size:1.5rem;"></span>
+						</div>
 					</div>
+					<span href="#" rsf:id="link" target="_blank" class="fw-semibold text-decoration-none"></span>
 				</div>
 			</div>
 
