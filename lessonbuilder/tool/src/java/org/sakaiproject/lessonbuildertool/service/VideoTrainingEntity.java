@@ -306,6 +306,16 @@ public class VideoTrainingEntity implements LessonEntity {
         return baseUrl + "/direct/video-training/" + id + "/view";
     }
 
+    public String getPortalUrl() {
+        if (simplePageBean != null) {
+            String siteId = simplePageBean.getCurrentSiteId();
+            if (siteId != null) {
+                return ServerConfigurationService.getServerUrl() + "/portal/site/" + siteId;
+            }
+        }
+        return getUrl();
+    }
+
     public String getThumbnailUrl() {
         loadVideo();
         if (video == null) {
