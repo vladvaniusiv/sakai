@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/common :: head(${isEdit} ? #{video.training.edit} : #{video.training.add})}"></head>
-<body>
-<div class="portletBody container-fluid sakai-video-training">
+<body class="Mrphs-toolBody sakai-video-training">
+<div class="Mrphs-sakai-video-training portletBody container-fluid sakai-video-training">
     <div th:replace="~{fragments/common :: menu('add', ${canManage}, ${canAnalytics}, ${canView})}"></div>
     <div th:replace="~{fragments/common :: messages(${success}, ${error})}"></div>
 
