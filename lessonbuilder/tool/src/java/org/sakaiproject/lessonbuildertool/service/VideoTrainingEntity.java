@@ -26,6 +26,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -40,7 +42,9 @@ import org.sakaiproject.site.api.SiteService;
 import org.sakaiproject.tool.api.ToolManager;
 import org.sakaiproject.util.ResourceLoader;
 import org.sakaiproject.util.api.FormattedText;
+import org.sakaiproject.videotraining.api.model.VideoProviderType;
 import org.sakaiproject.videotraining.api.model.VideoTrainingVideo;
+import org.sakaiproject.videotraining.api.util.ContentResourceHelper;
 import org.sakaiproject.videotraining.api.service.VideoTrainingService;
 
 /**
@@ -302,6 +306,30 @@ public class VideoTrainingEntity implements LessonEntity {
         return baseUrl + "/direct/video-training/" + id + "/view";
     }
 
+    public String getThumbnailUrl() {
+        loadVideo();
+        if (video == null) {
+            return "";
+        }
+
+        if (video.getProviderType() == VideoProviderType.NATIVE) {
+            return resolveContentReferenceFromSourceId(video.getSourceReference());
+        }
+
+        if (video.getProviderType() != VideoProviderType.EXTERNAL) {
+            return "";
+        }
+
+        return resolveExternalThumbnailUrl(video.getSourceReference());
+    }
+
+    public boolean isThumbnailVideo() {
+        loadVideo();
+        return video != null
+                && video.getProviderType() == VideoProviderType.NATIVE
+                && StringUtils.isNotBlank(video.getSourceReference());
+    }
+
     public String getEditNote() {
         loadVideo();
         if (video == null) {
@@ -435,5 +463,68 @@ public class VideoTrainingEntity implements LessonEntity {
     private String invokeString(Object target, String methodName) {
         Object value = invoke(target, methodName, new Class[] {}, new Object[] {});
         return value == null ? null : String.valueOf(value);
+    }
+
+    private String resolveContentReferenceFromSourceId(String sourceId) {
+        String normalizedSourceId = StringUtils.trimToEmpty(ContentResourceHelper.toContentResourceId(sourceId));
+        if (StringUtils.isBlank(normalizedSourceId)) {
+            return "";
+        }
+
+        return ServerConfigurationService.getServerUrl() + "/access/content" + normalizedSourceId;
+    }
+
+    private String resolveExternalThumbnailUrl(String sourceReference) {
+        String normalizedSource = normalizeExternalSourceReference(sourceReference);
+        if (StringUtils.isBlank(normalizedSource)) {
+            return "";
+        }
+
+        String youtubeVideoId = extractYouTubeVideoId(normalizedSource);
+        if (StringUtils.isNotBlank(youtubeVideoId)) {
+            return "https://img.youtube.com/vi/" + youtubeVideoId + "/hqdefault.jpg";
+        }
+
+        String vimeoVideoId = extractVimeoVideoId(normalizedSource);
+        if (StringUtils.isNotBlank(vimeoVideoId)) {
+            return "https://vumbnail.com/" + vimeoVideoId + ".jpg";
+        }
+
+        return "";
+    }
+
+    private String normalizeExternalSourceReference(String sourceReference) {
+        String normalized = StringUtils.trimToEmpty(sourceReference).replace("&amp;", "&");
+        if (StringUtils.isBlank(normalized)) {
+            return "";
+        }
+
+        return normalized;
+    }
+
+    private String extractYouTubeVideoId(String sourceReference) {
+        Pattern[] patterns = new Pattern[] {
+                Pattern.compile("(?:youtube\\.com/(?:watch\\?v=|embed/|shorts/)|youtu\\.be/)([A-Za-z0-9_-]{6,})", Pattern.CASE_INSENSITIVE),
+                Pattern.compile("[?&]v=([A-Za-z0-9_-]{6,})", Pattern.CASE_INSENSITIVE)
+        };
+
+        for (Pattern pattern : patterns) {
+            Matcher matcher = pattern.matcher(sourceReference);
+            if (matcher.find()) {
+                return matcher.group(1);
+            }
+        }
+
+        return "";
+    }
+
+    private String extractVimeoVideoId(String sourceReference) {
+        Pattern pattern = Pattern.compile("vimeo\\.com/(?:video/)?(\\d+)", Pattern.CASE_INSENSITIVE);
+        Matcher matcher = pattern.matcher(sourceReference);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+
+        return "";
     }
 }

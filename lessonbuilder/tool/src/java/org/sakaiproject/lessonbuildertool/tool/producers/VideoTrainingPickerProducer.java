@@ -176,6 +176,23 @@ public class VideoTrainingPickerProducer implements ViewComponentProducer, Navig
 				int index = videos.indexOf(video);
 				UIBranchContainer row = UIBranchContainer.make(form, "video:", String.valueOf(index));
 				UISelectChoice.make(row, "select", select.getFullID(), index);
+
+				if (video instanceof VideoTrainingEntity) {
+					VideoTrainingEntity videoTraining = (VideoTrainingEntity) video;
+					String thumbnailUrl = videoTraining.getThumbnailUrl();
+					if (thumbnailUrl != null && !thumbnailUrl.isEmpty()) {
+						if (videoTraining.isThumbnailVideo()) {
+							UIOutput.make(row, "thumbnail-video", "").decorate(new UIFreeAttributeDecorator("src", thumbnailUrl))
+								.decorate(new UIFreeAttributeDecorator("style", "display:block;"));
+						} else {
+							UIOutput.make(row, "thumbnail-image", "").decorate(new UIFreeAttributeDecorator("src", thumbnailUrl))
+								.decorate(new UIFreeAttributeDecorator("alt", video.getTitle()))
+								.decorate(new UIFreeAttributeDecorator("style", "display:block;"));
+						}
+						UIOutput.make(row, "thumbnail-placeholder", "").decorate(new UIFreeAttributeDecorator("style", "display:none;"));
+					}
+				}
+
 				UILink.make(row, "link", video.getTitle(), video.getUrl());
 			}
 
