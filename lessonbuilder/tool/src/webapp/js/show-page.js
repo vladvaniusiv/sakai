@@ -3464,10 +3464,10 @@ function addMultipleChoiceAnswer() {
 function reassignAnswerOptions() {
   const capitalLettersIndex = 65; // 65 corresponds to A.
   document.querySelectorAll('.question-multiplechoice-answer-option').forEach( (item, index) => {
-    item.innerHTML = String.fromCharCode(capitalLettersIndex + index);
+    item.lastChild.textContent = " " + String.fromCharCode(capitalLettersIndex + index);
   });
   document.querySelectorAll('.question-showans-answer-option').forEach( (item, index) => {
-    item.innerHTML = String.fromCharCode(capitalLettersIndex + index);
+    item.lastChild.textContent = " " + String.fromCharCode(capitalLettersIndex + index);
   });
 }
 // Clones one of the shortanswers in the Question dialog and appends it to the end of the list

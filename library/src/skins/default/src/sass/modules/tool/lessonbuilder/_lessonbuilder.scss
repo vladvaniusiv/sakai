@@ -1685,6 +1685,70 @@
     line-height:30px;
   }
 
+  .mobile-label {
+      display: none;
+  }
+  @media only screen and (max-width: 991px) {
+    #multipleChoiceAnswers, #copyableShortanswerDiv {
+      line-height:15px;
+    }
+    .question-multiplechoice-answer, .question-shortanswer-answer {
+      width: 120px;
+    }
+    #shortAnswersTable thead, #multipleChoiceAnswers thead {
+        display: none;
+    }
+
+    #shortAnswersTable tr, #multipleChoiceAnswers tr {
+        display: block;
+        border: 1px solid var(--sakai-border-color);
+        margin-bottom: 10px;
+        padding: 5px;
+    }
+
+    #shortAnswersTable td, #multipleChoiceAnswers td {
+        display: flex;
+        align-items: center;
+        border: none;
+        border-bottom: 1px solid var(--sakai-border-color);
+        padding: 8px 5px;
+        min-height: 40px;
+    }
+
+    .mobile-label {
+        display: inline-block;
+        font-weight: bold;
+        color: var(--sakai-text-color-1);
+        margin-right: 10px;
+        flex-basis: 40%;
+        text-align: left;
+    }
+
+    #shortAnswersTable td:before, #multipleChoiceAnswers td:before {
+        content: attr(data-label);
+        position: absolute;
+        left: 10px;
+        width: 45%;
+    }
+
+    #multipleChoiceAnswers td:has(a.deleteAnswerLink[style*="display:none"]),
+    #shortAnswersTable td:has(a.deleteAnswerLink[style*="display:none"]) {
+        display: none;
+    }
+
+    #shortAnswersTable td:last-child, #multipleChoiceAnswers td:last-child {
+        border-bottom: none;
+    }
+
+    #multipleChoiceAnswers tr#copyableMultipleChoiceAnswer td:nth-of-type(3) {
+        border-bottom: none;
+    }
+
+    #shortAnswersTable tr#copyableShortanswer td:nth-of-type(2) {
+        border-bottom: none;
+    }
+  }
+
   .controlsPanel fieldset {
     margin: 10px 0;
   }
@@ -2912,6 +2976,9 @@
     @media #{$desktop} {
       min-width: 900px;
     }	
+  }
+  .modal.fade label, .portletBody label{
+    display: inline;
   }
 }
 
