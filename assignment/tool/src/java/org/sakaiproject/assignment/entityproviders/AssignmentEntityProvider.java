@@ -1252,6 +1252,7 @@ public class AssignmentEntityProvider extends AbstractEntityProvider implements 
             throw new EntityException("You don't have permissions read submission " + submissionId, "", HttpServletResponse.SC_FORBIDDEN);
         }
 
+        List<AssignmentSubmissionSubmitter> allSubmitters = new ArrayList<>(submission.getSubmitters());
         Site site = null;
         try {
             site = siteService.getSite(courseId);
@@ -1346,7 +1347,7 @@ public class AssignmentEntityProvider extends AbstractEntityProvider implements 
 
         assignmentToolUtils.gradeSubmission(submission, gradeOption, options, alerts);
 
-        Set<String> activeSubmitters = site.getUsersIsAllowed(SECURE_ADD_ASSIGNMENT_SUBMISSION);
+        Set<String> activeSubmitters = submission.getSubmitters().stream().map(AssignmentSubmissionSubmitter::getSubmitter).collect(Collectors.toSet());
 
         if (submission != null) {
             boolean anonymousGrading = assignmentService.assignmentUsesAnonymousGrading(assignment);
@@ -2215,10 +2216,14 @@ public class AssignmentEntityProvider extends AbstractEntityProvider implements 
                 }).filter(Objects::nonNull).collect(Collectors.toList());
 
             if (this.submitters.isEmpty()) {
-                throw new Exception("No submitters for this submission: " + as.getId());
+                this.submitters = as.getSubmitters().stream()
+                    .map(ass -> { try { return new SimpleSubmitter(ass, sa.isAnonymousGrading()); } catch (Exception e) { return null; } })
+                    .filter(Objects::nonNull).collect(Collectors.toList());
             }
 
-            this.canSubmit = assignmentService.canSubmit(as.getAssignment(), this.submitters.stream().findAny().get().getId());
+            if (this.submitters.isEmpty()) throw new Exception("No submitters");
+
+            this.canSubmit = assignmentService.canSubmit(as.getAssignment(), this.submitters.get(0).getId());
 
             this.groupId = as.getGroupId();
             this.userSubmission = as.getUserSubmission();
