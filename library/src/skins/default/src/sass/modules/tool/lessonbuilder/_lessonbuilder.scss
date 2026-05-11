@@ -1161,7 +1161,6 @@
   .reordItemContainerDesc {
     margin-top:5px;
     text-overflow: ellipsis;
-    white-space: nowrap;
     overflow: hidden;
   }
   .highlightEl {
@@ -2979,6 +2978,31 @@
   }
   .modal.fade label, .portletBody label{
     display: inline;
+  }
+  .fs-5 a {
+    font-size: 1.1rem;
+    align-content: center;
+  }
+  .columnSetup2 {
+    container-type: inline-size;
+    container-name: layout-principal;
+  }
+  @container layout-principal (min-width: 700px) {
+      .columnSetup2 .col-md-7 {
+          width: 66.66666667%;
+      }
+
+      .columnSetup2 .col-md-4 {
+          width: 33.33333333%;
+      }
+  }
+
+  @container layout-principal (max-width: 700px) {
+      .columnSetup2 .col-md-7,
+      .columnSetup2 .col-md-4 {
+          width: 100%;
+          flex: 0 0 100%;
+      }
   }
 }
 
