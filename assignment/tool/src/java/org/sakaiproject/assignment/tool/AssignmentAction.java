@@ -10887,6 +10887,11 @@ public class AssignmentAction extends PagedResourceActionII {
                 submissionId = submissionIds.get(0);
             }
             if (submissionId != null) {
+                PeerAssessmentItem peerAssessmentItem = assignmentPeerAssessmentService.getPeerAssessmentItem(submissionId, peerId);
+                if (peerAssessmentItem != null && peerAssessmentItem.getOpenedAt() == null) {
+                    peerAssessmentItem.setOpenedAt(Instant.now());
+                    assignmentPeerAssessmentService.savePeerAssessmentItem(peerAssessmentItem, a.getContext(), null);
+                }
                 state.setAttribute(USER_SUBMISSIONS, submissionIds);
                 state.setAttribute(GRADE_SUBMISSION_SUBMISSION_ID, submissionId);
                 state.setAttribute(STATE_MODE, MODE_STUDENT_REVIEW_EDIT);

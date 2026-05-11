@@ -183,10 +183,12 @@ public class AssignmentPeerAssessmentServiceImpl extends HibernateDaoSupport imp
                 // this could be an update to an existing assessment... just make sure to grab any existing review items first
                 List<PeerAssessmentItem> existingItems = getPeerAssessmentItems(submissionIdMap.keySet(), assignment.getScaleFactor());
                 List<PeerAssessmentItem> removeItems = new ArrayList<>();
-                // screen existing items which have no score or comments
-                existingItems.stream()
-                        .filter(item -> item.getScore() == null && (StringUtils.isBlank(item.getComment())))
-                        .forEach(removeItems::add);
+                // screen existing items which have not been opened and still have no score, comments, or attachments
+                for (PeerAssessmentItem item : existingItems) {
+                    if (!isPeerAssessmentInProgress(item)) {
+                        removeItems.add(item);
+                    }
+                }
                 existingItems.removeAll(removeItems);
 
                 // loop through the items and update the map values
@@ -214,7 +216,7 @@ public class AssignmentPeerAssessmentServiceImpl extends HibernateDaoSupport imp
 
                         //check if the count is less than num of reviews before added another one,
                         //otherwise, we need to delete this one (if it's empty)
-                        if (count < numOfReviews || p.getScore() != null || StringUtils.isNotBlank(p.getComment())) {
+                        if (count < numOfReviews || isPeerAssessmentInProgress(p)) {
                             count++;
                             studentAssessorsMap.put(submitterId, count);
                             Map<String, PeerAssessmentItem> peerAssessments = assignedAssessmentsMap.computeIfAbsent(p.getId().getAssessorUserId(), k -> new HashMap<>());
@@ -367,6 +369,22 @@ public class AssignmentPeerAssessmentServiceImpl extends HibernateDaoSupport imp
         return lowestAssignedAssessor;
     }
 
+    private boolean isPeerAssessmentInProgress(PeerAssessmentItem item) {
+        if (item == null || item.getId() == null || Boolean.TRUE.equals(item.getRemoved())) {
+            return false;
+        }
+
+        if (Boolean.TRUE.equals(item.getSubmitted()) || item.getOpenedAt() != null) {
+            return true;
+        }
+
+        if (item.getScore() != null || StringUtils.isNotBlank(item.getComment())) {
+            return true;
+        }
+
+        return CollectionUtils.isNotEmpty(getPeerAssessmentAttachments(item.getId().getSubmissionId(), item.getId().getAssessorUserId()));
+    }
+
     public List<PeerAssessmentItem> getPeerAssessmentItems(final Collection<String> submissionsIds, Integer scaledFactor) {
         List<PeerAssessmentItem> listPeerAssessmentItem = new ArrayList<>();
         if (submissionsIds == null || submissionsIds.size() == 0) {
@@ -501,11 +519,13 @@ public class AssignmentPeerAssessmentServiceImpl extends HibernateDaoSupport imp
     }
 
     public void savePeerAssessmentItem(PeerAssessmentItem item, String siteId, String event) {
-        if (item != null && item.getId().getAssessorUserId() != null && item.getId().getSubmissionId() != null) {
+        if (item != null && item.getId() != null && item.getId().getAssessorUserId() != null && item.getId().getSubmissionId() != null) {
             getHibernateTemplate().saveOrUpdate(item);
             getHibernateTemplate().flush();
-            String reference = AssignmentReferenceReckoner.reckoner().peerAssessmentItem(item).context(siteId).reckon().getReference();
-            eventTrackingService.post(eventTrackingService.newEvent(event, reference, true));
+            if (StringUtils.isNotBlank(event)) {
+                String reference = AssignmentReferenceReckoner.reckoner().peerAssessmentItem(item).context(siteId).reckon().getReference();
+                eventTrackingService.post(eventTrackingService.newEvent(event, reference, true));
+            }
         }
     }
 

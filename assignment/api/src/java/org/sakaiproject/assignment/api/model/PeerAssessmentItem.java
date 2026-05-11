@@ -16,14 +16,26 @@
 package org.sakaiproject.assignment.api.model;
 
 import java.io.Serializable;
+import java.time.Instant;
 import java.util.List;
-import javax.persistence.*;
+
+import javax.persistence.Column;
+import javax.persistence.EmbeddedId;
+import javax.persistence.Entity;
+import javax.persistence.Index;
+import javax.persistence.Lob;
+import javax.persistence.NamedQueries;
+import javax.persistence.NamedQuery;
+import javax.persistence.Table;
+import javax.persistence.Transient;
+
+import org.hibernate.annotations.Type;
+import org.sakaiproject.assignment.api.AssignmentConstants;
+import org.sakaiproject.entity.api.Reference;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
-import org.sakaiproject.assignment.api.AssignmentConstants;
-import org.sakaiproject.entity.api.Reference;
 
 @Entity
 @Table(name = "ASN_PEER_ASSESSMENT_ITEM_T",
@@ -67,6 +79,10 @@ public class PeerAssessmentItem implements Serializable {
     //that the user still needs to complete (more of a hide flag than a submit)
     @Column(name = "SUBMITTED", nullable = false)
     private Boolean submitted = Boolean.FALSE;
+
+    @Type(type = "org.hibernate.type.InstantType")
+    @Column(name = "OPENED_DATE")
+    private Instant openedAt;
 
     //resource ids for attachments associated with this item stored in separate table
     @Transient
