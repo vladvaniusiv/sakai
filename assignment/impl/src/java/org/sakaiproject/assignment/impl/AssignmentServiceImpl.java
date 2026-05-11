@@ -294,6 +294,7 @@ public class AssignmentServiceImpl implements AssignmentService, EntityTransferr
 
         userMessagingService.importTemplateFromResourceXmlFile("templates/releaseGrade.xml", AssignmentConstants.TOOL_ID + ".releasegrade");
         userMessagingService.importTemplateFromResourceXmlFile("templates/releaseResubmission.xml", AssignmentConstants.TOOL_ID + ".releaseresubmission");
+        userMessagingService.importTemplateFromResourceXmlFile("templates/returnPeerReview.xml", AssignmentConstants.TOOL_ID + ".returnpeerreview");
         userMessagingService.importTemplateFromResourceXmlFile("templates/submission.xml", AssignmentConstants.TOOL_ID + ".submission");
         userMessagingService.importTemplateFromResourceXmlFile("templates/dueReminder.xml", AssignmentConstants.TOOL_ID + ".duereminder");
     }

@@ -33,10 +33,12 @@ import org.hibernate.criterion.DetachedCriteria;
 import org.hibernate.criterion.Restrictions;
 import org.hibernate.query.Query;
 import org.sakaiproject.api.app.scheduler.ScheduledInvocationManager;
+import org.sakaiproject.assignment.api.AssignmentConstants;
 import org.sakaiproject.assignment.api.AssignmentPeerAssessmentService;
 import org.sakaiproject.assignment.api.AssignmentReferenceReckoner;
 import org.sakaiproject.assignment.api.AssignmentService;
 import org.sakaiproject.assignment.api.AssignmentServiceConstants;
+import org.sakaiproject.assignment.impl.EmailUtil;
 import org.sakaiproject.assignment.api.model.AssessorSubmissionId;
 import org.sakaiproject.assignment.api.model.Assignment;
 import org.sakaiproject.assignment.api.model.AssignmentSubmission;
@@ -48,10 +50,17 @@ import org.sakaiproject.authz.api.SecurityService;
 import org.sakaiproject.event.api.EventTrackingService;
 import org.sakaiproject.exception.IdUnusedException;
 import org.sakaiproject.exception.PermissionException;
+import org.sakaiproject.event.api.NotificationService;
 import org.sakaiproject.grading.api.GradingAuthz;
+import org.sakaiproject.messaging.api.Message;
+import org.sakaiproject.messaging.api.MessageMedium;
+import org.sakaiproject.messaging.api.UserMessagingService;
 import org.sakaiproject.site.api.SiteService;
 import org.sakaiproject.tool.api.Session;
 import org.sakaiproject.tool.api.SessionManager;
+import org.sakaiproject.user.api.User;
+import org.sakaiproject.user.api.UserDirectoryService;
+import org.sakaiproject.user.api.UserNotDefinedException;
 import org.springframework.orm.hibernate5.HibernateCallback;
 import org.springframework.orm.hibernate5.support.HibernateDaoSupport;
 import org.springframework.transaction.annotation.Transactional;
@@ -75,6 +84,9 @@ public class AssignmentPeerAssessmentServiceImpl extends HibernateDaoSupport imp
     private SessionManager sessionManager;
     private SiteService siteService;
     private EventTrackingService eventTrackingService;
+    private UserMessagingService userMessagingService;
+    private UserDirectoryService userDirectoryService;
+    private EmailUtil emailUtil;
 
     @Override
     public void schedulePeerReview(String assignmentId) {
@@ -525,7 +537,29 @@ public class AssignmentPeerAssessmentServiceImpl extends HibernateDaoSupport imp
             if (StringUtils.isNotBlank(event)) {
                 String reference = AssignmentReferenceReckoner.reckoner().peerAssessmentItem(item).context(siteId).reckon().getReference();
                 eventTrackingService.post(eventTrackingService.newEvent(event, reference, true));
+                if (AssignmentConstants.EVENT_RETURN_PEER_REVIEW.equals(event)) {
+                    notifyPeerReviewReturned(item);
+                }
             }
+        }
+    }
+
+    private void notifyPeerReviewReturned(PeerAssessmentItem item) {
+        if (userMessagingService == null || userDirectoryService == null || emailUtil == null) {
+            return;
+        }
+
+        try {
+            AssignmentSubmission submission = assignmentService.getSubmission(item.getId().getSubmissionId());
+            User user = userDirectoryService.getUser(item.getId().getAssessorUserId());
+            userMessagingService.message(Collections.singleton(user),
+                    Message.builder().tool(AssignmentConstants.TOOL_ID).type("returnpeerreview").build(),
+                    Collections.singletonList(MessageMedium.EMAIL), emailUtil.getReturnPeerReviewReplacements(item), NotificationService.NOTI_REQUIRED);
+            log.debug("Sent peer review return notification for submission {} to {}", submission.getId(), user.getId());
+        } catch (IdUnusedException | UserNotDefinedException e) {
+            log.warn("Could not notify peer reviewer about returned draft: {}", e.getMessage());
+        } catch (Exception e) {
+            log.warn("Failed sending peer review return notification", e);
         }
     }
 
@@ -573,7 +607,7 @@ public class AssignmentPeerAssessmentServiceImpl extends HibernateDaoSupport imp
                     Integer totalScore = 0;
                     int denominator = 0;
                     for (PeerAssessmentItem item : items) {
-                        if (!item.getRemoved() && item.getScore() != null) {
+                        if (!item.getRemoved() && Boolean.TRUE.equals(item.getSubmitted()) && item.getScore() != null) {
                             totalScore += item.getScore();
                             denominator++;
                         }

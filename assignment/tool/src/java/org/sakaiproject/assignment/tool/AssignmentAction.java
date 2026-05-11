@@ -4828,7 +4828,7 @@ public class AssignmentAction extends PagedResourceActionII {
 
         SessionState state = ((JetspeedRunData) rundata).getPortletSessionState(((JetspeedRunData) rundata).getJs_peid());
         // save the instructor input
-        boolean hasChange = saveReviewGradeForm(rundata, state, submit ? "submit" : "save");
+        boolean hasChange = submit ? saveReviewGradeForm(rundata, state, "submit") : false;
         switch (option) {
             case "back":
             case "backListStudent":
@@ -7059,6 +7059,16 @@ public class AssignmentAction extends PagedResourceActionII {
 
         SessionState state = ((JetspeedRunData) data).getPortletSessionState(((JetspeedRunData) data).getJs_peid());
         saveReviewGradeForm(data, state, "save");
+    }
+
+    public void doReturn_grade_submission_review(RunData data) {
+        if (!"POST".equals(data.getRequest().getMethod())) {
+            return;
+        }
+
+        SessionState state = ((JetspeedRunData) data).getPortletSessionState(((JetspeedRunData) data).getJs_peid());
+        log.debug("doReturn_grade_submission_review invoked for user {}", sessionManager.getCurrentSessionUserId());
+        saveReviewGradeForm(data, state, "return");
     }
 
     public void doSave_toggle_remove_review(RunData data) {
@@ -12141,6 +12151,9 @@ public class AssignmentAction extends PagedResourceActionII {
             } else if ("savegrade_review".equals(option)) {
                 // save review grading
                 doSave_grade_submission_review(data);
+            } else if ("returngrade_review".equals(option)) {
+                // return review grading to draft
+                doReturn_grade_submission_review(data);
             } else if ("submitgrade_review".equals(option)) {
                 //we basically need to submit, save, and move the user to the next review (if available)
                 if (data.getParameters().get("nextSubmissionId") != null) {
@@ -12524,7 +12537,13 @@ public class AssignmentAction extends PagedResourceActionII {
             }
 
             Assignment assignment = s.getAssignment();
-            String assessorUserId = assignmentService.getSubmitterIdForAssignment(assignment, userDirectoryService.getCurrentUser().getId());
+            String assessorUserId = (String) state.getAttribute(PEER_ASSESSMENT_ASSESSOR_ID);
+            if (StringUtils.isBlank(assessorUserId)) {
+                assessorUserId = userDirectoryService.getCurrentUser().getId();
+            }
+            if (assignment.getIsGroup()) {
+                assessorUserId = assignmentService.getSubmitterIdForAssignment(assignment, assessorUserId);
+            }
 
             if (state.getAttribute(PEER_ASSESSMENT_ASSESSOR_ID) != null && !state.getAttribute(PEER_ASSESSMENT_ASSESSOR_ID).equals(assessorUserId)) {
                 //this is only set during the read only view, so just return
@@ -12537,66 +12556,78 @@ public class AssignmentAction extends PagedResourceActionII {
                 //find the original assessment item and compare to see if it has changed
                 //if so, save it
                 boolean changed = false;
+                boolean returnToDraft = "return".equals(gradeOption);
 
-                if (submissionId.equals(item.getId().getSubmissionId())
-                        && assessorUserId.equals(item.getId().getAssessorUserId())) {
-                    //Grade
-                    String g = StringUtils.trimToNull(params.getCleanString(GRADE_SUBMISSION_GRADE));
-                    Integer score = item.getScore();
-                    if (StringUtils.isNotEmpty(g)) {
-                        try {
-                            String assignmentId = (String) state.getAttribute(VIEW_ASSIGNMENT_ID);
-                            if (assignmentId == null) {
-                                addAlert(state, rb.getString("peerassessment.alert.saveerrorunkown"));
-                            } else {
-                                Assignment a = getAssignment(assignmentId, "saveReviewGradeForm", state);
-                                if (a == null) {
-                                    addAlert(state, rb.getString("peerassessment.alert.saveerrorunkown"));
-                                } else {
-                                    int factor = a.getScaleFactor();
-                                    int dec = (int) Math.log10(factor);
-                                    validPointGrade(state, g, factor);
-                                    if (state.getAttribute(STATE_MESSAGE) == null) {
-	                                    NumberFormat nbFormat = formattedText.getNumberFormat(dec, dec, false);
-	                                    DecimalFormat dcformat = (DecimalFormat) nbFormat;
-	                                    Double dScore = dcformat.parse(g).doubleValue();
-	
-	                                    if (dScore < 0) {
-	                                        addAlert(state, rb.getString("peerassessment.alert.saveinvalidscore"));
-	                                    } else if (dScore <= a.getMaxGradePoint() / (double) factor) {
-	                                        //scores are saved as whole values
-	                                        //so a score of 1.3 would be stored as 13
-	                                        score = (int) Math.round(dScore * factor);
-	                                    } else {
-	                                        addAlert(state, rb.getFormattedMessage("plesuse4", g, a.getMaxGradePoint() / (double) factor));
-	                                    }
-                                    }
-                                }
-                            }
-                        } catch (Exception e) {
-                            addAlert(state, rb.getString("peerassessment.alert.saveinvalidscore"));
-                        }
-                    } else {
-                        score = null;
-                    }
+                if (submissionId.equals(item.getId().getSubmissionId()) && assessorUserId.equals(item.getId().getAssessorUserId())) {
                     boolean scoreChanged = false;
-                    if (score != null && item.getScore() == null
-                            || score == null && item.getScore() != null
-                            || (score != null && item.getScore() != null && !score.equals(item.getScore()))) {
-                        //Score changed
+                    if (returnToDraft) {
+                        item.setSubmitted(false);
                         changed = true;
-                        scoreChanged = true;
-                        item.setScore(score);
-                    }
+                    } else {
+                        //Grade
+                        String g = StringUtils.trimToNull(params.getCleanString(GRADE_SUBMISSION_GRADE));
+                        Integer score = item.getScore();
+                        if ("submit".equals(gradeOption)) {
+                            String scoreReqProp = assignment.getProperties().get("peerAssessmentScoreRequired");
+                            if ("true".equalsIgnoreCase(scoreReqProp) && StringUtils.isEmpty(g)) {
+                                String currentFeedback = params.getCleanString(GRADE_SUBMISSION_FEEDBACK_COMMENT);
+                                state.setAttribute("peer_assessment_temp_feedback", currentFeedback);
+                                addAlert(state, rb.getString("peerassessment.error.scoreRequired"));
+                                return false;
+                            }
+                        }
+                        if (StringUtils.isNotEmpty(g)) {
+                                try {
+                                    String assignmentId = (String) state.getAttribute(VIEW_ASSIGNMENT_ID);
+                                    if (assignmentId == null) {
+                                        addAlert(state, rb.getString("peerassessment.alert.saveerrorunkown"));
+                                    } else {
+                                        Assignment a = getAssignment(assignmentId, "saveReviewGradeForm", state);
+                                        if (a == null) {
+                                            addAlert(state, rb.getString("peerassessment.alert.saveerrorunkown"));
+                                        } else {
+                                            int factor = a.getScaleFactor();
+                                            int dec = (int) Math.log10(factor);
+                                            validPointGrade(state, g, factor);
+                                            if (state.getAttribute(STATE_MESSAGE) == null) {
+        	                                    NumberFormat nbFormat = formattedText.getNumberFormat(dec, dec, false);
+        	                                    DecimalFormat dcformat = (DecimalFormat) nbFormat;
+        	                                    Double dScore = dcformat.parse(g).doubleValue();
 
-                    //Comment:
-                    String feedbackComment = processFormattedTextFromBrowser(state, params.getCleanString(GRADE_SUBMISSION_FEEDBACK_COMMENT), true);
-                    if (feedbackComment != null && item.getComment() == null
-                            || feedbackComment == null && item.getComment() != null
-                            || (feedbackComment != null && item.getComment() != null && !feedbackComment.equals(item.getComment()))) {
-                        //comment changed
-                        changed = true;
-                        item.setComment(feedbackComment);
+        	                                    if (dScore < 0) {
+        	                                        addAlert(state, rb.getString("peerassessment.alert.saveinvalidscore"));
+        	                                    } else if (dScore <= a.getMaxGradePoint() / (double) factor) {
+        	                                        //scores are saved as whole values
+        	                                        //so a score of 1.3 would be stored as 13
+        	                                        score = (int) Math.round(dScore * factor);
+        	                                    } else {
+        	                                        addAlert(state, rb.getFormattedMessage("plesuse4", g, a.getMaxGradePoint() / (double) factor));
+        	                                    }
+                                            }
+                                        }
+                                    }
+                                } catch (Exception e) {
+                                    addAlert(state, rb.getString("peerassessment.alert.saveinvalidscore"));
+                                }
+                        }
+                        if (score != null && item.getScore() == null
+                                || score == null && item.getScore() != null
+                                || (score != null && item.getScore() != null && !score.equals(item.getScore()))) {
+                            //Score changed
+                            changed = true;
+                            scoreChanged = true;
+                            item.setScore(score);
+                        }
+
+                        //Comment:
+                        String feedbackComment = processFormattedTextFromBrowser(state, params.getCleanString(GRADE_SUBMISSION_FEEDBACK_COMMENT), true);
+                        if (feedbackComment != null && item.getComment() == null
+                                || feedbackComment == null && item.getComment() != null
+                                || (feedbackComment != null && item.getComment() != null && !feedbackComment.equals(item.getComment()))) {
+                            //comment changed
+                            changed = true;
+                            item.setComment(feedbackComment);
+                        }
                     }
 
                     /* Attachments */
@@ -12659,9 +12690,12 @@ public class AssignmentAction extends PagedResourceActionII {
                             addAlert(state, rb.getString("peerassessment.alert.savenoscorecomment"));
                         }
                     }
-                    if (("submit".equals(gradeOption) || "save".equals(gradeOption))) {
+                    if (("submit".equals(gradeOption) || "save".equals(gradeOption) || returnToDraft)) {
                         if (changed && state.getAttribute(STATE_MESSAGE) == null) {
                             String event = "submit".equals(gradeOption) ? AssignmentConstants.EVENT_SUBMIT_PEER_REVIEW : AssignmentConstants.EVENT_SAVE_PEER_REVIEW;
+                            if (returnToDraft) {
+                                event = AssignmentConstants.EVENT_RETURN_PEER_REVIEW;
+                            }
                             //save this in the DB
                             assignmentPeerAssessmentService.savePeerAssessmentItem(item, assignment.getContext(), event);
                             if (scoreChanged) {
@@ -12685,12 +12719,16 @@ public class AssignmentAction extends PagedResourceActionII {
                             state.setAttribute(GRADE_SUBMISSION_DONE, Boolean.TRUE);
                             if ("submit".equals(gradeOption)) {
                                 state.setAttribute(GRADE_SUBMISSION_SUBMIT, Boolean.TRUE);
+                            } else if (returnToDraft) {
+                                state.setAttribute("peerAssessmentReturnedToDraft", Boolean.TRUE);
                             }
                         }
                         if (attachmentsChanged && !preExistingAlerts) {
                             //save new attachments to the DB as long as there weren't any pre-existing alerts from prior to the form validation
                             assignmentPeerAssessmentService.savePeerAssessmentAttachments(item);
                         }
+                    } else if (returnToDraft) {
+                        log.warn("No peer assessment item found for submission {} assessor {} during return-to-draft", submissionId, assessorUserId);
                     }
 
                     //update session state:

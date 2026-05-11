@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<emailTemplates>
+<emailTemplate>
+  <subject>[${localSakaiName}] ${bundle["noti.returnpeerreview.subject.content"]}</subject>
+  <message>${bundle["noti.site.title"]} ${siteTitle}
+    ${bundle["noti.site.url"]} &lt;a href="${siteUrl}"&gt;${siteUrl}&lt;/a&gt;
+
+    ${bundle["noti.returnpeerreview.text"]?replace("{0}", title)?replace("{1}", url)}
+  </message>
+  <messagehtml>${bundle["noti.site.title"]} ${siteTitle}
+    ${bundle["noti.site.url"]} &lt;a href="${siteUrl}">${siteUrl}&lt;/a&gt;
+    &lt;br /&gt;
+    ${bundle["noti.returnpeerreview.text"]?replace("{0}", title)?replace("{1}", url)}
+  </messagehtml>
+  <version>2</version>
+  <owner>admin</owner>
+  <key>sakai.assignment.grades.returnpeerreview</key>
+  <locale></locale>
+  <localeLangTag></localeLangTag>
+</emailTemplate>
+</emailTemplates>

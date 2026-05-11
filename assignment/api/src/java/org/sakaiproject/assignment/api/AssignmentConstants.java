@@ -142,6 +142,12 @@ public final class AssignmentConstants {
     public static final String EVENT_SUBMIT_PEER_REVIEW = "asn.submit.peer";
 
     /**
+     * Event for returning an assignment peer review to draft status
+     */
+    public static final String EVENT_RETURN_PEER_REVIEW = "asn.return.peer";
+
+
+    /**
      * Calendar event field for assignment due dates
      */
     public static final String NEW_ASSIGNMENT_DUE_DATE_SCHEDULED = "new_assignment_due_date_scheduled";

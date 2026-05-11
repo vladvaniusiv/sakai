@@ -29,6 +29,7 @@ import org.sakaiproject.assignment.api.AssignmentService;
 import org.sakaiproject.assignment.api.model.Assignment;
 import org.sakaiproject.assignment.api.model.AssignmentSubmission;
 import org.sakaiproject.assignment.api.model.AssignmentSubmissionSubmitter;
+import org.sakaiproject.assignment.api.model.PeerAssessmentItem;
 import org.sakaiproject.component.api.ServerConfigurationService;
 import org.sakaiproject.content.api.ContentHostingService;
 import org.sakaiproject.content.util.ZipContentUtil;
@@ -196,6 +197,26 @@ public class EmailUtil {
         replacements.put("title", assignment.getTitle());
         replacements.put("canSubmit", assignmentService.canSubmit(assignment, userId));
         replacements.put("bundle", resourceLoader);
+
+        return replacements;
+    }
+
+    public Map<String, Object> getReturnPeerReviewReplacements(PeerAssessmentItem item) {
+
+        Map<String, Object> replacements = new HashMap<>();
+
+        try {
+            AssignmentSubmission submission = assignmentService.getSubmission(item.getId().getSubmissionId());
+            Assignment assignment = submission.getAssignment();
+            Site site = siteService.getSite(assignment.getContext());
+            replacements.put("siteTitle", site.getTitle());
+            replacements.put("siteUrl", site.getUrl());
+            replacements.put("title", assignment.getTitle());
+            replacements.put("url", "<a href=\"" + getAssignmentUrl(assignment) + "\">" + site.getTitle() + "</a>");
+            replacements.put("bundle", resourceLoader);
+        } catch (Exception e) {
+            log.warn("Failed to get peer review return email replacements", e);
+        }
 
         return replacements;
     }
