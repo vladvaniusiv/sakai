@@ -13,7 +13,7 @@
 		    now.setMinutes(now.getMinutes() + 10);
 		    // ISO string trimmed to minutes
 		    var iso = now.toISOString().slice(0,16);
-		    dp.value = iso;
+			dp.min = iso;
 		  }
 		} catch(e) { console.warn('prefill return date error', e); }
 		document.body.addEventListener('total-points-updated', (e) => {
@@ -583,13 +583,14 @@
 							<input type="button" accesskey="s" name="return" value="$tlang.getString('peerassessment.restorereview')" onclick="SPNR.disableControlsAndSpin( this, null ); ASN.submitForm( 'gradeForm', 'toggleremove_review', '$formattedText.escapeUrl($submissionReference)', null ); return false;" title="$tlang.getString("peerassessment.restorereview")" />
 						#else
 							<input type="button" accesskey="s" name="return" value="$tlang.getString('peerassessment.removereview')" onclick="SPNR.disableControlsAndSpin( this, null ); ASN.submitForm( 'gradeForm', 'toggleremove_review', '$formattedText.escapeUrl($submissionReference)', null ); return false;" title="$tlang.getString("peerassessment.removereview")" />
-							<div style="display:inline-block;margin-left:8px;vertical-align:middle;">
-								<label class="textPanelFooter" for="returnPeerIsoDate">$tlang.getString('peerassessment.returntodraft'):</label>
-								<sakai-date-picker id="returnPeerIsoDate" epoch-millis="$assignment.PeerAssessmentPeriodDate.toEpochMilli()" hidden-prefix="return_peer_period_" add-hidden-fields>
-								</sakai-date-picker>
-								<input type="button" id="returntodraft" name="returntodraft" value="$tlang.getString('peerassessment.returntodraft')" onclick="SPNR.disableControlsAndSpin( this, null ); returnReviewToDraft('$formattedText.escapeUrl($submissionReference)'); return false;" title="$tlang.getString('peerassessment.returntodraft')" />
-							</div>
-
+							#if ($item.Submitted)
+								<div style="display:inline-block;margin-left:8px;vertical-align:middle;">
+									<label class="textPanelFooter" for="returnPeerIsoDate">$tlang.getString('peerassessment.returntodraft'):</label>
+									<sakai-date-picker id="returnPeerIsoDate" epoch-millis="$assignment.PeerAssessmentPeriodDate.toEpochMilli()" hidden-prefix="return_peer_period_" add-hidden-fields>
+									</sakai-date-picker>
+									<input type="button" id="returntodraft" name="returntodraft" value="$tlang.getString('peerassessment.returntodraft')" onclick="SPNR.disableControlsAndSpin( this, null ); returnReviewToDraft('$formattedText.escapeUrl($submissionReference)'); return false;" title="$tlang.getString('peerassessment.returntodraft')" />
+								</div>
+							#end
 						#end
 					#else
 						<input type="button" id="post" name="returnSubmit" value="$tlang.getString('gen.subm3')" class="active" onclick="SPNR.disableControlsAndSpin( this, null ); ASN.submitForm( 'gradeForm', 'submitgrade_review', '$formattedText.escapeUrl($submissionReference)', null ); return false;" title="$tlang.getString("gen.subm3")" />

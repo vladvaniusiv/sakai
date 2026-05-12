@@ -49,6 +49,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.FormatStyle;
@@ -5786,6 +5787,7 @@ public class AssignmentAction extends PagedResourceActionII {
                 }
             }
             if (peerAssessmentItem != null) {
+                context.put("item", peerAssessmentItem);
                 //check if current user is the peer assessor, if not, only display data (no editing)
                 String currentUserReviewerId = sessionUser.getId();
                 if (assignment.getIsGroup() && currentUserGroup != null) {
@@ -7068,6 +7070,52 @@ public class AssignmentAction extends PagedResourceActionII {
 
         SessionState state = ((JetspeedRunData) data).getPortletSessionState(((JetspeedRunData) data).getJs_peid());
         log.debug("doReturn_grade_submission_review invoked for user {}", sessionManager.getCurrentSessionUserId());
+
+        try {
+            String assignmentId = (String) state.getAttribute(VIEW_ASSIGNMENT_ID);
+            Assignment assignment = getAssignment(assignmentId, "doReturn_grade_submission_review", state);
+
+            if (assignment == null) {
+                addAlert(state, rb.getString("peerassessment.alert.saveerrorunkown"));
+                return;
+            }
+
+            ParameterParser params = data.getParameters();
+
+            int year = params.getInt("return_peer_period_year");
+            int month = params.getInt("return_peer_period_month");
+            int day = params.getInt("return_peer_period_day");
+            int hour = params.getInt("return_peer_period_hour");
+            int minute = params.getInt("return_peer_period_min");
+
+            ZonedDateTime newPeerDate = ZonedDateTime.of(year, month, day, hour, minute, 0, 0, ZoneId.systemDefault());
+
+            Instant newDateInstant = newPeerDate.toInstant();
+
+            // New date cannot be earlier than existing peer review date
+            Instant currentPeerDate = assignment.getPeerAssessmentPeriodDate();
+
+            if (currentPeerDate != null && newDateInstant.isBefore(currentPeerDate)) {
+                addAlert(state, rb.getString("peerassessment.return.invalidBefore"));
+                return;
+            }
+
+            // New date must be at least 10 minutes in the future
+            Instant minimumAllowed = Instant.now().plus(10, ChronoUnit.MINUTES);
+            if (newDateInstant.isBefore(minimumAllowed)) {
+                addAlert(state, rb.getString("peerassessment.return.invalidAfter"));
+                return;
+            }
+
+            // Update peer assessment period globally
+            assignment.setPeerAssessmentPeriodDate(newDateInstant);
+            assignmentService.updateAssignment(assignment);
+
+        } catch (Exception e) {
+            addAlert(state, rb.getString("peerassessment.return.invalidDate"));
+            return;
+        }
+
         saveReviewGradeForm(data, state, "return");
     }
 
