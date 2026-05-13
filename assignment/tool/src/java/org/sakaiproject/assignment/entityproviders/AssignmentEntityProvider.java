@@ -100,7 +100,7 @@ import org.sakaiproject.util.api.FormattedText;
 @Slf4j
 @Setter
 public class AssignmentEntityProvider extends AbstractEntityProvider implements EntityProvider,
-        CoreEntityProvider, Resolvable, ActionsExecutable, Describeable,
+        CoreEntityProvider, Resolvable, ActionsExecutable, Describeable, Updateable,
         AutoRegisterEntityProvider, PropertyProvideable, Outputable, Inputable {
 
     public final static String ENTITY_PREFIX = "assignment";
@@ -825,7 +825,7 @@ public class AssignmentEntityProvider extends AbstractEntityProvider implements 
                 if (reviews != null) {
                     List<SimplePeerAssessmentItem> completedReviews = new ArrayList<>();
                     for (PeerAssessmentItem review : reviews) {
-                        if (!review.getRemoved() && (review.getScore() != null || (StringUtils.isNotBlank(review.getComment())))) {
+                        if (review.getScore() != null || (StringUtils.isNotBlank(review.getComment()))) {
                             //only show peer reviews that have either a score or a comment saved
                             try {
                                 if (assignment.getIsGroup()) {
@@ -2297,5 +2297,106 @@ public class AssignmentEntityProvider extends AbstractEntityProvider implements 
                     .map(Reference::getUrl)
                     .collect(Collectors.toList());
         }
+    }
+
+    @Override
+    public void updateEntity(EntityReference ref, Object entity, Map<String, Object> params) {
+        log.debug(ref.getReference());
+    }
+
+    @EntityCustomAction(action="peer-review-action", viewKey=EntityView.VIEW_EDIT)
+    public Map<String, Object> handlePeerAction(EntityView view, Map<String, Object> params) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "error"); 
+
+        try {
+            String action = (String) params.get("action");
+            String submissionId = (String) params.get("submissionId");
+            String assessorUserId = (String) params.get("assessorUserId");
+            String siteId = (String) params.get("siteId");
+
+            if ("toggleremove_review".equals(action)) {
+                PeerAssessmentItem item = assignmentPeerAssessmentService.getPeerAssessmentItem(submissionId, assessorUserId);
+                if (item != null) {
+                    item.setRemoved(!item.getRemoved());
+                    assignmentPeerAssessmentService.savePeerAssessmentItem(item, siteId, AssignmentConstants.EVENT_SAVE_PEER_REVIEW);
+                    result.put("status", "success");
+                }
+            }
+            else if ("returntodraft".equals(action)) {
+                Object dateParam = params.get("date");
+
+                if (dateParam == null || String.valueOf(dateParam).isBlank() || "null".equals(String.valueOf(dateParam))) {
+                    result.put("message", "Fecha no recibida en el servidor");
+                    return result;
+                }
+
+                try {
+                    long epoch = Long.parseLong(String.valueOf(dateParam));
+                    Instant newDate = Instant.ofEpochMilli(epoch);
+                    AssignmentSubmission sub = assignmentService.getSubmission(submissionId);
+                    Assignment assignment = sub.getAssignment();
+                    if (newDate.isBefore(assignment.getPeerAssessmentPeriodDate())) {
+                        result.put("message", rb.getString("peerassessment.return.invalidBefore"));
+                        return result;
+                    }
+
+                    PeerAssessmentItem item = assignmentPeerAssessmentService.getPeerAssessmentItem(submissionId, assessorUserId);
+                    if (item != null) {
+                        assignment.setPeerAssessmentPeriodDate(newDate);
+                        assignmentService.updateAssignment(assignment);
+
+                        item.setSubmitted(false);
+                        assignmentPeerAssessmentService.savePeerAssessmentItem(item, siteId, "assignment.peer.return.draft");
+                        result.put("status", "success");
+                    } else {
+                        result.put("message", "No se encontró el item de evaluación");
+                    }
+                } catch (NumberFormatException e) {
+                    result.put("message", "Error de formato en fecha");
+                }
+            }
+        } catch (Exception e) {
+            result.put("message", "System error: " + e.getMessage());
+        }
+
+        return result;
+    }
+
+    @EntityCustomAction(action = "peer-review-date", viewKey = EntityView.VIEW_SHOW)
+    public Map<String, Object> getPeerReviewDate(EntityView view, Map<String, Object> params) {
+
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            String submissionId = (String) params.get("submissionId");
+            AssignmentSubmission sub = assignmentService.getSubmission(submissionId);
+
+            if (sub == null) {
+                result.put("status", "error");
+                result.put("message", "Submission not found");
+                return result;
+            }
+
+            Assignment assignment = sub.getAssignment();
+
+            if (assignment.getPeerAssessmentPeriodDate() != null) {
+                result.put("status", "success");
+                result.put(
+                    "peerAssessmentPeriodDate",
+                    assignment.getPeerAssessmentPeriodDate().toEpochMilli()
+                );
+            } else {
+                result.put("status", "error");
+                result.put("message", "No peer review date");
+            }
+
+        } catch (Exception e) {
+            log.error("Error getting peer review date", e);
+            result.put("status", "error");
+            result.put("message", e.getMessage());
+        }
+
+        return result;
     }
 }

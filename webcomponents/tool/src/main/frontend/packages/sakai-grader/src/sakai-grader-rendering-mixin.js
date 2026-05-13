@@ -229,6 +229,40 @@ export const graderRenderingMixin = Base => class extends Base {
                       </div>
                       <div class="mt-2 mb-2 grader-title">${this._i18n.reviewer_comments}</div>
                       <div>${unsafeHTML(pr.comment)}</div>
+                      <div class="peer-review-admin-actions mt-3 pt-3 border-top">
+                        ${pr.removed ? html`
+                          <button class="btn btn-secondary btn-sm" @click=${() => this._restorePeerReview(pr)}>
+                            <i class="fa fa-undo me-1"></i> ${this._i18n.restorereview}
+                          </button>
+                        ` : html`
+                          <button class="btn btn-outline-danger btn-sm" @click=${() => this._removePeerReview(pr)}>
+                            <i class="fa fa-trash me-1"></i> ${this._i18n.removereview}
+                          </button>
+                        `}
+
+                        <!-- Quitamos pr.submitted temporalmente o lo validamos mejor -->
+                        ${!pr.removed && pr.submitted ? html`
+                          <div class="mt-3 p-2 bg-light rounded border">
+                            <label class="form-label d-block small fw-bold">
+                              ${this._i18n.returntodraft}:
+                            </label>
+                            <div class="d-flex align-items-center">
+                              <sakai-date-picker
+
+                                id="picker-${pr.assessorUserId}-${this._getPeerReviewDefaultDate()}"
+
+                                .epochMillis=${this._getPeerReviewDefaultDate()}
+
+                                @datetime-selected=${e => this._onReturnDateSelected(e, pr)}>
+
+                              </sakai-date-picker>
+                              <button class="btn btn-warning btn-sm ms-2" @click=${() => this._returnReviewToDraft(pr)}>
+                                ${this._i18n.returntodraft}
+                              </button>
+                            </div>
+                          </div>
+                        ` : nothing}
+                      </div>
                       ${pr.attachmentUrlList?.length > 0 ? html`
                         <div class="grader-title mb-2">${this._i18n.reviewer_attachments}</div>
                         ${pr.attachmentUrlList.map((url, i) => html`
@@ -247,6 +281,146 @@ export const graderRenderingMixin = Base => class extends Base {
         ` : nothing }
       </div>
     `;
+  }
+  async firstUpdated(changedProperties) {
+    if (super.firstUpdated) {
+      super.firstUpdated(changedProperties);
+    }
+    await this._loadPeerReviewDate();
+  }
+
+  _onReturnDateSelected(e, pr) {
+    if (e.detail && e.detail.epochMillis !== undefined) {
+      pr.tempReturnDate = parseInt(String(e.detail.epochMillis), 10);
+    } else if (e.detail && e.detail.value !== undefined) {
+      pr.tempReturnDate = parseInt(String(e.detail.value), 10);
+    } else if (e.detail && e.detail.iso8601) {
+      pr.tempReturnDate = new Date(e.detail.iso8601).getTime();
+    } else {
+      pr.tempReturnDate = null;
+    }
+  }
+
+  _getPeerReviewDefaultDate() {
+    if (
+      this.peerAssessmentPeriodDate !== undefined
+      && this.peerAssessmentPeriodDate !== null
+      && !Number.isNaN(Number(this.peerAssessmentPeriodDate))
+    ) {
+      return Number(this.peerAssessmentPeriodDate);
+    }
+
+    //Fallback: now +20 min
+    return Date.now() + (20 * 60 * 1000);
+  }
+
+  async _loadPeerReviewDate() {
+    try {
+      const url = `/direct/assignment/${this.gradableId}/peer-review-date.json?submissionId=${this._submission.id}`;
+      const response = await fetch(url);
+      const result = await response.json();
+      if (
+        response.ok
+        && result.status === "success"
+        && result.peerAssessmentPeriodDate !== undefined
+        && result.peerAssessmentPeriodDate !== null
+      ) {
+        this.peerAssessmentPeriodDate = Number(result.peerAssessmentPeriodDate);
+        this.requestUpdate();
+      }
+    } catch (e) {
+      console.error("Error loading peer review date", e);
+    }
+  }
+
+  async _removePeerReview(pr) {
+    await this._performPeerAction("toggleremove_review", pr);
+  }
+
+  async _restorePeerReview(pr) {
+    await this._performPeerAction("toggleremove_review", pr);
+  }
+
+  async _returnReviewToDraft(pr) {
+
+    const returnDate = pr.tempReturnDate || this._getPeerReviewDefaultDate();
+
+    if (returnDate === null || returnDate === undefined || Number.isNaN(Number(returnDate))) {
+      alert("Invalid return date");
+      return;
+    }
+
+    const minimumDate = Date.now() + (10 * 60 * 1000);
+    if (returnDate < minimumDate) {
+      // Intentamos obtener la traducción, si no existe usamos el string literal
+      const errorMsg = this._i18n.invalidAfter || "The return date must be at least 10 minutes from now.";
+      alert(errorMsg);
+      return;
+    }
+
+    await this._performPeerAction(
+      "returntodraft",
+      pr,
+      { date: Number(returnDate) }
+    );
+  }
+
+  async _performPeerAction(action, pr, extraParams = {}) {
+    if (this._performingAction) return;
+    this._performingAction = true;
+
+    const submissionId = this._submission.id;
+    const assessorId = pr.assessorUserId;
+
+    const newDate = extraParams.date ? String(extraParams.date) : null;
+
+    const url = `/direct/assignment/${this.gradableId}/peer-review-action.json`;
+
+    const data = new URLSearchParams();
+    data.append("action", action);
+    data.append("submissionId", submissionId);
+    data.append("assessorUserId", assessorId);
+    data.append("siteId", getSiteId());
+    if (newDate) {
+      data.append("date", newDate);
+    }
+
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        body: data.toString()
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.status !== "error") {
+
+        if (action === "toggleremove_review") {
+          pr.removed = !pr.removed;
+        }
+
+        if (pr && action === "returntodraft") {
+          pr.submitted = false;
+          if (newDate) {
+            this.peerAssessmentPeriodDate = Number(newDate);
+          }
+        }
+
+        this._saveSucceeded = true;
+        this.requestUpdate();
+      } else {
+        alert(result.message || this._i18n.failed_save);
+        this._saveFailed = true;
+      }
+    } catch {
+      this._saveFailed = true;
+    } finally {
+      this._performingAction = false;
+      setTimeout(() => { this._saveSucceeded = false; }, 2000);
+    }
   }
 
   _renderSaved() {
