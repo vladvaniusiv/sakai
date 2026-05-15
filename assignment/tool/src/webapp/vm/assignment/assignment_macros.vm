@@ -612,12 +612,84 @@
                                     <div class="mt-2 mb-2 fw-bold">$tlang.getString("gen.comments")</div>
                                     <div class="textPanel borderPanel">$formattedText.escapeHtmlFormattedText($review.getComment())</div>
                                 #end
+                                <div class="peer-review-admin-actions mt-3 pt-3 border-top">
+                                    #if ($review.Removed)
+                                        <input
+                                            type="button"
+                                            class="btn btn-sm btn-outline-primary"
+                                            value="$tlang.getString('peerassessment.restorereview')"
+                                            onclick="SPNR.disableControlsAndSpin(this, null);
+                                            toggleRemoveReview('$formattedText.escapeUrl($review.id.submissionId)', '$review.id.assessorUserId');
+                                            return false;" />
+                                    #else
+                                        <input
+                                            type="button"
+                                            class="btn btn-sm btn-outline-danger"
+                                            value="$tlang.getString('peerassessment.removereview')"
+                                            onclick="SPNR.disableControlsAndSpin(this, null);
+                                            toggleRemoveReview('$formattedText.escapeUrl($review.id.submissionId)', '$review.id.assessorUserId');
+                                            return false;" />
+
+                                        #if ($review.Submitted)
+                                            <div class="mt-3 p-2 bg-light rounded border">
+                                                <label class="textPanelFooter" for="returnPeerIsoDate-$review.id.assessorUserId">
+                                                    $tlang.getString('peerassessment.returntodraft'):
+                                                </label>
+
+                                                <sakai-date-picker
+                                                    id="returnPeerIsoDate-$review.id.assessorUserId"
+                                                    epoch-millis="$assignment.PeerAssessmentPeriodDate.toEpochMilli()"
+                                                    hidden-prefix="return_peer_period_"
+                                                    add-hidden-fields>
+                                                </sakai-date-picker>
+                                                <br>
+                                                <input
+                                                    type="button"
+                                                    class="btn btn-sm mt-2"
+                                                    value="$tlang.getString('peerassessment.returntodraftbutton')"
+                                                    onclick="SPNR.disableControlsAndSpin(this, null);
+                                                    returnReviewToDraft('$formattedText.escapeUrl($review.id.submissionId)', '$review.id.assessorUserId');
+                                                    return false;"
+                                                    title="$tlang.getString('peerassessment.returntodraft')" />
+                                            </div>
+                                        #end
+                                    #end
+                                </div>
                             </div>
                         </div>
                     </div>
                 #end
             </div>
         </div>
+        <script type="text/javascript">
+            function returnReviewToDraft(submissionRef, assessorId) {
+                var input = document.getElementById('peerAssessorUserId');
+                if (input) {
+                    input.value = assessorId;
+                }
+                ASN.submitForm('gradeForm', 'returngrade_review', submissionRef, null);
+
+                setTimeout(function() {
+
+                    document.getElementById('peerAssessorUserId').value = '';
+
+                }, 0);
+            }
+
+            function toggleRemoveReview(submissionRef, assessorId) {
+                var input = document.getElementById('peerAssessorUserId');
+                if (input) {
+                    input.value = assessorId;
+                }
+                ASN.submitForm('gradeForm', 'toggleremove_review', submissionRef, null);
+
+                setTimeout(function() {
+
+                    document.getElementById('peerAssessorUserId').value = '';
+
+                }, 0);
+            }
+        </script>
     #end
 #end
 

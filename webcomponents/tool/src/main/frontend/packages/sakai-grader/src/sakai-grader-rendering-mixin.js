@@ -231,35 +231,40 @@ export const graderRenderingMixin = Base => class extends Base {
                       <div>${unsafeHTML(pr.comment)}</div>
                       <div class="peer-review-admin-actions mt-3 pt-3 border-top">
                         ${pr.removed ? html`
-                          <button class="btn btn-secondary btn-sm" @click=${() => this._restorePeerReview(pr)}>
-                            <i class="fa fa-undo me-1"></i> ${this._i18n.restorereview}
-                          </button>
+                          <input
+                            type="button"
+                            class="btn btn-secondary btn-sm"
+                            value="${this._i18n.restorereview}"
+                            @click=${() => this._restorePeerReview(pr)}
+                            title="${this._i18n.restorereview}"
+                          />
                         ` : html`
-                          <button class="btn btn-outline-danger btn-sm" @click=${() => this._removePeerReview(pr)}>
-                            <i class="fa fa-trash me-1"></i> ${this._i18n.removereview}
-                          </button>
+                          <input
+                            type="button"
+                            class="btn btn-danger btn-sm"
+                            value="${this._i18n.removereview}"
+                            @click=${() => this._removePeerReview(pr)}
+                            title="${this._i18n.removereview}"
+                          />
                         `}
-
-                        <!-- Quitamos pr.submitted temporalmente o lo validamos mejor -->
                         ${!pr.removed && pr.submitted ? html`
                           <div class="mt-3 p-2 bg-light rounded border">
-                            <label class="form-label d-block small fw-bold">
+                            <label class="textPanelFooter">
                               ${this._i18n.returntodraft}:
                             </label>
-                            <div class="d-flex align-items-center">
-                              <sakai-date-picker
-
-                                id="picker-${pr.assessorUserId}-${this._getPeerReviewDefaultDate()}"
-
-                                .epochMillis=${this._getPeerReviewDefaultDate()}
-
-                                @datetime-selected=${e => this._onReturnDateSelected(e, pr)}>
-
-                              </sakai-date-picker>
-                              <button class="btn btn-warning btn-sm ms-2" @click=${() => this._returnReviewToDraft(pr)}>
-                                ${this._i18n.returntodraft}
-                              </button>
-                            </div>
+                            <sakai-date-picker
+                              id="picker-${pr.assessorUserId}-${this._getPeerReviewDefaultDate()}"
+                              .epochMillis=${this._getPeerReviewDefaultDate()}
+                              @datetime-selected=${e => this._onReturnDateSelected(e, pr)}>
+                            </sakai-date-picker>
+                            <br>
+                            <input
+                              type="button"
+                              value="${this._i18n.returntodraftbutton}"
+                              class="btn btn-sm mt-2"
+                              @click=${() => this._returnReviewToDraft(pr)}
+                              title="${this._i18n.returntodraft}"
+                            />
                           </div>
                         ` : nothing}
                       </div>

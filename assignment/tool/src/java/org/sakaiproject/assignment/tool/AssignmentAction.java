@@ -7064,29 +7064,46 @@ public class AssignmentAction extends PagedResourceActionII {
     }
 
     public void doReturn_grade_submission_review(RunData data) {
+        ParameterParser params = data.getParameters();
+        SessionState state = ((JetspeedRunData) data).getPortletSessionState(((JetspeedRunData) data).getJs_peid());
+        String assessorFromRequest = params.getString("peerAssessorUserId");
+
         if (!"POST".equals(data.getRequest().getMethod())) {
             return;
         }
 
-        SessionState state = ((JetspeedRunData) data).getPortletSessionState(((JetspeedRunData) data).getJs_peid());
         log.debug("doReturn_grade_submission_review invoked for user {}", sessionManager.getCurrentSessionUserId());
 
         try {
-            String assignmentId = (String) state.getAttribute(VIEW_ASSIGNMENT_ID);
-            Assignment assignment = getAssignment(assignmentId, "doReturn_grade_submission_review", state);
+            String submissionId = params.getString("submissionId");
+            if (submissionId != null && submissionId.startsWith("/")) {
+                submissionId = AssignmentReferenceReckoner.reckoner().reference(submissionId).reckon().getId();
+            }
 
+            AssignmentSubmission sub = assignmentService.getSubmission(submissionId);
+            Assignment assignment = sub.getAssignment();
             if (assignment == null) {
                 addAlert(state, rb.getString("peerassessment.alert.saveerrorunkown"));
                 return;
             }
 
-            ParameterParser params = data.getParameters();
+            String prefix = "return_peer_period_";
+            String yearStr = params.getString(prefix + "year");
+            String monthStr = params.getString(prefix + "month");
+            String dayStr = params.getString(prefix + "day");
+            String hourStr = params.getString(prefix + "hour");
+            String minuteStr = params.getString(prefix + "min");
 
-            int year = params.getInt("return_peer_period_year");
-            int month = params.getInt("return_peer_period_month");
-            int day = params.getInt("return_peer_period_day");
-            int hour = params.getInt("return_peer_period_hour");
-            int minute = params.getInt("return_peer_period_min");
+            if (StringUtils.isAnyBlank(yearStr, monthStr, dayStr, hourStr, minuteStr)) {
+                addAlert(state, rb.getString("peerassessment.return.invalidDate"));
+                return;
+            }
+
+            int year = Integer.parseInt(yearStr);
+            int month = Integer.parseInt(monthStr);
+            int day = Integer.parseInt(dayStr);
+            int hour = Integer.parseInt(hourStr);
+            int minute = Integer.parseInt(minuteStr);
 
             ZonedDateTime newPeerDate = ZonedDateTime.of(year, month, day, hour, minute, 0, 0, ZoneId.systemDefault());
 
@@ -7111,6 +7128,46 @@ public class AssignmentAction extends PagedResourceActionII {
             assignment.setPeerAssessmentPeriodDate(newDateInstant);
             assignmentService.updateAssignment(assignment);
 
+            if (StringUtils.isNotBlank(assessorFromRequest)) {
+                PeerAssessmentItem itemToReturn = assignmentPeerAssessmentService.getPeerAssessmentItem(submissionId, assessorFromRequest);
+                if (itemToReturn != null) {
+                    itemToReturn.setSubmitted(false);
+                    String siteId = (String) state.getAttribute("context");
+                    if (siteId == null) {
+                        siteId = (String) state.getAttribute("siteId");
+                    }
+                    if (siteId == null && assignment != null) {
+                        siteId = assignment.getContext();
+                    }
+
+                    assignmentPeerAssessmentService.savePeerAssessmentItem(itemToReturn, siteId, "assignment.peerreview.return.event");
+                }
+            }
+
+            state.setAttribute("submission", sub);
+            state.removeAttribute(PEER_ASSESSMENT_ITEMS);
+            state.removeAttribute("peerAssessmentItems");
+            state.removeAttribute("peerReviews");
+
+            Integer scaledFactor = assignment.getScaleFactor();
+            List<PeerAssessmentItem> updatedReviews = assignmentPeerAssessmentService.getPeerAssessmentItems(submissionId, scaledFactor);
+            if (updatedReviews != null) {
+                for (PeerAssessmentItem item : updatedReviews) {
+                    if (item.getAssessorDisplayName() == null) {
+                        try {
+                            item.setAssessorDisplayName(userDirectoryService.getUser(item.getId().getAssessorUserId()).getDisplayName());
+                        } catch (Exception e) {
+                            item.setAssessorDisplayName(item.getId().getAssessorUserId());
+                        }
+                    }
+                }
+                state.setAttribute(PEER_ASSESSMENT_ITEMS, updatedReviews);
+                state.setAttribute("peerAssessmentItems", updatedReviews);
+                state.setAttribute("peerReviews", updatedReviews);
+                data.getRequest().setAttribute("peerAssessmentItems", updatedReviews);
+                data.getRequest().setAttribute("peerReviews", updatedReviews);
+            }
+
         } catch (Exception e) {
             addAlert(state, rb.getString("peerassessment.return.invalidDate"));
             return;
@@ -7121,22 +7178,34 @@ public class AssignmentAction extends PagedResourceActionII {
 
     public void doSave_toggle_remove_review(RunData data) {
         SessionState state = ((JetspeedRunData) data).getPortletSessionState(((JetspeedRunData) data).getJs_peid());
+        ParameterParser params = data.getParameters();
+        String assessorFromRequest = params.getString("peerAssessorUserId");
+        if (StringUtils.isNotBlank(assessorFromRequest)) {
+            state.setAttribute(PEER_ASSESSMENT_ASSESSOR_ID, assessorFromRequest);
+        }
         if (state.getAttribute(PEER_ASSESSMENT_ASSESSOR_ID) != null) {
             String peerAssessor = (String) state.getAttribute(PEER_ASSESSMENT_ASSESSOR_ID);
-            ParameterParser params = data.getParameters();
             String submissionRef = params.getString("submissionId");
             String submissionId = null;
             String assignmentRef = null;
             String siteId = null;
             AssignmentSubmission submission = null;
-            if(submissionRef != null){
-            	submissionRef = submissionRef.endsWith("/") ? StringUtils.chop(submissionRef) : submissionRef;
-            	AssignmentReferenceReckoner.AssignmentReference submissionReference = AssignmentReferenceReckoner.reckoner().reference(submissionRef).reckon();
-                submissionId = submissionReference.getId();
-                siteId = submissionReference.getContext();
+            siteId = (String) state.getAttribute("context");
+            if (siteId == null) {
+                siteId = (String) state.getAttribute("siteId");
+            }
+            if (submissionRef != null) {
+                if (submissionRef.startsWith("/")) {
+                    AssignmentReferenceReckoner.AssignmentReference ref = AssignmentReferenceReckoner.reckoner().reference(submissionRef).reckon();
+                    submissionId = ref.getId();
+                    siteId = ref.getContext();
+                } else {
+                    submissionId = submissionRef;
+                }
             }
             if (submissionId != null) {
                 //call the DB to make sure this user can edit this assessment, otherwise it wouldn't exist
+                try {
                 PeerAssessmentItem item = assignmentPeerAssessmentService.getPeerAssessmentItem(submissionId, peerAssessor);
                 if (item != null) {
                     item.setRemoved(!item.getRemoved());
@@ -7145,7 +7214,7 @@ public class AssignmentAction extends PagedResourceActionII {
                         //item was part of the calculation, re-calculate
                         boolean saved = assignmentPeerAssessmentService.updateScore(submissionId, peerAssessor);
                         if (saved) {
-                        	submission = getSubmission(submissionRef, "saveReviewGradeForm", state);
+                        	submission = assignmentService.getSubmission(submissionId);
                         	Assignment a = submission.getAssignment();
                         	if (a != null) {
                         		assignmentRef = AssignmentReferenceReckoner.reckoner().assignment(a).reckon().getReference();
@@ -7174,6 +7243,9 @@ public class AssignmentAction extends PagedResourceActionII {
                         }
                     }
                 }
+            } catch (Exception e) {
+                addAlert(state, "Error processing review status.");
+            }
             }
         }
     }
@@ -12582,6 +12654,8 @@ public class AssignmentAction extends PagedResourceActionII {
             AssignmentSubmission s = getSubmission(submissionId, "saveReviewGradeForm", state);
             if (s != null) {
                 submissionId = s.getId();//using the id instead of the reference
+            } else {
+                return false;
             }
 
             Assignment assignment = s.getAssignment();
@@ -12591,11 +12665,6 @@ public class AssignmentAction extends PagedResourceActionII {
             }
             if (assignment.getIsGroup()) {
                 assessorUserId = assignmentService.getSubmitterIdForAssignment(assignment, assessorUserId);
-            }
-
-            if (state.getAttribute(PEER_ASSESSMENT_ASSESSOR_ID) != null && !state.getAttribute(PEER_ASSESSMENT_ASSESSOR_ID).equals(assessorUserId)) {
-                //this is only set during the read only view, so just return
-                return false;
             }
 
             //call the DB to make sure this user can edit this assessment, otherwise it wouldn't exist

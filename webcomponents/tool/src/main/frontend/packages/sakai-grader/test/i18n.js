@@ -14,6 +14,7 @@ reviewer_attachments=Reviewer Attachments
 removereview=Remove Review
 restorereview=Restore Review
 returntodraft=Allow review resubmission
+returntodraftbutton=Allow
 invalidAfter=The return date must be at least 10 minutes from now.
 grading_rubric_tooltip=Grade this submission using a rubric
 rubric=Rubric

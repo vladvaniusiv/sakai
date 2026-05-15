@@ -37,6 +37,7 @@
         <input type="hidden" name="option" id="option" value=""/>
         <input type="hidden" name="view" id="view" value=""/>
         <input type="hidden" name="submissionId" id="submissionId" value="$!submissionReference"/>
+		<input type="hidden" id="peerAssessorUserId" name="peerAssessorUserId" value="" />
 
         <div class="navPanel">
             <div class="highlight gradingHeader">
@@ -362,7 +363,9 @@
         </div>
         <div role="tabpanel" class="tab-pane mt-2" id="submission-rubric">
 
-            #reviewersInfo( $!peerReviews $!hasAssociatedRubric $!assignment $ownerGroupId $submitterId )
+            #if ($peerReviews)
+                #reviewersInfo( $peerReviews $!hasAssociatedRubric $!assignment $ownerGroupId $submitterId )
+            #end
 
             #if($!rubricSelfReport)
             <h1>$tlang.getString("autoevaluation")</h1>
