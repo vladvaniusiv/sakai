@@ -13,6 +13,7 @@ public final class VideoTrainingConstants {
     public static final String PERMISSION_MANAGE_ALL = "video.training.manage.all";
     public static final String PERMISSION_ANALYTICS = "video.training.analytics";
     public static final String PERMISSION_CAPTIONS_MANAGE = "video.training.captions.manage";
+    public static final String PERMISSION_CATEGORIES_MANAGE = "video.training.categories.manage";
 
     private VideoTrainingConstants() {
         throw new IllegalStateException("Utility class");

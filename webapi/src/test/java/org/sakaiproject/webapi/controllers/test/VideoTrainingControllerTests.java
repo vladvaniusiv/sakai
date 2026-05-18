@@ -62,6 +62,8 @@ public class VideoTrainingControllerTests extends BaseControllerTests {
     private static final String SITE_ID = "site-1";
     private static final String USER_ID = "user-1";
     private static final String VIDEO_ID = "video-1";
+    private static final int LIMIT = 24;
+    private static final int OFFSET = 0;
 
     private MockMvc mockMvc;
 
@@ -148,7 +150,7 @@ public class VideoTrainingControllerTests extends BaseControllerTests {
     }
 
     @Test
-    public void testGetSiteVideosApiV1Alias() throws Exception {
+    public void testGetSiteVideosAlias() throws Exception {
         VideoTrainingVideo video = createVideo();
 
         when(videoTrainingService.canManageLibrary(SITE_ID, USER_ID)).thenReturn(true);
@@ -157,13 +159,13 @@ public class VideoTrainingControllerTests extends BaseControllerTests {
         when(videoTrainingService.getSiteLibraryPage(SITE_ID, "", 1, 24)).thenReturn(List.of(video));
         when(videoTrainingService.canViewVideo(eq(video), eq(USER_ID), any(Instant.class))).thenReturn(true);
 
-        mockMvc.perform(get("/api/v1/sites/{siteId}/video-training", SITE_ID))
+        mockMvc.perform(get("/sites/{siteId}/video-training", SITE_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.videos[0].id", is(VIDEO_ID)));
     }
 
     @Test
-    public void testGetCourseVideosApiV1Endpoint() throws Exception {
+    public void testGetCourseVideosEndpoint() throws Exception {
         VideoTrainingVideo video = createVideo();
 
         when(videoTrainingService.canManageLibrary(SITE_ID, USER_ID)).thenReturn(false);
@@ -172,14 +174,14 @@ public class VideoTrainingControllerTests extends BaseControllerTests {
         when(videoTrainingService.getVisibleVideosForUserPage(eq(SITE_ID), eq(USER_ID), any(Instant.class), eq(""), eq(1), eq(24))).thenReturn(List.of(video));
         when(videoTrainingService.canViewVideo(eq(video), eq(USER_ID), any(Instant.class))).thenReturn(true);
 
-        mockMvc.perform(get("/api/v1/courses/{courseId}/videos", SITE_ID))
+        mockMvc.perform(get("/courses/{courseId}/videos", SITE_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.videos[0].id", is(VIDEO_ID)))
                 .andExpect(jsonPath("$.query", is("")));
     }
 
     @Test
-    public void testGetVideosCatalogApiV1Endpoint() throws Exception {
+    public void testGetVideosCatalogEndpoint() throws Exception {
         VideoTrainingVideo video = createVideo();
 
         when(videoTrainingService.canManageLibrary(SITE_ID, USER_ID)).thenReturn(false);
@@ -188,7 +190,7 @@ public class VideoTrainingControllerTests extends BaseControllerTests {
         when(videoTrainingService.getVisibleVideosForUserPage(eq(SITE_ID), eq(USER_ID), any(Instant.class), eq(""), eq(1), eq(24))).thenReturn(List.of(video));
         when(videoTrainingService.canViewVideo(eq(video), eq(USER_ID), any(Instant.class))).thenReturn(true);
 
-        mockMvc.perform(get("/api/v1/videos")
+        mockMvc.perform(get("/videos")
                 .param("siteId", SITE_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.videos[0].id", is(VIDEO_ID)))
@@ -219,7 +221,7 @@ public class VideoTrainingControllerTests extends BaseControllerTests {
 
     @Test
     public void testHealthEndpoint() throws Exception {
-        mockMvc.perform(get("/api/v1/video-training/health"))
+        mockMvc.perform(get("/video-training/health"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status", is("UP")))
                 .andExpect(jsonPath("$.service", is("video-training")));
@@ -257,7 +259,7 @@ public class VideoTrainingControllerTests extends BaseControllerTests {
     }
 
     @Test
-    public void testGetVideoDetailsApiV1Endpoint() throws Exception {
+    public void testGetVideoDetailsEndpoint() throws Exception {
         VideoTrainingVideo video = createVideo();
 
         when(videoTrainingService.getVideoById(VIDEO_ID)).thenReturn(Optional.of(video));
@@ -265,7 +267,7 @@ public class VideoTrainingControllerTests extends BaseControllerTests {
         when(videoTrainingService.canManageLibrary(SITE_ID, USER_ID)).thenReturn(false);
         when(videoTrainingService.canViewAnalytics(SITE_ID, USER_ID)).thenReturn(false);
 
-        mockMvc.perform(get("/api/v1/videos/{videoId}", VIDEO_ID)
+        mockMvc.perform(get("/videos/{videoId}", VIDEO_ID)
                     .param("siteId", SITE_ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id", is(VIDEO_ID)))
@@ -274,23 +276,25 @@ public class VideoTrainingControllerTests extends BaseControllerTests {
     }
 
     @Test
-    public void testGetCategoriesApiV1Endpoint() throws Exception {
+    public void testGetCategoriesEndpoint() throws Exception {
         VideoTrainingCategory category = new VideoTrainingCategory();
         category.setId("cat-1");
         category.setSiteId(SITE_ID);
         category.setName("Module A");
 
         when(videoTrainingService.canManageLibrary(SITE_ID, USER_ID)).thenReturn(true);
-        when(videoTrainingService.getCategories(SITE_ID)).thenReturn(List.of(category));
+        when(videoTrainingService.getCategories(SITE_ID, OFFSET, LIMIT)).thenReturn(List.of(category));
 
-        mockMvc.perform(get("/api/v1/sites/{siteId}/video-training/categories", SITE_ID))
+        mockMvc.perform(get("/sites/{siteId}/videos/categories", SITE_ID)
+                    .param("offset", String.valueOf(OFFSET))
+                    .param("limit", String.valueOf(LIMIT)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.categories[0].id", is("cat-1")))
                 .andExpect(jsonPath("$.categories[0].name", is("Module A")));
     }
 
     @Test
-    public void testPromoteLessonResourceApiV1Endpoint() throws Exception {
+    public void testPromoteLessonResourceEndpoint() throws Exception {
         VideoTrainingVideo video = createVideo();
         video.setVisibilityScope(VideoVisibilityScope.LESSON);
 
@@ -309,7 +313,7 @@ public class VideoTrainingControllerTests extends BaseControllerTests {
                 "\"fileSizeBytes\":1234" +
                 "}";
 
-        mockMvc.perform(post("/api/v1/lessons/{siteId}/promote-resource", SITE_ID)
+        mockMvc.perform(post("/lessons/{siteId}/promote-resource", SITE_ID)
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(payload))
                 .andExpect(status().isOk())

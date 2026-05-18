@@ -1,6 +1,8 @@
 package org.sakaiproject.videotraining.api.model;
 
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 
 import javax.persistence.Column;
 import javax.persistence.Convert;
@@ -9,6 +11,9 @@ import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
+import javax.persistence.JoinColumn;
+import javax.persistence.JoinTable;
+import javax.persistence.ManyToMany;
 import javax.persistence.Table;
 
 import org.hibernate.annotations.GenericGenerator;
@@ -84,6 +89,14 @@ public class VideoTrainingVideo implements PersistableEntity<String> {
     @Column(nullable = false)
     @Convert(converter = InstantEpochMillisConverter.class)
     private Instant modifiedOn = Instant.now();
+
+    @ManyToMany
+    @JoinTable(
+        name = "vtm_video_category",
+        joinColumns = @JoinColumn(name = "video_id"),
+        inverseJoinColumns = @JoinColumn(name = "category_id")
+    )
+    private Set<VideoTrainingCategory> categories = new HashSet<>();
 
     public VideoTrainingVideo(
         String siteId,
