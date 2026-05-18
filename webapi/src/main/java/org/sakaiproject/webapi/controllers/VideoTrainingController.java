@@ -8,10 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import javax.annotation.Resource;
-
 import org.apache.commons.lang3.StringUtils;
-import org.sakaiproject.authz.api.SecurityService;
 import org.sakaiproject.tool.api.Session;
 import org.sakaiproject.videotraining.api.model.PagedResponse;
 import org.sakaiproject.videotraining.api.model.VideoPublicationStatus;
@@ -22,6 +19,7 @@ import org.sakaiproject.videotraining.api.model.VideoTrainingCourseGroup;
 import org.sakaiproject.videotraining.api.model.VideoTrainingLessonLink;
 import org.sakaiproject.videotraining.api.model.VideoTrainingVideo;
 import org.sakaiproject.videotraining.api.service.VideoTrainingService;
+import org.sakaiproject.webapi.beans.VideoCategoryRestBean;
 import org.sakaiproject.webapi.beans.VideoTrainingAnalyticsRestBean;
 import org.sakaiproject.webapi.beans.VideoTrainingRestBean;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +29,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -102,7 +101,7 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         return new PagedResponse<>(beans, totalCount, safePage, safeSize);
     }
 
-    @GetMapping(value = "/api/v1/videos/grouped-by-course", produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping(value = "/videos/grouped-by-course", produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, Object> getVideosGroupedByCourse(@RequestParam(name = "siteIds") List<String> siteIds,
             @RequestParam(name = "size", required = false, defaultValue = "10") int size) {
 
@@ -124,7 +123,7 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         return Map.of("groups", payload);
     }
 
-    @GetMapping(value = {"/sites/{siteId}/video-training/{videoId}", "/api/v1/sites/{siteId}/video-training/{videoId}"}, produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping(value = {"/sites/{siteId}/videos/{videoId}"}, produces = MediaType.APPLICATION_JSON_VALUE)
     public VideoTrainingRestBean getVideoDetails(@PathVariable("siteId") String siteId, @PathVariable("videoId") String videoId) {
 
         Session session = checkSakaiSession();
@@ -143,14 +142,10 @@ public class VideoTrainingController extends AbstractSakaiApiController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot access this video");
         }
 
-        boolean canManage = videoTrainingService.canManageLibrary(siteId, userId);
-        boolean canManageCaptions = canManage;
-        boolean canAnalytics = videoTrainingService.canViewAnalytics(siteId, userId);
-
         return new VideoTrainingRestBean(video);
     }
 
-    @GetMapping(value = "/sites/{siteId}/video-training/analytics", produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping(value = "/sites/{siteId}/videos/analytics", produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, List<VideoTrainingAnalyticsRestBean>> getAnalytics(@PathVariable("siteId") String siteId) {
 
         Session session = checkSakaiSession();
@@ -166,7 +161,7 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         return Map.of("analytics", beans);
     }
 
-    @PostMapping(value = {"/sites/{siteId}/video-training/{videoId}/metadata", "/api/v1/sites/{siteId}/video-training/{videoId}/metadata"},
+    @PutMapping(value = {"/sites/{siteId}/videos/{videoId}"},
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public VideoTrainingRestBean updateVideoMetadata(@PathVariable("siteId") String siteId,
@@ -202,27 +197,41 @@ public class VideoTrainingController extends AbstractSakaiApiController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid update payload", e);
         }
 
-        boolean canAnalytics = videoTrainingService.canViewAnalytics(siteId, userId);
         if (request != null && request.getCategoryIds() != null) {
             videoTrainingService.setVideoCategoryIds(saved.getId(), request.getCategoryIds());
         }
         return new VideoTrainingRestBean(saved);
     }
 
-    @GetMapping(value = "/api/v1/sites/{siteId}/video-training/categories", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Map<String, Object> getCategories(@PathVariable("siteId") String siteId) {
+    @GetMapping(value = "/sites/{siteId}/videos/categories", produces = MediaType.APPLICATION_JSON_VALUE)
+    public PagedResponse<VideoCategoryRestBean> getCategories(
+        @PathVariable("siteId") String siteId,
+        @RequestParam(name = "page", defaultValue = "1") int page,
+        @RequestParam(name = "size", defaultValue = "10") int size
+    ) {
         Session session = checkSakaiSession();
+        String userId = session.getUserId();
         checkSite(siteId);
 
-        if (!videoTrainingService.canManageLibrary(siteId, session.getUserId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot manage this site's video taxonomy");
+        int safeSize = normalizePageSize(size);
+        Long totalCount = videoTrainingService.countCategoriesForSite(siteId, userId);
+        int safePage = normalizePage(page, safeSize, totalCount);
+
+        boolean hasAccess = siteService.allowAccessSite(siteId);
+
+        if (!hasAccess) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot access this site's video categories");
         }
 
-        List<VideoTrainingCategory> categories = videoTrainingService.getCategories(siteId);
-        return Map.of("categories", categories);
+        List<VideoTrainingCategory> categories = videoTrainingService.getCategories(siteId, safePage, safeSize);
+        List<VideoCategoryRestBean> beans = categories.stream()
+            .map(category -> new VideoCategoryRestBean(category))
+            .collect(Collectors.toList());
+
+        return new PagedResponse<>(beans, totalCount, safePage, safeSize);
     }
 
-    @PostMapping(value = "/api/v1/sites/{siteId}/video-training/categories",
+    @PostMapping(value = "/sites/{siteId}/videos/categories",
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public VideoTrainingCategory saveCategory(@PathVariable("siteId") String siteId,
@@ -233,13 +242,49 @@ public class VideoTrainingController extends AbstractSakaiApiController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot manage this site's video taxonomy");
         }
 
-        VideoTrainingCategory category = request != null && StringUtils.isNotBlank(request.getId())
-                ? videoTrainingService.getCategoryById(request.getId()).orElse(new VideoTrainingCategory())
-                : new VideoTrainingCategory();
-        category.setSiteId(siteId);
-        category.setName(StringUtils.trimToEmpty(request != null ? request.getName() : null));
-        category.setParentCategoryId(StringUtils.trimToNull(request != null ? request.getParentCategoryId() : null));
-        category.setSortOrder(request != null && request.getSortOrder() != null ? request.getSortOrder() : 0);
+        if (request == null || StringUtils.isBlank(request.getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "categoryId is required");
+        }
+
+        Optional<VideoTrainingCategory> category = videoTrainingService.getCategoryById(request.getId());
+
+        if (category.isPresent()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Category already exists with id " + request.getId());
+        }
+
+        VideoTrainingCategory newCategory = new VideoTrainingCategory(
+            siteId, request.getName(), request.getParentCategoryId(), request.getSortOrder());
+
+        try {
+            return videoTrainingService.saveCategory(newCategory);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid category payload", e);
+        }
+    }
+
+    @PutMapping("/sites/{siteId}/videos/categories/{categoryId}")
+    public VideoTrainingCategory updateVideoTrainingCategory(
+            @PathVariable("siteId") String siteId,
+            @PathVariable("categoryId") String categoryId,
+            @RequestBody VideoTrainingCategoryRequest request) {
+
+        Session session = checkSakaiSession();
+        checkSite(siteId);
+        if (!videoTrainingService.canManageLibrary(siteId, session.getUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot manage this site's video taxonomy");
+        }
+
+        if (request == null || StringUtils.isBlank(categoryId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "categoryId is required");
+        }
+
+        VideoTrainingCategory category = videoTrainingService.getCategoryById(request.getId())
+            .orElseThrow(() -> new ResponseStatusException(
+                HttpStatus.NOT_FOUND, "Category not found with id " + request.getId()));
+
+        category.setName(request.getName() != null ? request.getName() : category.getName());
+        category.setParentCategoryId(request.getParentCategoryId() != null ? request.getParentCategoryId() : category.getParentCategoryId());
+        category.setSortOrder(request.getSortOrder() != null ? request.getSortOrder() : category.getSortOrder());
 
         try {
             return videoTrainingService.saveCategory(category);
@@ -248,20 +293,17 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         }
     }
 
-    @DeleteMapping(value = "/api/v1/sites/{siteId}/video-training/categories/{categoryId}/delete")
+    @DeleteMapping(value = "/sites/{siteId}/videos/categories/{categoryId}")
     public Map<String, Object> deleteCategory(@PathVariable("siteId") String siteId,
             @PathVariable("categoryId") String categoryId) {
-        Session session = checkSakaiSession();
+        checkSakaiSession();
         checkSite(siteId);
-        if (!videoTrainingService.canManageLibrary(siteId, session.getUserId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot manage this site's video taxonomy");
-        }
 
         videoTrainingService.deleteCategory(categoryId);
         return Map.of("deleted", true);
     }
 
-    @GetMapping(value = "/api/v1/sites/{siteId}/video-training/quota", produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping(value = "/sites/{siteId}/video-training/quota", produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, Object> getQuota(@PathVariable("siteId") String siteId) {
         Session session = checkSakaiSession();
         checkSite(siteId);
@@ -274,7 +316,7 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         return Map.of("siteId", siteId, "maxBytes", maxBytes, "usedBytes", usedBytes);
     }
 
-    @PostMapping(value = "/api/v1/lessons/{siteId}/videos/{videoId}/links",
+    @PostMapping(value = "/lessons/{siteId}/videos/{videoId}/links",
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public VideoTrainingLessonLink saveLessonLink(@PathVariable("siteId") String siteId,
@@ -297,7 +339,7 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         return videoTrainingService.saveLessonLink(link);
     }
 
-    @PostMapping(value = "/api/v1/lessons/{siteId}/lesson-links/{lessonLinkId}/delete", produces = MediaType.APPLICATION_JSON_VALUE)
+    @PostMapping(value = "/lessons/{siteId}/lesson-links/{lessonLinkId}/delete", produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, Object> deleteLessonLink(@PathVariable("siteId") String siteId,
             @PathVariable("lessonLinkId") String lessonLinkId) {
         Session session = checkSakaiSession();
@@ -310,7 +352,7 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         return Map.of("deleted", true);
     }
 
-    @PostMapping(value = "/api/v1/lessons/{siteId}/promote-resource",
+    @PostMapping(value = "/lessons/{siteId}/promote-resource",
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
     public VideoTrainingRestBean promoteLessonResource(@PathVariable("siteId") String siteId,
@@ -333,15 +375,6 @@ public class VideoTrainingController extends AbstractSakaiApiController {
                 request.getFileSizeBytes());
 
         return new VideoTrainingRestBean(promoted);
-    }
-
-    @GetMapping(value = "/api/v1/video-training/health", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Map<String, Object> health() {
-        Map<String, Object> health = new HashMap<>();
-        health.put("status", "UP");
-        health.put("service", "video-training");
-        health.put("timestamp", Instant.now().toEpochMilli());
-        return health;
     }
 
     private VideoTrainingAnalyticsRestBean toAnalyticsRestBean(VideoTrainingAnalyticsSummary summary) {
@@ -374,7 +407,7 @@ public class VideoTrainingController extends AbstractSakaiApiController {
             return;
         }
 
-        if (request.getTitle() != null) {
+        if (request.getTitle() != null && !video.isInheritTitleMetadata()) {
             String title = StringUtils.trimToEmpty(request.getTitle());
             if (StringUtils.isBlank(title)) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Title cannot be blank");
@@ -382,7 +415,7 @@ public class VideoTrainingController extends AbstractSakaiApiController {
             video.setTitle(title);
         }
 
-        if (request.getDescription() != null) {
+        if (request.getDescription() != null && !video.isInheritDescriptionMetadata()) {
             video.setDescription(StringUtils.trimToEmpty(request.getDescription()));
         }
 
@@ -400,10 +433,6 @@ public class VideoTrainingController extends AbstractSakaiApiController {
             } catch (IllegalArgumentException e) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid publicationStatus", e);
             }
-        }
-
-        if (request.getFileSizeBytes() != null && request.getFileSizeBytes() >= 0L) {
-            video.setFileSizeBytes(request.getFileSizeBytes());
         }
 
         if (Boolean.TRUE.equals(request.getClearReleaseDate())) {

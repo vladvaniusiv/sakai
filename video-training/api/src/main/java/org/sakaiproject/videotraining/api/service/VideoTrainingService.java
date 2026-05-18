@@ -64,6 +64,8 @@ public interface VideoTrainingService {
      */
     long countSiteVideosForUser(String siteId, String userId, String searchText);
 
+    long countCategoriesForSite(String siteId, String userId);
+
     List<VideoTrainingVideo> getVisibleGlobalVideosPage(String searchText, int page, int size);
 
     List<VideoTrainingVideo> getGlobalVideosForUser(String userId, String searchText, int page, int size);
@@ -111,6 +113,8 @@ public interface VideoTrainingService {
 
     boolean canViewAnalytics(String siteId, String userId);
 
+    boolean canManageCategories(String siteId, String userId);
+
     boolean canManageCaptions(String siteId, String userId);
 
     Long getSiteStorageQuotaBytes(String siteId);
@@ -119,7 +123,7 @@ public interface VideoTrainingService {
 
     void registerAudit(String siteId, String userId, String action, String videoId, String details);
 
-    List<VideoTrainingCategory> getCategories(String siteId);
+    List<VideoTrainingCategory> getCategories(String siteId, int offset, int limit);
 
     Optional<VideoTrainingCategory> getCategoryById(String categoryId);
 

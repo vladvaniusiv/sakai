@@ -7,5 +7,6 @@ import org.sakaiproject.videotraining.api.model.VideoTrainingCategory;
 
 public interface VideoTrainingCategoryRepository extends SpringCrudRepository<VideoTrainingCategory, String> {
 
-    List<VideoTrainingCategory> findBySiteIdOrderBySortOrderAscNameAsc(String siteId);
+    List<VideoTrainingCategory> findBySiteIdOrderBySortOrderAscNameAsc(String siteId, int offset, int limit);
+    long countBySiteId(String siteId);
 }

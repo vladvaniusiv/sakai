@@ -36,8 +36,8 @@ import org.sakaiproject.videotraining.api.repository.VideoTrainingAnalyticsEvent
 import org.sakaiproject.videotraining.api.repository.VideoTrainingCaptionRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingCategoryRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingLessonLinkRepository;
-import org.sakaiproject.videotraining.api.repository.VideoTrainingVideoCategoryRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingVideoRepository;
+import org.sakaiproject.videotraining.impl.service.VideoTrainingServiceImpl;
 
 public class VideoTrainingServiceImplTest {
 
@@ -51,7 +51,6 @@ public class VideoTrainingServiceImplTest {
     private VideoTrainingCaptionRepository captionRepository;
     private VideoTrainingAnalyticsEventRepository analyticsEventRepository;
     private VideoTrainingCategoryRepository categoryRepository;
-    private VideoTrainingVideoCategoryRepository videoCategoryRepository;
     private VideoTrainingLessonLinkRepository lessonLinkRepository;
     private ContentHostingService contentHostingService;
     private EventTrackingService eventTrackingService;
@@ -66,7 +65,6 @@ public class VideoTrainingServiceImplTest {
         captionRepository = Mockito.mock(VideoTrainingCaptionRepository.class);
         analyticsEventRepository = Mockito.mock(VideoTrainingAnalyticsEventRepository.class);
         categoryRepository = Mockito.mock(VideoTrainingCategoryRepository.class);
-        videoCategoryRepository = Mockito.mock(VideoTrainingVideoCategoryRepository.class);
         lessonLinkRepository = Mockito.mock(VideoTrainingLessonLinkRepository.class);
         contentHostingService = Mockito.mock(ContentHostingService.class);
         eventTrackingService = Mockito.mock(EventTrackingService.class);
@@ -80,7 +78,6 @@ public class VideoTrainingServiceImplTest {
         service.setCaptionRepository(captionRepository);
         service.setAnalyticsEventRepository(analyticsEventRepository);
         service.setCategoryRepository(categoryRepository);
-        service.setVideoCategoryRepository(videoCategoryRepository);
         service.setLessonLinkRepository(lessonLinkRepository);
         service.setContentHostingService(contentHostingService);
         service.setEventTrackingService(eventTrackingService);

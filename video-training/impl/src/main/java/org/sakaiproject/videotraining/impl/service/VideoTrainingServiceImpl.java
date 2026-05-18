@@ -6,11 +6,13 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -30,6 +32,7 @@ import org.sakaiproject.tool.api.SessionManager;
 import org.sakaiproject.videotraining.api.VideoTrainingConstants;
 import static org.sakaiproject.videotraining.api.VideoTrainingConstants.PERMISSION_ANALYTICS;
 import static org.sakaiproject.videotraining.api.VideoTrainingConstants.PERMISSION_CAPTIONS_MANAGE;
+import static org.sakaiproject.videotraining.api.VideoTrainingConstants.PERMISSION_CATEGORIES_MANAGE;
 import static org.sakaiproject.videotraining.api.VideoTrainingConstants.PERMISSION_MANAGE;
 import static org.sakaiproject.videotraining.api.VideoTrainingConstants.PERMISSION_MANAGE_ALL;
 import static org.sakaiproject.videotraining.api.VideoTrainingConstants.PERMISSION_VIEW;
@@ -49,7 +52,6 @@ import org.sakaiproject.videotraining.api.repository.VideoTrainingCaptionReposit
 import org.sakaiproject.videotraining.api.repository.VideoTrainingCategoryRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingLessonLinkRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingUserVideoPreferenceRepository;
-import org.sakaiproject.videotraining.api.repository.VideoTrainingVideoCategoryRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingVideoRepository;
 import org.sakaiproject.videotraining.api.service.VideoTrainingService;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,7 +70,6 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
     @Setter private VideoTrainingCaptionRepository captionRepository;
     @Setter private VideoTrainingAnalyticsEventRepository analyticsEventRepository;
     @Setter private VideoTrainingCategoryRepository categoryRepository;
-    @Setter private VideoTrainingVideoCategoryRepository videoCategoryRepository;
     @Setter private VideoTrainingLessonLinkRepository lessonLinkRepository;
     @Setter private VideoTrainingUserVideoPreferenceRepository userVideoPreferenceRepository;
     @Setter private ContentHostingService contentHostingService;
@@ -224,11 +225,12 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
             analyticsEventRepository.delete(event);
         }
 
-        videoCategoryRepository.deleteByVideoId(videoId);
         lessonLinkRepository.deleteByVideoId(videoId);
         if (userVideoPreferenceRepository != null) {
             userVideoPreferenceRepository.deleteByVideoId(videoId);
         }
+
+        existing.getCategories().clear();
 
         videoRepository.delete(existing);
         registerAudit(existing.getSiteId(), currentUserId, "VIDEO_DELETED", videoId, existing.getTitle());
@@ -360,6 +362,18 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
 
         // Otherwise, count the visible videos for the user.
         return countVisibleVideosForUser(siteId, userId, Instant.now(), query);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long countCategoriesForSite(String siteId, String userId) {
+        boolean hasAccess = siteService.allowAccessSite(siteId);
+
+        if (!hasAccess) {
+            return 0L;
+        }
+
+        return categoryRepository.countBySiteId(siteId);
     }
 
     @Override
@@ -712,17 +726,17 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
     public List<VideoTrainingAnalyticsSummary> getSiteAnalyticsSummary(String siteId) {
         List<VideoTrainingAnalyticsEvent> events = analyticsEventRepository.findBySiteIdAndEventType(siteId, "view");
 
-        java.util.Map<String, Long> totalViewsByVideo = new java.util.HashMap<>();
-        java.util.Map<String, java.util.Set<String>> usersByVideo = new java.util.HashMap<>();
+        Map<String, Long> totalViewsByVideo = new HashMap<>();
+        Map<String, Set<String>> usersByVideo = new HashMap<>();
 
         for (VideoTrainingAnalyticsEvent event : events) {
             totalViewsByVideo.merge(event.getVideoId(), 1L, Long::sum);
-            usersByVideo.computeIfAbsent(event.getVideoId(), key -> new java.util.HashSet<>()).add(event.getUserId());
+            usersByVideo.computeIfAbsent(event.getVideoId(), key -> new HashSet<>()).add(event.getUserId());
         }
 
         List<VideoTrainingAnalyticsSummary> summaries = new ArrayList<>();
-        for (java.util.Map.Entry<String, Long> entry : totalViewsByVideo.entrySet()) {
-            java.util.Set<String> users = usersByVideo.getOrDefault(entry.getKey(), java.util.Set.of());
+        for (Map.Entry<String, Long> entry : totalViewsByVideo.entrySet()) {
+            Set<String> users = usersByVideo.getOrDefault(entry.getKey(), Set.of());
             summaries.add(new VideoTrainingAnalyticsSummary(entry.getKey(), entry.getValue(), users.size()));
         }
 
@@ -793,6 +807,14 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
 
         String requiredPermission = StringUtils.defaultIfBlank(video.getRequiredViewPermission(), VideoTrainingConstants.PERMISSION_VIEW);
         return securityService.unlock(userId, requiredPermission, siteRef);
+    }
+
+    @Override
+    public boolean canManageCategories(String siteId, String userId) {
+        if (securityService.isSuperUser(userId)) {
+            return true;
+        }
+        return securityService.unlock(userId, PERMISSION_CATEGORIES_MANAGE, siteService.siteReference(siteId));
     }
 
     @Override
@@ -873,8 +895,9 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<VideoTrainingCategory> getCategories(String siteId) {
-        return categoryRepository.findBySiteIdOrderBySortOrderAscNameAsc(siteId);
+    public List<VideoTrainingCategory> getCategories(String siteId, int page, int size) {
+        int offset = (page - 1) * size;
+        return categoryRepository.findBySiteIdOrderBySortOrderAscNameAsc(siteId, offset, size);
     }
 
     @Override
@@ -909,6 +932,7 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
     }
 
     @Override
+    @Transactional
     public void deleteCategory(String categoryId) {
         VideoTrainingCategory category = categoryRepository.findById(categoryId).orElse(null);
         if (category == null) {
@@ -920,25 +944,28 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
             throw new SecurityException("User cannot manage categories for site " + category.getSiteId());
         }
 
-        for (VideoTrainingVideo video : getSiteLibrary(category.getSiteId())) {
-            List<String> ids = getVideoCategoryIds(video.getId());
-            if (ids.remove(categoryId)) {
-                setVideoCategoryIds(video.getId(), ids);
-            }
+        for (VideoTrainingVideo video : category.getVideos()) {
+            video.getCategories().remove(category);
         }
 
+        category.getVideos().clear();
+
         categoryRepository.delete(category);
+
         registerAudit(category.getSiteId(), userId, "CATEGORY_DELETED", null, category.getName());
     }
 
     @Override
     @Transactional(readOnly = true)
     public List<String> getVideoCategoryIds(String videoId) {
-        List<String> ids = new ArrayList<>();
-        for (org.sakaiproject.videotraining.api.model.VideoTrainingVideoCategory row : videoCategoryRepository.findByVideoId(videoId)) {
-            ids.add(row.getCategoryId());
-        }
-        return ids;
+
+        VideoTrainingVideo video = getVideoById(videoId)
+            .orElseThrow(() -> new IllegalArgumentException("Unknown video"));
+
+        return video.getCategories()
+            .stream()
+            .map(VideoTrainingCategory::getId)
+            .toList();
     }
 
     @Override
@@ -949,7 +976,8 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
             throw new SecurityException("User cannot manage categories for this video");
         }
 
-        videoCategoryRepository.deleteByVideoId(videoId);
+        video.getCategories().clear();
+
         if (categoryIds != null) {
             for (String categoryId : categoryIds) {
                 if (StringUtils.isBlank(categoryId)) {
@@ -959,13 +987,10 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
                 if (category == null || !StringUtils.equals(category.getSiteId(), video.getSiteId())) {
                     continue;
                 }
-                org.sakaiproject.videotraining.api.model.VideoTrainingVideoCategory row = new org.sakaiproject.videotraining.api.model.VideoTrainingVideoCategory();
-                row.setVideoId(videoId);
-                row.setCategoryId(categoryId);
-                row.setCreatedOn(Instant.now());
-                videoCategoryRepository.save(row);
+                video.getCategories().add(category);
             }
         }
+        videoRepository.save(video);
         registerAudit(video.getSiteId(), userId, "VIDEO_CATEGORIES_UPDATED", videoId, String.join(",", getVideoCategoryIds(videoId)));
     }
 
