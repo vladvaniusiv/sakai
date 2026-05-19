@@ -15245,13 +15245,14 @@ public class AssignmentAction extends PagedResourceActionII {
                             }
                         }
                     }
+                    Set<String> processedEids = new HashSet<>();
                     InputStream fileContentStream = fileFromUpload.getInputStream();
                     if (fileContentStream != null) {
                         submissionTable = uploadAll_parseZipFile(state,
                                 hasSubmissionText, hasSubmissionAttachment,
                                 hasGradeFile, hasFeedbackText, hasComment,
                                 hasFeedbackAttachment, submissionTable,
-                                assignment, fileContentStream, gradeFileFormat, anonymousSubmissionAndEidTable);
+                                assignment, fileContentStream, gradeFileFormat, anonymousSubmissionAndEidTable, processedEids);
                     }
 
                     if (state.getAttribute(STATE_MESSAGE) == null) {
@@ -15261,7 +15262,7 @@ public class AssignmentAction extends PagedResourceActionII {
                                 hasSubmissionText, hasSubmissionAttachment,
                                 hasGradeFile, hasFeedbackText, hasComment,
                                 hasFeedbackAttachment, releaseGrades,
-                                submissionTable, submissions, assignment);
+                                submissionTable, submissions, assignment, processedEids);
                     }
                 }
             }
@@ -15297,7 +15298,7 @@ public class AssignmentAction extends PagedResourceActionII {
                                                                    boolean hasSubmissionText, boolean hasSubmissionAttachment,
                                                                    boolean hasGradeFile, boolean hasFeedbackText, boolean hasComment,
                                                                    boolean hasFeedbackAttachment, Map<String, UploadGradeWrapper> submissionTable,
-                                                                   Assignment assignment, InputStream fileContentStream, String gradeFileFormat, Map<String, String> anonymousSubmissionAndEidTable) {
+                                                                   Assignment assignment, InputStream fileContentStream, String gradeFileFormat, Map<String, String> anonymousSubmissionAndEidTable, Set<String> processedEids) {
         // a flag value for checking whether the zip file is of proper format:
         // should have a grades.csv file or grades.xls if there is no user folders
         boolean zipHasGradeFile = false;
@@ -15381,6 +15382,7 @@ public class AssignmentAction extends PagedResourceActionII {
                                                 if (state.getAttribute(STATE_MESSAGE) == null) {
                                                     w.setGrade(gradeType == Assignment.GradeType.SCORE_GRADE_TYPE ? scalePointGrade(state, itemString, assignment.getScaleFactor()) : itemString);
                                                     submissionTable.put(eid, w);
+                                                    processedEids.add(eid);
                                                 }
                                             }
 
@@ -15458,6 +15460,7 @@ public class AssignmentAction extends PagedResourceActionII {
                                             if (state.getAttribute(STATE_MESSAGE) == null) {
                                                 w.setGrade(gradeType == Assignment.GradeType.SCORE_GRADE_TYPE ? scalePointGrade(state, itemString, assignment.getScaleFactor()) : itemString);
                                                 submissionTable.put(eid, w);
+                                                processedEids.add(eid);
                                             }
                                         }
                                     } catch (Exception e) {
@@ -15508,6 +15511,7 @@ public class AssignmentAction extends PagedResourceActionII {
 
                             if (submissionTable.containsKey(userEid)) {
                                 if (!zipHasFolderValidUserId) zipHasFolderValidUserId = true;
+                                processedEids.add(userEid);
                                 if (hasComment && entryName.contains("comments")) {
                                     // read the comments file
                                     String comment = getBodyTextFromZipHtml(zipFile.getInputStream(entry), true);
@@ -15691,7 +15695,7 @@ public class AssignmentAction extends PagedResourceActionII {
                                              boolean hasSubmissionText, boolean hasSubmissionAttachment,
                                              boolean hasGradeFile, boolean hasFeedbackText, boolean hasComment,
                                              boolean hasFeedbackAttachment, boolean releaseGrades,
-                                             Map<String, UploadGradeWrapper> submissionTable, Set<AssignmentSubmission> submissions, Assignment assignment) {
+                                             Map<String, UploadGradeWrapper> submissionTable, Set<AssignmentSubmission> submissions, Assignment assignment, Set<String> processedEids) {
         if (assignment != null && submissions != null) {
             for (AssignmentSubmission submission : submissions) {
                 String eid;
@@ -15724,7 +15728,7 @@ public class AssignmentAction extends PagedResourceActionII {
                 }
 
                 UploadGradeWrapper w = submissionTable.get(eid);
-                if (w != null) {
+                if (w != null && processedEids.contains(eid)) {
                     // the feedback text
                     if (hasFeedbackText) {
                         submission.setFeedbackText(w.getFeedbackText());
