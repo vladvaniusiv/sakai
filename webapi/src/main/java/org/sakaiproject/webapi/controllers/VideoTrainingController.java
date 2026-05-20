@@ -365,7 +365,7 @@ public class VideoTrainingController extends AbstractSakaiApiController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot manage this site's video quota");
         }
 
-        Long maxBytes = videoTrainingService.getSiteStorageQuotaBytes(siteId);
+        Long maxBytes = Optional.ofNullable(videoTrainingService.getSiteStorageQuotaBytes(siteId)).orElse(0L);
         long usedBytes = videoTrainingService.getSiteStorageUsageBytes(siteId);
         return Map.of("siteId", siteId, "maxBytes", maxBytes, "usedBytes", usedBytes);
     }
