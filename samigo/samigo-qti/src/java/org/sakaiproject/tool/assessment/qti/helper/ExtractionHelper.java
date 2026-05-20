@@ -23,6 +23,7 @@
 
 package org.sakaiproject.tool.assessment.qti.helper;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1271,14 +1272,24 @@ public class ExtractionHelper
 			  // oldSplittedResourceId[2] = b917f0b9-e21d-4819-80ee-35feac91c9eb or ktsao
 			  // oldSplittedResourceId[3] = Blue Hill.jpg
 			  endIndex = splittedString[i].indexOf("\"",splittedString[i].indexOf("\"")+1);
-			  oldResourceId = splittedString[i].substring(splittedString[i].indexOf("\"")+1, endIndex);
-			  String[] oldSplittedResourceId = oldResourceId.split("/");
-			  fullFilePath = unzipLocation + "/" + oldResourceId.replace(" ", "");
-			  filename = oldSplittedResourceId[oldSplittedResourceId.length - 1];
-			  MimetypesFileTypeMap mimetypesFileTypeMap = new MimetypesFileTypeMap();
-			  contentType = mimetypesFileTypeMap.getContentType(filename);
-			  contentResource = attachmentHelper.createContentResource(fullFilePath, filename, contentType);
-
+        oldResourceId = splittedString[i].substring(splittedString[i].indexOf("\"")+1, endIndex);
+        String decodedResourceId = oldResourceId;
+        try {
+            decodedResourceId = java.net.URLDecoder.decode(oldResourceId, java.nio.charset.StandardCharsets.UTF_8.name());
+        } catch (java.io.UnsupportedEncodingException e) {
+            log.warn("QTI Import - Could not decode resource URL: " + oldResourceId);
+        }
+        String[] oldSplittedResourceId = decodedResourceId.split("/");
+        filename = oldSplittedResourceId[oldSplittedResourceId.length - 1];
+        fullFilePath = unzipLocation + "/" + decodedResourceId.replace(" ", "");
+        File physicalFile = new File(fullFilePath);
+        if (physicalFile.exists() && !physicalFile.isDirectory()) {
+          MimetypesFileTypeMap mimetypesFileTypeMap = new MimetypesFileTypeMap();
+          contentType = mimetypesFileTypeMap.getContentType(filename);
+          contentResource = attachmentHelper.createContentResource(fullFilePath, filename, contentType);
+        } else {
+          log.warn("QTI Import - Physical file not found in ZIP package: " + fullFilePath + ". Migration of this resource will be skipped.");
+        }
 			  if (contentResource != null) {
 				  resourceId = contentResource.getId();
 				  updatedText.append(splittedString[i].substring(0,splittedString[i].indexOf("\"")+1));
@@ -1287,7 +1298,8 @@ public class ExtractionHelper
 				  updatedText.append(splittedString[i].substring(endIndex));
 			  }
 			  else {
-				  throw new RuntimeException("resourceId is null");
+          updatedText.append(splittedString[i].substring(0, endIndex));
+          updatedText.append(splittedString[i].substring(endIndex));
 			  }
 
 		  }
