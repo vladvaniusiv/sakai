@@ -95,6 +95,53 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
     }
 
     @Override
+    public VideoTrainingVideo updateVideoVisibility(String videoId, VideoVisibilityScope newScope) {
+        if (StringUtils.isBlank(videoId)) {
+            throw new IllegalArgumentException("videoId must not be blank");
+        }
+        if (newScope == null) {
+            throw new IllegalArgumentException("newScope must not be null");
+        }
+
+        VideoTrainingVideo existing = getVideoById(videoId).orElseThrow(() -> new IllegalArgumentException("Unknown videoId"));
+        existing.setVisibilityScope(newScope);
+        return videoRepository.save(existing);
+    }
+
+    @Override
+    public VideoTrainingVideo updateVideoStatus(String videoId, VideoPublicationStatus newStatus) {
+        if (StringUtils.isBlank(videoId)) {
+            throw new IllegalArgumentException("videoId must not be blank");
+        }
+
+        if (newStatus == null) {
+            throw new IllegalArgumentException("newStatus must not be null");
+        }
+
+        VideoTrainingVideo existing = getVideoById(videoId).orElseThrow(() -> new IllegalArgumentException("Unknown videoId"));
+        validatePublicationStatusTransition(normalizePublicationStatus(existing.getPublicationStatus()), normalizePublicationStatus(newStatus), existing.getVisibilityScope());
+
+        existing.setPublicationStatus(newStatus);
+        return videoRepository.save(existing);
+    }
+
+    @Override
+    public VideoTrainingVideo updateVideoSchedule(String videoId, Instant releaseDate, Instant retractDate) {
+        if (StringUtils.isBlank(videoId)) {
+            throw new IllegalArgumentException("videoId must not be blank");
+        }
+
+        VideoTrainingVideo existingVideo = getVideoById(videoId).orElseThrow(() -> new IllegalArgumentException("Unknown videoId"));
+        if (releaseDate != null && retractDate != null && releaseDate.isAfter(retractDate)) {
+            throw new IllegalArgumentException("releaseDate must be before retractDate");
+        }
+
+        existingVideo.setReleaseDate(releaseDate);
+        existingVideo.setRetractDate(retractDate);
+        return videoRepository.save(existingVideo);
+    }
+
+    @Override
     public VideoTrainingVideo saveVideo(VideoTrainingVideo video) {
         if (video == null) {
             throw new IllegalArgumentException("video must not be null");
