@@ -15,16 +15,22 @@ import javax.persistence.Table;
 import org.hibernate.annotations.GenericGenerator;
 import org.sakaiproject.springframework.data.PersistableEntity;
 
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
 @Entity
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @Table(name = "vtm_category")
 public class VideoTrainingCategory implements PersistableEntity<String> {
 
     @Id
+    @EqualsAndHashCode.Include
     @GeneratedValue(generator = "uuid2")
     @GenericGenerator(name = "uuid2", strategy = "uuid2")
     @Column(nullable = false, length = 36)
@@ -50,6 +56,7 @@ public class VideoTrainingCategory implements PersistableEntity<String> {
     @Convert(converter = InstantEpochMillisConverter.class)
     private Instant modifiedOn = Instant.now();
 
+    @ToString.Exclude
     @ManyToMany(mappedBy = "categories")
     private Set<VideoTrainingVideo> videos = new HashSet<>();
 
