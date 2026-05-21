@@ -27,6 +27,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -123,26 +124,40 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         return Map.of("groups", payload);
     }
 
-    @GetMapping(value = {"/sites/{siteId}/videos/{videoId}"}, produces = MediaType.APPLICATION_JSON_VALUE)
-    public VideoTrainingRestBean getVideoDetails(@PathVariable("siteId") String siteId, @PathVariable("videoId") String videoId) {
+    @GetMapping(value = {"/videos/{videoId}"}, produces = MediaType.APPLICATION_JSON_VALUE)
+    public VideoTrainingRestBean getVideoDetails(@PathVariable("videoId") String videoId) {
 
         Session session = checkSakaiSession();
-        checkSite(siteId);
 
         Optional<VideoTrainingVideo> optionalVideo = videoTrainingService.getVideoById(videoId);
         VideoTrainingVideo video = optionalVideo.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Video not found"));
 
-        if (!siteId.equals(video.getSiteId())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Video does not belong to site " + siteId);
-        }
-
         String userId = session.getUserId();
         if (!videoTrainingService.canViewVideo(video, userId, Instant.now())
-                && !videoTrainingService.canManageLibrary(siteId, userId)) {
+                && !videoTrainingService.canManageLibrary(video.getSiteId(), userId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot access this video");
         }
 
         return new VideoTrainingRestBean(video);
+    }
+
+    @GetMapping(value = {"/videos/{videoId}/categories"}, produces = MediaType.APPLICATION_JSON_VALUE)
+    public List<VideoCategoryRestBean> getVideoCategories(@PathVariable("videoId") String videoId) {
+        Session session = checkSakaiSession();
+
+        Optional<VideoTrainingVideo> optionalVideo = videoTrainingService.getVideoById(videoId);
+        VideoTrainingVideo video = optionalVideo.orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Video not found"));
+
+        String userId = session.getUserId();
+        if (!videoTrainingService.canViewVideo(video, userId, Instant.now())
+                && !videoTrainingService.canManageLibrary(video.getSiteId(), userId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot access this video");
+        }
+
+        return video.getCategories()
+            .stream()
+            .map(VideoCategoryRestBean::new)
+            .toList();
     }
 
     @GetMapping(value = "/sites/{siteId}/videos/analytics", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -161,27 +176,20 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         return Map.of("analytics", beans);
     }
 
-    @PutMapping(value = {"/sites/{siteId}/videos/{videoId}"},
+    @PutMapping(value = {"/videos/{videoId}"},
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
-    public VideoTrainingRestBean updateVideoMetadata(@PathVariable("siteId") String siteId,
-            @PathVariable("videoId") String videoId,
+    public VideoTrainingRestBean updateVideoMetadata(@PathVariable("videoId") String videoId,
             @RequestBody VideoTrainingUpdateRequest request) {
 
         Session session = checkSakaiSession();
-        checkSite(siteId);
-
-        String userId = session.getUserId();
-        boolean canManage = videoTrainingService.canManageLibrary(siteId, userId);
-        if (!canManage) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot manage this site's video library");
-        }
 
         VideoTrainingVideo video = videoTrainingService.getVideoById(videoId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Video not found"));
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Video not found"));
 
-        if (!siteId.equals(video.getSiteId())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Video does not belong to site " + siteId);
+        boolean canManage = videoTrainingService.canManageLibrary(video.getSiteId(), session.getUserId());
+        if (!canManage) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot manage this site's video library");
         }
 
         applyUpdateRequest(video, request);
@@ -263,7 +271,7 @@ public class VideoTrainingController extends AbstractSakaiApiController {
     }
 
     @PutMapping("/sites/{siteId}/videos/categories/{categoryId}")
-    public VideoTrainingCategory updateVideoTrainingCategory(
+    public VideoTrainingCategory updateVideoCategory(
             @PathVariable("siteId") String siteId,
             @PathVariable("categoryId") String categoryId,
             @RequestBody VideoTrainingCategoryRequest request) {
@@ -293,6 +301,43 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         }
     }
 
+    @PatchMapping("/videos/{videoId}/visibility")
+    public VideoTrainingRestBean changeVideoVisibility(
+            @PathVariable("videoId") String videoId,
+            @RequestParam("visibilityScope") VideoVisibilityScope visibilityScope) {
+        checkSakaiSession();
+
+        VideoTrainingVideo updatedVideo = videoTrainingService.updateVideoVisibility(videoId, visibilityScope);
+
+        return new VideoTrainingRestBean(updatedVideo);
+    }
+
+    @PatchMapping("/videos/{videoId}/status")
+    public VideoTrainingRestBean changeVideoStatus(
+            @PathVariable("videoId") String videoId,
+            @RequestParam("status") VideoPublicationStatus status) {
+        checkSakaiSession();
+
+        VideoTrainingVideo updatedVideo = videoTrainingService.updateVideoStatus(videoId, status);
+
+        return new VideoTrainingRestBean(updatedVideo);
+    }
+
+    @PatchMapping("/videos/{videoId}/schedule")
+    public VideoTrainingRestBean scheduleVideo(
+            @PathVariable("videoId") String videoId,
+            @RequestParam(name = "releaseDateEpochMs", required = false) Long releaseDateEpochMs,
+            @RequestParam(name = "retractDateEpochMs", required = false) Long retractDateEpochMs) {
+        checkSakaiSession();
+
+        Instant releaseDate = releaseDateEpochMs != null ? Instant.ofEpochMilli(releaseDateEpochMs) : null;
+        Instant retractDate = retractDateEpochMs != null ? Instant.ofEpochMilli(retractDateEpochMs) : null;
+
+        VideoTrainingVideo updatedVideo = videoTrainingService.updateVideoSchedule(videoId, releaseDate, retractDate);
+
+        return new VideoTrainingRestBean(updatedVideo);
+    }
+
     @DeleteMapping(value = "/sites/{siteId}/videos/categories/{categoryId}")
     public Map<String, Object> deleteCategory(@PathVariable("siteId") String siteId,
             @PathVariable("categoryId") String categoryId) {
@@ -303,7 +348,7 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         return Map.of("deleted", true);
     }
 
-    @GetMapping(value = "/sites/{siteId}/video-training/quota", produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping(value = "/sites/{siteId}/videos/quota", produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, Object> getQuota(@PathVariable("siteId") String siteId) {
         Session session = checkSakaiSession();
         checkSite(siteId);

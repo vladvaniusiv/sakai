@@ -14,8 +14,15 @@ import org.sakaiproject.videotraining.api.model.VideoTrainingCourseGroup;
 import org.sakaiproject.videotraining.api.model.VideoTrainingLessonLink;
 import org.sakaiproject.videotraining.api.model.VideoTrainingUserVideoPreference;
 import org.sakaiproject.videotraining.api.model.VideoTrainingVideo;
+import org.sakaiproject.videotraining.api.model.VideoVisibilityScope;
 
 public interface VideoTrainingService {
+
+    VideoTrainingVideo updateVideoVisibility(String videoId, VideoVisibilityScope newScope);
+
+    VideoTrainingVideo updateVideoStatus(String videoId, VideoPublicationStatus newStatus);
+
+    VideoTrainingVideo updateVideoSchedule(String videoId, Instant releaseDate, Instant retractDate);
 
     VideoTrainingVideo saveVideo(VideoTrainingVideo video);
 
