@@ -983,7 +983,7 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
     public void deleteCategory(String categoryId) {
         VideoTrainingCategory category = categoryRepository.findById(categoryId).orElse(null);
         if (category == null) {
-            return;
+            throw new IllegalArgumentException("Unknown category");
         }
 
         String userId = sessionManager.getCurrentSessionUserId();

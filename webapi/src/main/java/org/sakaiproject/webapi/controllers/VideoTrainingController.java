@@ -80,7 +80,8 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         @PathVariable(required = true) String siteId,
         @RequestParam(name = "q", required = false) String q,
         @RequestParam(name = "page", defaultValue = "1") int page,
-        @RequestParam(name = "size", defaultValue = "10") int size
+        @RequestParam(name = "size", defaultValue = "10") int size,
+        @RequestParam(name = "view", defaultValue = "viewable") String view
     ) {
         Session session = checkSakaiSession();
         String userId = session.getUserId();
@@ -88,12 +89,28 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         String query = StringUtils.trimToEmpty(q);
         int safeSize = normalizePageSize(size);
 
-        Long totalCount = videoTrainingService.countSiteVideosForUser(siteId, userId, query);
+        if (view != null && !view.equals("manageable") && !view.equals("viewable")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid view parameter");
+        }
+
+        Long totalCount = 0L;
+        List<VideoTrainingVideo> paginatedVideoList = new ArrayList<>();
 
         int safePage = normalizePage(page, safeSize, totalCount);
 
-        List<VideoTrainingVideo> paginatedVideoList =
-            videoTrainingService.getSiteVideosForUserPage(siteId, userId, query, safePage, safeSize);
+        switch (view) {
+            case "manageable":
+                totalCount = videoTrainingService.countSiteVideosForUser(siteId, userId, query);
+                paginatedVideoList =
+                    videoTrainingService.getSiteVideosForUserPage(siteId, userId, query, safePage, safeSize);
+                break;
+            case "viewable":
+                totalCount = videoTrainingService.countSiteViewableVideosForUser(
+                    siteId, userId, query
+                );
+                paginatedVideoList = videoTrainingService.getSiteViewableVideosForUserPage(siteId, userId, query, safePage, safeSize);
+                break;
+        }
 
         List<VideoTrainingRestBean> beans = paginatedVideoList.stream()
             .map(video -> new VideoTrainingRestBean(video))
@@ -250,16 +267,6 @@ public class VideoTrainingController extends AbstractSakaiApiController {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot manage this site's video taxonomy");
         }
 
-        if (request == null || StringUtils.isBlank(request.getId())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "categoryId is required");
-        }
-
-        Optional<VideoTrainingCategory> category = videoTrainingService.getCategoryById(request.getId());
-
-        if (category.isPresent()) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Category already exists with id " + request.getId());
-        }
-
         VideoTrainingCategory newCategory = new VideoTrainingCategory(
             siteId, request.getName(), request.getParentCategoryId(), request.getSortOrder());
 
@@ -286,12 +293,21 @@ public class VideoTrainingController extends AbstractSakaiApiController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "categoryId is required");
         }
 
-        VideoTrainingCategory category = videoTrainingService.getCategoryById(request.getId())
+        VideoTrainingCategory category = videoTrainingService.getCategoryById(categoryId)
             .orElseThrow(() -> new ResponseStatusException(
-                HttpStatus.NOT_FOUND, "Category not found with id " + request.getId()));
+                HttpStatus.NOT_FOUND, "Category not found with id " + categoryId));
 
         category.setName(request.getName() != null ? request.getName() : category.getName());
-        category.setParentCategoryId(request.getParentCategoryId() != null ? request.getParentCategoryId() : category.getParentCategoryId());
+
+        if (request.getParentCategoryId() != null) {
+            Optional<VideoTrainingCategory> parentCategory = videoTrainingService.getCategoryById(request.getParentCategoryId());
+            if (parentCategory.isPresent() && parentCategory.get().getSiteId().equals(siteId)) {
+                category.setParentCategoryId(request.getParentCategoryId());
+            } else {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid parentCategoryId");
+            }
+        }
+
         category.setSortOrder(request.getSortOrder() != null ? request.getSortOrder() : category.getSortOrder());
 
         try {
@@ -593,18 +609,9 @@ public class VideoTrainingController extends AbstractSakaiApiController {
 
     public static class VideoTrainingCategoryRequest {
 
-        private String id;
         private String name;
         private String parentCategoryId;
         private Integer sortOrder;
-
-        public String getId() {
-            return id;
-        }
-
-        public void setId(String id) {
-            this.id = id;
-        }
 
         public String getName() {
             return name;
