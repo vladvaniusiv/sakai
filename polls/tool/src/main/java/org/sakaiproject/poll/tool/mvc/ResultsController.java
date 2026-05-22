@@ -139,8 +139,10 @@ public class ResultsController {
         boolean isAdmin = securityService.isSuperUser();
         boolean canAdd = isAdmin || securityService.unlock(PERMISSION_ADD, siteRef);
         boolean isSiteOwner = isAdmin || securityService.unlock("site.upd", siteRef);
+        boolean canEdit = canEditPoll(currentPoll);
 
         model.addAttribute("poll", currentPoll);
+        model.addAttribute("canEdit", canEdit);
         model.addAttribute("rows", rows);
         model.addAttribute("chartLabels", rows.stream().map(ResultRow::getChartLabel).collect(Collectors.toList()));
         model.addAttribute("chartVotes", rows.stream().map(ResultRow::getVotes).collect(Collectors.toList()));
@@ -195,6 +197,18 @@ public class ResultsController {
             text += messageSource.getMessage("deleted_option_tag_html", null, locale);
         }
         return text;
+    }
+
+    private boolean canEditPoll(Poll poll) {
+        if (securityService.isSuperUser()) {
+            return true;
+        }
+        String siteRef = siteService.siteReference(toolManager.getCurrentPlacement().getContext());
+        if (securityService.unlock("poll.editAny", siteRef)) {
+            return true;
+        }
+        return securityService.unlock("poll.editOwn", siteRef)
+                && StringUtils.equals(poll.getOwner(), sessionManager.getCurrentSessionUserId());
     }
 
     @Value
