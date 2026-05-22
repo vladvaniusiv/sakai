@@ -1,7 +1,8 @@
 package org.sakaiproject.webapi.beans;
 
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.sakaiproject.videotraining.api.model.VideoProviderType;
 import org.sakaiproject.videotraining.api.model.VideoPublicationStatus;
@@ -20,10 +21,7 @@ public class VideoTrainingRestBean {
     private Long fileSizeBytes;
     private String visibilityScope;
     private String publicationStatus;
-    /*private boolean canView;
-    private boolean canManage;
-    private boolean canManageCaptions;
-    private boolean canViewAnalytics;*/
+    private List<VideoCategoryRestBean> categories;
 
     public void setProviderType(VideoProviderType providerType) {
         this.providerType = providerType != null ? providerType.name() : "";
@@ -46,6 +44,11 @@ public class VideoTrainingRestBean {
         this.fileSizeBytes = video.getFileSizeBytes();
         this.setVisibilityScope(video.getVisibilityScope());
         this.setPublicationStatus(video.getPublicationStatus());
+        this.categories = video.getCategories() == null
+            ? Collections.emptyList()
+            : video.getCategories().stream()
+                .map(VideoCategoryRestBean::new)
+                .collect(Collectors.toList());
     }
 
 }

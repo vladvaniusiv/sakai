@@ -36,6 +36,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
+import lombok.extern.slf4j.Slf4j;
+@Slf4j
 @RestController
 public class VideoTrainingController extends AbstractSakaiApiController {
 
@@ -119,28 +121,6 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         return new PagedResponse<>(beans, totalCount, safePage, safeSize);
     }
 
-    @GetMapping(value = "/videos/grouped-by-course", produces = MediaType.APPLICATION_JSON_VALUE)
-    public Map<String, Object> getVideosGroupedByCourse(@RequestParam(name = "siteIds") List<String> siteIds,
-            @RequestParam(name = "size", required = false, defaultValue = "10") int size) {
-
-        Session session = checkSakaiSession();
-        List<VideoTrainingCourseGroup> groups = videoTrainingService.getCourseGroupsForSites(siteIds, session.getUserId(), Instant.now(), size);
-
-        List<Map<String, Object>> payload = new ArrayList<>();
-        for (VideoTrainingCourseGroup group : groups) {
-            Map<String, Object> groupPayload = new HashMap<>();
-            groupPayload.put("siteId", group.getSiteId());
-            groupPayload.put("siteTitle", group.getSiteTitle());
-            groupPayload.put("totalVideos", group.getTotalVideos());
-            groupPayload.put("videos", group.getVideos().stream()
-                    .map(VideoTrainingRestBean::new)
-                    .collect(Collectors.toList()));
-            payload.add(groupPayload);
-        }
-
-        return Map.of("groups", payload);
-    }
-
     @GetMapping(value = {"/videos/{videoId}"}, produces = MediaType.APPLICATION_JSON_VALUE)
     public VideoTrainingRestBean getVideoDetails(@PathVariable("videoId") String videoId) {
 
@@ -204,7 +184,7 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         VideoTrainingVideo video = videoTrainingService.getVideoById(videoId)
             .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Video not found"));
 
-        boolean canManage = videoTrainingService.canManageLibrary(video.getSiteId(), session.getUserId());
+        boolean canManage = videoTrainingService.canManageVideo(videoId, session.getUserId());
         if (!canManage) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot manage this site's video library");
         }
@@ -259,7 +239,7 @@ public class VideoTrainingController extends AbstractSakaiApiController {
     @PostMapping(value = "/sites/{siteId}/videos/categories",
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE)
-    public VideoTrainingCategory saveCategory(@PathVariable("siteId") String siteId,
+    public VideoCategoryRestBean saveCategory(@PathVariable("siteId") String siteId,
             @RequestBody VideoTrainingCategoryRequest request) {
         Session session = checkSakaiSession();
         checkSite(siteId);
@@ -271,23 +251,18 @@ public class VideoTrainingController extends AbstractSakaiApiController {
             siteId, request.getName(), request.getParentCategoryId(), request.getSortOrder());
 
         try {
-            return videoTrainingService.saveCategory(newCategory);
+            return new VideoCategoryRestBean(videoTrainingService.saveCategory(newCategory));
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid category payload", e);
         }
     }
 
-    @PutMapping("/sites/{siteId}/videos/categories/{categoryId}")
-    public VideoTrainingCategory updateVideoCategory(
-            @PathVariable("siteId") String siteId,
+    @PutMapping("/videos/categories/{categoryId}")
+    public VideoCategoryRestBean updateVideoCategory(
             @PathVariable("categoryId") String categoryId,
             @RequestBody VideoTrainingCategoryRequest request) {
 
         Session session = checkSakaiSession();
-        checkSite(siteId);
-        if (!videoTrainingService.canManageLibrary(siteId, session.getUserId())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot manage this site's video taxonomy");
-        }
 
         if (request == null || StringUtils.isBlank(categoryId)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "categoryId is required");
@@ -296,6 +271,13 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         VideoTrainingCategory category = videoTrainingService.getCategoryById(categoryId)
             .orElseThrow(() -> new ResponseStatusException(
                 HttpStatus.NOT_FOUND, "Category not found with id " + categoryId));
+
+        String siteId = category.getSiteId();
+
+        checkSite(siteId);
+        if (!videoTrainingService.canManageLibrary(siteId, session.getUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User cannot manage this site's video taxonomy");
+        }
 
         category.setName(request.getName() != null ? request.getName() : category.getName());
 
@@ -311,7 +293,7 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         category.setSortOrder(request.getSortOrder() != null ? request.getSortOrder() : category.getSortOrder());
 
         try {
-            return videoTrainingService.saveCategory(category);
+            return new VideoCategoryRestBean(videoTrainingService.saveCategory(category));
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid category payload", e);
         }
@@ -354,14 +336,25 @@ public class VideoTrainingController extends AbstractSakaiApiController {
         return new VideoTrainingRestBean(updatedVideo);
     }
 
-    @DeleteMapping(value = "/sites/{siteId}/videos/categories/{categoryId}")
-    public Map<String, Object> deleteCategory(@PathVariable("siteId") String siteId,
+    @DeleteMapping(value = "/videos/categories/{categoryId}")
+    public Map<String, Object> deleteCategory(
             @PathVariable("categoryId") String categoryId) {
-        checkSakaiSession();
-        checkSite(siteId);
 
-        videoTrainingService.deleteCategory(categoryId);
-        return Map.of("deleted", true);
+        Session session = checkSakaiSession();
+
+        try {
+            videoTrainingService.deleteCategory(categoryId);
+            return Map.of("deleted", true);
+
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
+
+        } catch (SecurityException e) {
+            log.warn("User {} cannot delete category {}",
+                    session.getUserId(), categoryId);
+
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, e.getMessage());
+        }
     }
 
     @GetMapping(value = "/sites/{siteId}/videos/quota", produces = MediaType.APPLICATION_JSON_VALUE)
