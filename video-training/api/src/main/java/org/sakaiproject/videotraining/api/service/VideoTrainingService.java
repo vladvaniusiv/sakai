@@ -124,6 +124,8 @@ public interface VideoTrainingService {
 
     boolean canManageCaptions(String siteId, String userId);
 
+    boolean canManageVideo(String videoId, String userId);
+
     Long getSiteStorageQuotaBytes(String siteId);
 
     long getSiteStorageUsageBytes(String siteId);

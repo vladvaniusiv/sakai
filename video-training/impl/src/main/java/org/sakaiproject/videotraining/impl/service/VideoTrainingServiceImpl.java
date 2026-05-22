@@ -99,8 +99,15 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
         if (StringUtils.isBlank(videoId)) {
             throw new IllegalArgumentException("videoId must not be blank");
         }
+
         if (newScope == null) {
             throw new IllegalArgumentException("newScope must not be null");
+        }
+
+        boolean canManage = canManageVideo(videoId, videoId);
+
+        if (!canManage) {
+            throw new SecurityException("User cannot manage video " + videoId);
         }
 
         VideoTrainingVideo existing = getVideoById(videoId).orElseThrow(() -> new IllegalArgumentException("Unknown videoId"));
@@ -118,6 +125,12 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
             throw new IllegalArgumentException("newStatus must not be null");
         }
 
+        boolean canManage = canManageVideo(videoId, videoId);
+
+        if (!canManage) {
+            throw new SecurityException("User cannot manage video " + videoId);
+        }
+
         VideoTrainingVideo existing = getVideoById(videoId).orElseThrow(() -> new IllegalArgumentException("Unknown videoId"));
         validatePublicationStatusTransition(normalizePublicationStatus(existing.getPublicationStatus()), normalizePublicationStatus(newStatus), existing.getVisibilityScope());
 
@@ -132,6 +145,13 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
         }
 
         VideoTrainingVideo existingVideo = getVideoById(videoId).orElseThrow(() -> new IllegalArgumentException("Unknown videoId"));
+
+        boolean canManage = canManageVideo(videoId, videoId);
+
+        if (!canManage) {
+            throw new SecurityException("User cannot manage video " + videoId);
+        }
+
         if (releaseDate != null && retractDate != null && releaseDate.isAfter(retractDate)) {
             throw new IllegalArgumentException("releaseDate must be before retractDate");
         }
@@ -897,10 +917,10 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
                 return quotaKb * 1024L;
             }
         } catch (Exception e) {
-            return null;
+            return 0L;
         }
 
-        return null;
+        return 0L;
     }
 
     @Override
@@ -1039,6 +1059,22 @@ public class VideoTrainingServiceImpl implements VideoTrainingService {
         }
         videoRepository.save(video);
         registerAudit(video.getSiteId(), userId, "VIDEO_CATEGORIES_UPDATED", videoId, String.join(",", getVideoCategoryIds(videoId)));
+    }
+
+    @Override
+    public boolean canManageVideo(String videoId, String userId) {
+        VideoTrainingVideo video = getVideoById(videoId).orElse(null);
+        if (video == null) {
+            return false;
+        }
+
+        String siteRefForVideo = siteService.siteReference(video.getSiteId());
+
+        return securityService.isSuperUser(userId)
+            || securityService.unlock(userId, PERMISSION_MANAGE_ALL, siteRefForVideo)
+            || (securityService.unlock(userId, PERMISSION_MANAGE, siteRefForVideo)
+                && video != null
+                && Objects.equals(video.getOwnerId(), userId));
     }
 
     @Override
