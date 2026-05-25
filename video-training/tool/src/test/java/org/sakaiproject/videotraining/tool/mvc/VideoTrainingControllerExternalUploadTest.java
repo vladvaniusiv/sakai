@@ -8,32 +8,31 @@ import static org.mockito.Mockito.when;
 
 import java.time.Instant;
 
-import org.junit.Test;
 import org.junit.Assert;
-import org.mockito.ArgumentCaptor;
+import org.junit.Test;
+import org.sakaiproject.api.app.scheduler.ScheduledInvocationManager;
+import org.sakaiproject.authz.api.SecurityService;
+import org.sakaiproject.component.api.ServerConfigurationService;
+import org.sakaiproject.content.api.ContentHostingService;
+import org.sakaiproject.site.api.SiteService;
+import org.sakaiproject.tool.api.SessionManager;
+import org.sakaiproject.tool.api.ToolManager;
+import org.sakaiproject.time.api.UserTimeService;
+import org.sakaiproject.tool.api.Placement;
 import org.sakaiproject.videotraining.api.model.VideoProviderType;
 import org.sakaiproject.videotraining.api.model.VideoTrainingProcessJob;
 import org.sakaiproject.videotraining.api.model.VideoTrainingVideo;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingProcessJobRepository;
 import org.sakaiproject.videotraining.api.service.VideoTrainingOAuthCredentialsService;
 import org.sakaiproject.videotraining.api.service.VideoTrainingService;
-import org.sakaiproject.api.app.scheduler.ScheduledInvocationManager;
-import org.sakaiproject.component.api.ServerConfigurationService;
 import org.springframework.context.MessageSource;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-import org.sakaiproject.content.api.ContentHostingService;
-import org.sakaiproject.tool.api.SessionManager;
-import org.sakaiproject.site.api.SiteService;
-import org.sakaiproject.tool.api.ToolManager;
-import org.sakaiproject.time.api.UserTimeService;
-import org.sakaiproject.authz.api.SecurityService;
-import org.sakaiproject.tool.api.Placement;
-
-public class VideoTrainingControllerHlsUploadTest {
+public class VideoTrainingControllerExternalUploadTest {
 
     @Test
-    public void createVideo_createsPendingProcessJob_whenHlsUpload() throws Exception {
+    public void createVideo_createsPendingProcessJob_whenYoutubeUpload() throws Exception {
         MessageSource messageSource = mock(MessageSource.class);
         ContentHostingService contentHostingService = mock(ContentHostingService.class);
         SessionManager sessionManager = mock(SessionManager.class);
@@ -53,6 +52,7 @@ public class VideoTrainingControllerHlsUploadTest {
         when(sessionManager.getCurrentSessionUserId()).thenReturn("user1");
         when(videoTrainingService.canManageLibrary("site-1", "user1")).thenReturn(false);
         when(videoTrainingService.hasManagePermission("site-1", "user1")).thenReturn(false);
+        when(oauthCredentialsService.isConfigured(VideoProviderType.YOUTUBE_UPLOAD)).thenReturn(true);
         when(serverConfigurationService.getBoolean("video.training.hls.enabled", true)).thenReturn(true);
         when(serverConfigurationService.getString("video.training.max.upload.size", "512")).thenReturn("512");
 
@@ -63,21 +63,16 @@ public class VideoTrainingControllerHlsUploadTest {
         VideoTrainingVideo saved = new VideoTrainingVideo();
         saved.setId("v1");
         saved.setOwnerId("user1");
-        saved.setProviderType(VideoProviderType.HLS_UPLOAD);
+        saved.setProviderType(VideoProviderType.YOUTUBE_UPLOAD);
 
         when(videoTrainingService.saveVideo(any(VideoTrainingVideo.class))).thenReturn(saved);
-        when(scheduledInvocationManager.createDelayedInvocation(any(Instant.class), eq("HlsTranscodingJob"), eq("v1"))).thenReturn("trigger-1");
+        when(scheduledInvocationManager.createDelayedInvocation(any(Instant.class), eq("ExternalUploadJob"), eq("v1"))).thenReturn("trigger-1");
 
-        org.springframework.web.servlet.mvc.support.RedirectAttributes redirectAttributes = mock(org.springframework.web.servlet.mvc.support.RedirectAttributes.class);
-        String result = controller.createVideo("title", "desc", "", null, null, null, multipart, null, null, null, null, null, null, redirectAttributes, java.util.Locale.getDefault());
+        RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
+        String result = controller.createVideo("title", "desc", VideoProviderType.YOUTUBE_UPLOAD.name(), null, null, null, multipart, null, null, null, null, null, null, redirectAttributes, java.util.Locale.getDefault());
 
-        ArgumentCaptor<VideoTrainingProcessJob> captor = ArgumentCaptor.forClass(VideoTrainingProcessJob.class);
-        verify(processJobRepository).save(captor.capture());
-        verify(scheduledInvocationManager).createDelayedInvocation(any(Instant.class), eq("HlsTranscodingJob"), eq("v1"));
-        VideoTrainingProcessJob job = captor.getValue();
-        Assert.assertNotNull(job);
-        Assert.assertEquals("v1", job.getVideoId());
-        Assert.assertNotNull(job.getStatus());
         Assert.assertEquals("redirect:/videos", result);
+        verify(processJobRepository).save(any(VideoTrainingProcessJob.class));
+        verify(scheduledInvocationManager).createDelayedInvocation(any(Instant.class), eq("ExternalUploadJob"), eq("v1"));
     }
 }

@@ -5,6 +5,8 @@
     const externalSection = document.getElementById('externalSourceSection');
     const uploadSection = document.getElementById('uploadSourceSection');
     const resourcesSection = document.getElementById('resourcesSourceSection');
+    const storageDestinationSection = document.getElementById('storageDestinationSection');
+    const storageDestinationSelect = document.getElementById('storageDestination');
     const sourceReferenceInput = document.getElementById('sourceReference');
     const existingResourceSelect = document.getElementById('existingResourceReference');
     const nativeFileInput = document.getElementById('nativeFile');
@@ -13,6 +15,8 @@
     const maxNativeUploadBytes = Number.parseInt(form?.dataset.nativeUploadMaxBytes || '', 10);
     const visibilityReductionConfirmMessage = form?.dataset.visibilityReductionConfirmMessage || '';
     const hlsUploadEnabled = form?.dataset.hlsUploadEnabled === 'true';
+    const youtubeUploadConfigured = form?.dataset.youtubeUploadConfigured === 'true';
+    const defaultUploadProviderType = form?.dataset.defaultUploadProviderType || 'HLS_UPLOAD';
     const isEdit = form?.dataset.isEdit === 'true';
     const videoId = form?.dataset.videoId || '';
     let currentVisibilityScope = form?.dataset.initialVisibilityScope || visibilityScopeSelect?.value || 'COURSE';
@@ -90,6 +94,9 @@
         if (resourcesSection) {
             resourcesSection.hidden = !isResources;
         }
+        if (storageDestinationSection) {
+            storageDestinationSection.hidden = !isUpload;
+        }
 
         if (sourceReferenceInput) {
             sourceReferenceInput.required = isExternal;
@@ -110,8 +117,19 @@
         } else if (isResources) {
             providerTypeInput.value = 'RESOURCES';
         } else if (isUpload) {
-            providerTypeInput.value = hlsUploadEnabled ? 'HLS_UPLOAD' : 'NATIVE';
+            const selectedStorageType = storageDestinationSelect && !storageDestinationSelect.disabled
+                ? storageDestinationSelect.value
+                : defaultUploadProviderType;
+            providerTypeInput.value = selectedStorageType || defaultUploadProviderType;
         }
+    }
+
+    if (storageDestinationSelect) {
+        storageDestinationSelect.addEventListener('change', () => {
+            if (selectedMode() === 'upload') {
+                providerTypeInput.value = storageDestinationSelect.value || defaultUploadProviderType;
+            }
+        });
     }
 
     sourceModeInputs.forEach((input) => {
@@ -146,6 +164,10 @@
             event.preventDefault();
         }
     });
+
+    if (storageDestinationSelect && providerTypeInput.value) {
+        storageDestinationSelect.value = providerTypeInput.value;
+    }
 
     applyMode(selectedMode());
 })();

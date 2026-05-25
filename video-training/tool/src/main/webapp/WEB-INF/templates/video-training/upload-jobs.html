@@ -9,6 +9,9 @@
     <div class="vt-page-header">
         <h1 class="h3" th:text="#{video.training.uploadJobs}">Upload jobs</h1>
         <p class="vt-page-subtitle" th:text="#{video.training.uploadJobs.subtitle}">Recent uploads and transcoding jobs.</p>
+        <div class="mt-3" th:if="${isAdmin}">
+            <a class="btn btn-outline-primary btn-sm" th:href="@{/credentials}" th:text="#{video.training.credentials}">OAuth credentials</a>
+        </div>
     </div>
 
     <div class="table-responsive" th:if="${!#lists.isEmpty(jobs)}">

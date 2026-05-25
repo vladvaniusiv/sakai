@@ -32,6 +32,8 @@ import java.util.TimeZone;
 import java.util.UUID;
 import java.util.regex.Matcher;
 
+import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeTokenRequest;
+import com.google.api.client.googleapis.auth.oauth2.GoogleTokenResponse;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.youtube.YouTube;
@@ -65,9 +67,11 @@ import org.sakaiproject.videotraining.api.model.VideoPublicationStatus;
 import org.sakaiproject.videotraining.api.model.VideoTrainingProcessJob;
 import org.sakaiproject.videotraining.api.model.VideoTrainingProcessJobStatus;
 import org.sakaiproject.videotraining.api.model.VideoTrainingCaption;
+import org.sakaiproject.videotraining.api.model.VideoTrainingOAuthCredentials;
 import org.sakaiproject.videotraining.api.model.VideoTrainingVideo;
 import org.sakaiproject.videotraining.api.model.VideoTrainingVideoView;
 import org.sakaiproject.videotraining.api.model.VideoVisibilityScope;
+import org.sakaiproject.videotraining.api.service.VideoTrainingOAuthCredentialsService;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingProcessJobRepository;
 import org.sakaiproject.videotraining.api.service.VideoTrainingService;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -120,6 +124,8 @@ public class VideoTrainingController {
     private static final String DEFAULT_SORT_FIELD = "modifiedOn";
     private static final String DEFAULT_SORT_DIRECTION = "desc";
     private static final String MODERATION_ENABLED_PROPERTY = "video.training.moderation.enabled";
+    private static final String YOUTUBE_AUTH_STATE_SESSION_KEY = "video.training.youtube.oauth.state";
+    private static final String YOUTUBE_UPLOAD_SCOPE = "https://www.googleapis.com/auth/youtube.upload";
     private static final int DEFAULT_PAGE_SIZE = 24;
     private static final int MAX_PAGE_SIZE = 100;
     private static final String MAX_NATIVE_UPLOAD_SIZE_PROPERTY = "video.training.max.upload.size";
@@ -142,6 +148,7 @@ public class VideoTrainingController {
     private final ToolManager toolManager;
     private final UserTimeService userTimeService;
     private final VideoTrainingService videoTrainingService;
+    private final VideoTrainingOAuthCredentialsService oauthCredentialsService;
     private final VideoTrainingProcessJobRepository processJobRepository;
     private final ScheduledInvocationManager scheduledInvocationManager;
     private final org.sakaiproject.component.api.ServerConfigurationService serverConfigurationService;
@@ -154,6 +161,7 @@ public class VideoTrainingController {
             ToolManager toolManager,
             @Qualifier("org.sakaiproject.time.api.UserTimeService") UserTimeService userTimeService,
             VideoTrainingService videoTrainingService,
+            VideoTrainingOAuthCredentialsService oauthCredentialsService,
             VideoTrainingProcessJobRepository processJobRepository,
             ScheduledInvocationManager scheduledInvocationManager,
             org.sakaiproject.component.api.ServerConfigurationService serverConfigurationService,
@@ -166,6 +174,7 @@ public class VideoTrainingController {
         this.toolManager = toolManager;
         this.userTimeService = userTimeService;
         this.videoTrainingService = videoTrainingService;
+        this.oauthCredentialsService = oauthCredentialsService;
         this.processJobRepository = processJobRepository;
         this.scheduledInvocationManager = scheduledInvocationManager;
         this.serverConfigurationService = serverConfigurationService;
@@ -414,9 +423,108 @@ public class VideoTrainingController {
         model.addAttribute("sourceMode", SOURCE_MODE_UPLOAD);
         model.addAttribute("nativeUploadMaxBytes", getConfiguredMaxNativeUploadBytes());
         model.addAttribute("providerTypes", VideoProviderType.values());
+        model.addAttribute("youtubeUploadConfigured", oauthCredentialsService.isConfigured(VideoProviderType.YOUTUBE_UPLOAD));
+        model.addAttribute("defaultUploadProviderType", defaultUploadProviderType(null));
         model.addAttribute("visibilityScopes", VideoVisibilityScope.values());
         model.addAttribute("publicationStatuses", publicationStatusesForForm());
         return "video-training/edit";
+    }
+
+    @GetMapping("/credentials")
+    public String adminCredentials(RedirectAttributes redirectAttributes, Locale locale, Model model) {
+        if (!securityService.isSuperUser()) {
+            redirectAttributes.addFlashAttribute("error",
+                    messageSource.getMessage("video.training.accessDenied", null, locale));
+            return "redirect:/videos";
+        }
+
+        model.addAttribute("isAdmin", true);
+        model.addAttribute("youtubeCredentials", loadCredentialsForForm(VideoProviderType.YOUTUBE_UPLOAD));
+        model.addAttribute("youtubeAuthorizationReady", isYoutubeAuthorizationReady());
+        return "video-training/credentials";
+    }
+
+    @PostMapping("/credentials")
+    public String saveAdminCredentials(@RequestParam(name = "youtubeClientId", required = false) String youtubeClientId,
+            @RequestParam(name = "youtubeApiKey", required = false) String youtubeApiKey,
+            @RequestParam(name = "youtubeClientSecret", required = false) String youtubeClientSecret,
+            RedirectAttributes redirectAttributes,
+            Locale locale) {
+        if (!securityService.isSuperUser()) {
+            redirectAttributes.addFlashAttribute("error",
+                    messageSource.getMessage("video.training.accessDenied", null, locale));
+            return "redirect:/videos";
+        }
+
+        String currentYoutubeRefreshToken = oauthCredentialsService.getCredentials(VideoProviderType.YOUTUBE_UPLOAD)
+                .map(VideoTrainingOAuthCredentials::getRefreshToken)
+                .orElse(null);
+        oauthCredentialsService.saveCredentials(VideoProviderType.YOUTUBE_UPLOAD, youtubeClientId, youtubeApiKey, youtubeClientSecret, currentYoutubeRefreshToken);
+        redirectAttributes.addFlashAttribute("success", messageSource.getMessage("video.training.credentials.saved", null, locale));
+        return "redirect:/credentials";
+    }
+
+    @GetMapping("/credentials/youtube/connect")
+    public String connectYoutubeCredentials(HttpServletRequest request,
+            RedirectAttributes redirectAttributes,
+            Locale locale) {
+        if (!securityService.isSuperUser()) {
+            redirectAttributes.addFlashAttribute("error",
+                    messageSource.getMessage("video.training.accessDenied", null, locale));
+            return "redirect:/videos";
+        }
+
+        VideoTrainingOAuthCredentials credentials = oauthCredentialsService.getCredentials(VideoProviderType.YOUTUBE_UPLOAD).orElse(null);
+        if (credentials == null || StringUtils.isBlank(credentials.getClientId()) || StringUtils.isBlank(credentials.getClientSecret())) {
+            redirectAttributes.addFlashAttribute("error",
+                    messageSource.getMessage("video.training.credentials.youtube.notConfigured", null, locale));
+            return "redirect:/credentials";
+        }
+
+        String state = UUID.randomUUID().toString();
+        sessionManager.getCurrentSession().setAttribute(YOUTUBE_AUTH_STATE_SESSION_KEY, state);
+        return "redirect:" + buildYoutubeAuthorizationUrl(request, credentials, state);
+    }
+
+    @GetMapping("/credentials/youtube/callback")
+    public String youtubeCredentialsCallback(@RequestParam(name = "code", required = false) String code,
+            @RequestParam(name = "state", required = false) String state,
+            HttpServletRequest request,
+            RedirectAttributes redirectAttributes,
+            Locale locale) {
+        if (!securityService.isSuperUser()) {
+            redirectAttributes.addFlashAttribute("error",
+                    messageSource.getMessage("video.training.accessDenied", null, locale));
+            return "redirect:/videos";
+        }
+
+        String sessionState = StringUtils.trimToEmpty((String) sessionManager.getCurrentSession().getAttribute(YOUTUBE_AUTH_STATE_SESSION_KEY));
+        sessionManager.getCurrentSession().removeAttribute(YOUTUBE_AUTH_STATE_SESSION_KEY);
+        if (StringUtils.isBlank(code) || !StringUtils.equals(sessionState, StringUtils.trimToEmpty(state))) {
+            redirectAttributes.addFlashAttribute("error",
+                    messageSource.getMessage("video.training.credentials.youtube.authorizationFailed", null, locale));
+            return "redirect:/credentials";
+        }
+
+        VideoTrainingOAuthCredentials current = oauthCredentialsService.getCredentials(VideoProviderType.YOUTUBE_UPLOAD).orElse(null);
+        if (current == null || StringUtils.isBlank(current.getClientId()) || StringUtils.isBlank(current.getClientSecret())) {
+            redirectAttributes.addFlashAttribute("error",
+                    messageSource.getMessage("video.training.credentials.youtube.notConfigured", null, locale));
+            return "redirect:/credentials";
+        }
+
+        try {
+            String refreshToken = exchangeYoutubeRefreshToken(request, current, code);
+            oauthCredentialsService.saveCredentials(VideoProviderType.YOUTUBE_UPLOAD, current.getClientId(), current.getApiKey(), current.getClientSecret(), refreshToken);
+            redirectAttributes.addFlashAttribute("success",
+                    messageSource.getMessage("video.training.credentials.youtube.authorized", null, locale));
+        } catch (Exception ex) {
+            log.warn("Failed to complete YouTube OAuth authorization", ex);
+            redirectAttributes.addFlashAttribute("error",
+                    messageSource.getMessage("video.training.credentials.youtube.authorizationFailed", null, locale));
+        }
+
+        return "redirect:/credentials";
     }
 
     @GetMapping("/videos/{videoId}/edit")
@@ -454,6 +562,8 @@ public class VideoTrainingController {
         model.addAttribute("sourceMode", determineSourceMode(video, existingResources));
         model.addAttribute("nativeUploadMaxBytes", getConfiguredMaxNativeUploadBytes());
         model.addAttribute("providerTypes", VideoProviderType.values());
+        model.addAttribute("youtubeUploadConfigured", oauthCredentialsService.isConfigured(VideoProviderType.YOUTUBE_UPLOAD));
+        model.addAttribute("defaultUploadProviderType", defaultUploadProviderType(video));
         model.addAttribute("visibilityScopes", VideoVisibilityScope.values());
         VideoVisibilityScope scope = video.getVisibilityScope() != null ? video.getVisibilityScope() : VideoVisibilityScope.COURSE;
         VideoPublicationStatus[] validTransitions = videoTrainingService.getValidPublicationStatusTransitions(video.getPublicationStatus(), scope);
@@ -481,7 +591,7 @@ public class VideoTrainingController {
             Locale locale) {
 
         String effectiveSourceMode = resolveSourceMode(sourceMode, providerType);
-        VideoProviderType parsedProviderType = providerTypeForSourceMode(effectiveSourceMode);
+        VideoProviderType parsedProviderType = resolveProviderTypeForSourceMode(effectiveSourceMode, providerType);
         VideoVisibilityScope parsedVisibilityScope;
         VideoPublicationStatus parsedPublicationStatus;
         try {
@@ -552,6 +662,11 @@ public class VideoTrainingController {
                 return "redirect:/videos/new";
             }
 
+            if (parsedProviderType == VideoProviderType.YOUTUBE_UPLOAD && !oauthCredentialsService.isConfigured(VideoProviderType.YOUTUBE_UPLOAD)) {
+                redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.invalidProvider", null, locale));
+                return "redirect:/videos/new";
+            }
+
             Long maxNativeUploadBytes = getConfiguredMaxNativeUploadBytes();
             Long margin = 64L * 1024L;
             if (nativeFile.getSize() > (maxNativeUploadBytes + margin)) {
@@ -559,12 +674,11 @@ public class VideoTrainingController {
                 return "redirect:/videos/new";
             }
 
-            if (isHlsUploadEnabled()) {
+            if (isManagedUploadProvider(parsedProviderType)) {
                 try {
                     stagedTempFilePath = stageTemporaryHlsUpload(nativeFile);
                     resolvedSourceReference = stagedTempFilePath;
                     resolvedFileSizeBytes = nativeFile.getSize();
-                    parsedProviderType = VideoProviderType.HLS_UPLOAD;
                     parsedPublicationStatus = VideoPublicationStatus.DRAFT;
                 } catch (Exception ex) {
                     cleanupTemporaryUpload(stagedTempFilePath);
@@ -633,7 +747,7 @@ public class VideoTrainingController {
 
         try {
             VideoTrainingVideo savedVideo = videoTrainingService.saveVideo(video);
-            if (savedVideo.getProviderType() == VideoProviderType.HLS_UPLOAD) {
+            if (isManagedUploadProvider(savedVideo.getProviderType())) {
                 VideoTrainingProcessJob processJob = new VideoTrainingProcessJob();
                 processJob.setVideoId(savedVideo.getId());
                 processJob.setSubmitterUserId(savedVideo.getOwnerId());
@@ -643,8 +757,12 @@ public class VideoTrainingController {
                 processJob.setCreatedOn(Instant.now());
                 processJob.setModifiedOn(Instant.now());
                 processJobRepository.save(processJob);
-                log.info("Created HLS process job {} for video {} (submitter={})", processJob.getId(), processJob.getVideoId(), processJob.getSubmitterUserId());
-                scheduleHlsProcessing(savedVideo.getId());
+                log.info("Created upload process job {} for video {} (submitter={}, provider={})", processJob.getId(), processJob.getVideoId(), processJob.getSubmitterUserId(), savedVideo.getProviderType());
+                if (savedVideo.getProviderType() == VideoProviderType.HLS_UPLOAD) {
+                    scheduleHlsProcessing(savedVideo.getId());
+                } else {
+                    scheduleUploadProcessing(savedVideo.getId());
+                }
                 redirectAttributes.addFlashAttribute("success", messageSource.getMessage("video.training.createdProcessing", null, locale));
             } else {
                 redirectAttributes.addFlashAttribute("success", messageSource.getMessage("video.training.created", null, locale));
@@ -702,7 +820,7 @@ public class VideoTrainingController {
         VideoTrainingVideo originalVideo = copyVideo(existing);
 
         String effectiveSourceMode = resolveSourceMode(sourceMode, providerType);
-        VideoProviderType parsedProviderType = providerTypeForSourceMode(effectiveSourceMode);
+        VideoProviderType parsedProviderType = resolveProviderTypeForSourceMode(effectiveSourceMode, providerType);
         VideoVisibilityScope parsedVisibilityScope;
         VideoPublicationStatus parsedPublicationStatus;
         try {
@@ -776,6 +894,11 @@ public class VideoTrainingController {
                     return "redirect:/videos/" + videoId + "/edit";
                 }
 
+                if (parsedProviderType == VideoProviderType.YOUTUBE_UPLOAD && !oauthCredentialsService.isConfigured(VideoProviderType.YOUTUBE_UPLOAD)) {
+                    redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.invalidProvider", null, locale));
+                    return "redirect:/videos/" + videoId + "/edit";
+                }
+
                 Long maxNativeUploadBytes = getConfiguredMaxNativeUploadBytes();
                 Long margin = 64L * 1024L; // 64KB margin for multipart overhead
                 if (nativeFile.getSize() > (maxNativeUploadBytes + margin)) {
@@ -784,12 +907,11 @@ public class VideoTrainingController {
                     return "redirect:/videos/" + videoId + "/edit";
                 }
                 try {
-                    if (isHlsUploadEnabled()) {
+                    if (isManagedUploadProvider(parsedProviderType)) {
                         stagedTempFilePath = stageTemporaryHlsUpload(nativeFile);
                         uploadedSourceReference = stagedTempFilePath;
                         resolvedSourceReference = stagedTempFilePath;
                         resolvedFileSizeBytes = nativeFile.getSize();
-                        parsedProviderType = VideoProviderType.HLS_UPLOAD;
                         parsedPublicationStatus = VideoPublicationStatus.DRAFT;
                     } else {
                         uploadedSourceReference = uploadNativeVideo(existing.getSiteId(), currentUserId(), parsedVisibilityScope, nativeFile);
@@ -806,12 +928,12 @@ public class VideoTrainingController {
                             messageSource.getMessage("video.training.nativeUploadFailed", null, locale));
                     return "redirect:/videos/" + videoId + "/edit";
                 }
-            } else if (existing.getProviderType() == VideoProviderType.HLS_UPLOAD) {
+            } else if (isManagedUploadProvider(existing.getProviderType())) {
                 resolvedSourceReference = previousSourceReference;
                 if (resolvedFileSizeBytes == null) {
                     resolvedFileSizeBytes = existing.getFileSizeBytes();
                 }
-                parsedProviderType = VideoProviderType.HLS_UPLOAD;
+                parsedProviderType = existing.getProviderType();
             } else if (existing.getProviderType() == VideoProviderType.NATIVE) {
                 resolvedSourceReference = previousSourceReference;
                 if (resolvedFileSizeBytes == null) {
@@ -906,7 +1028,7 @@ public class VideoTrainingController {
 
         try {
             VideoTrainingVideo savedVideo = videoTrainingService.saveVideo(existing);
-            if (savedVideo.getProviderType() == VideoProviderType.HLS_UPLOAD && StringUtils.isNotBlank(stagedTempFilePath)) {
+            if (isManagedUploadProvider(savedVideo.getProviderType()) && StringUtils.isNotBlank(stagedTempFilePath)) {
                 VideoTrainingProcessJob processJob = new VideoTrainingProcessJob();
                 processJob.setVideoId(savedVideo.getId());
                 processJob.setSubmitterUserId(savedVideo.getOwnerId());
@@ -916,8 +1038,12 @@ public class VideoTrainingController {
                 processJob.setCreatedOn(Instant.now());
                 processJob.setModifiedOn(Instant.now());
                 processJobRepository.save(processJob);
-                log.info("Queued HLS process job {} for video {} (submitter={})", processJob.getId(), processJob.getVideoId(), processJob.getSubmitterUserId());
-                scheduleHlsProcessing(savedVideo.getId());
+                log.info("Queued upload process job {} for video {} (submitter={}, provider={})", processJob.getId(), processJob.getVideoId(), processJob.getSubmitterUserId(), savedVideo.getProviderType());
+                if (savedVideo.getProviderType() == VideoProviderType.HLS_UPLOAD) {
+                    scheduleHlsProcessing(savedVideo.getId());
+                } else {
+                    scheduleUploadProcessing(savedVideo.getId());
+                }
             }
         } catch (SecurityException ex) {
             cleanupManagedNativeResource(uploadedSourceReference);
@@ -1064,7 +1190,7 @@ public class VideoTrainingController {
         model.addAttribute("canManage", canManage);
         model.addAttribute("canManageCaptions", videoTrainingService.canManageCaptions(video.getSiteId(), userId));
         model.addAttribute("isExternalVideo", video.getProviderType() == VideoProviderType.EXTERNAL);
-        model.addAttribute("isProcessingUpload", video.getProviderType() == VideoProviderType.HLS_UPLOAD
+        model.addAttribute("isProcessingUpload", isManagedUploadProvider(video.getProviderType())
             && video.getPublicationStatus() != VideoPublicationStatus.PUBLISHED);
         model.addAttribute("externalEmbedUrl", externalEmbedUrl);
         model.addAttribute("nativePlaybackUrl", resolveNativePlaybackUrl(video));
@@ -1268,13 +1394,84 @@ public class VideoTrainingController {
         model.addAttribute("canView", videoTrainingService.hasViewPermission(siteId, userId)
                 || canManageAll
                 || canManageOwn);
+        model.addAttribute("isAdmin", securityService.isSuperUser());
     }
 
     private void scheduleHlsProcessing(String videoId) {
+        scheduleDelayedInvocation("HlsTranscodingJob", videoId, "HLS");
+    }
+
+    private void scheduleUploadProcessing(String videoId) {
+        scheduleDelayedInvocation("ExternalUploadJob", videoId, "external upload");
+    }
+
+    private boolean isYoutubeAuthorizationReady() {
+        return oauthCredentialsService.getCredentials(VideoProviderType.YOUTUBE_UPLOAD)
+                .map(credentials -> StringUtils.isNotBlank(credentials.getClientId()) && StringUtils.isNotBlank(credentials.getClientSecret()))
+                .orElse(false);
+    }
+
+    private String buildYoutubeAuthorizationUrl(HttpServletRequest request, VideoTrainingOAuthCredentials credentials, String state) {
+        String redirectUri = buildAbsoluteUrl(request, "/credentials/youtube/callback");
+        StringBuilder builder = new StringBuilder("https://accounts.google.com/o/oauth2/v2/auth");
+        builder.append("?client_id=").append(urlEncode(credentials.getClientId()));
+        builder.append("&redirect_uri=").append(urlEncode(redirectUri));
+        builder.append("&response_type=code");
+        builder.append("&scope=").append(urlEncode(YOUTUBE_UPLOAD_SCOPE));
+        builder.append("&access_type=offline");
+        builder.append("&prompt=consent");
+        builder.append("&include_granted_scopes=true");
+        if (StringUtils.isNotBlank(state)) {
+            builder.append("&state=").append(urlEncode(state));
+        }
+        return builder.toString();
+    }
+
+    private String exchangeYoutubeRefreshToken(HttpServletRequest request, VideoTrainingOAuthCredentials credentials, String code) throws IOException {
+        String redirectUri = buildAbsoluteUrl(request, "/credentials/youtube/callback");
+        GoogleAuthorizationCodeTokenRequest tokenRequest = new GoogleAuthorizationCodeTokenRequest(
+                new NetHttpTransport(),
+                JacksonFactory.getDefaultInstance(),
+                credentials.getClientId(),
+                credentials.getClientSecret(),
+                code,
+                redirectUri);
+        GoogleTokenResponse tokenResponse = tokenRequest.execute();
+        String refreshToken = StringUtils.trimToNull(tokenResponse.getRefreshToken());
+        if (StringUtils.isBlank(refreshToken)) {
+            refreshToken = StringUtils.trimToNull(credentials.getRefreshToken());
+        }
+        if (StringUtils.isBlank(refreshToken)) {
+            throw new IllegalStateException("Google did not return a refresh token");
+        }
+        return refreshToken;
+    }
+
+    private String buildAbsoluteUrl(HttpServletRequest request, String path) {
+        StringBuilder url = new StringBuilder();
+        url.append(request.getScheme()).append("://").append(request.getServerName());
+        int port = request.getServerPort();
+        if (!("http".equalsIgnoreCase(request.getScheme()) && port == 80)
+                && !("https".equalsIgnoreCase(request.getScheme()) && port == 443)) {
+            url.append(":").append(port);
+        }
+        url.append(request.getContextPath());
+        if (!path.startsWith("/")) {
+            url.append('/');
+        }
+        url.append(path);
+        return url.toString();
+    }
+
+    private String urlEncode(String value) {
+        return URLEncoder.encode(StringUtils.defaultString(value), StandardCharsets.UTF_8).replace("+", "%20");
+    }
+
+    private void scheduleDelayedInvocation(String jobName, String videoId, String label) {
         try {
             Instant fireTime = Instant.now().plusSeconds(5L);
-            String invocationId = scheduledInvocationManager.createDelayedInvocation(fireTime, "HlsTranscodingJob", videoId);
-            log.info("Scheduled HLS trigger {} for video {} at {}", invocationId, videoId, fireTime);
+            String invocationId = scheduledInvocationManager.createDelayedInvocation(fireTime, jobName, videoId);
+            log.info("Scheduled {} trigger {} for video {} at {}", label, invocationId, videoId, fireTime);
         } catch (RuntimeException ex) {
             cleanupProcessJobs(videoId);
             throw ex;
@@ -1660,7 +1857,14 @@ public class VideoTrainingController {
         return serverConfigurationService.getBoolean(MODERATION_ENABLED_PROPERTY, false);
     }
 
-    private VideoProviderType providerTypeForSourceMode(String sourceMode) {
+    private VideoProviderType resolveProviderTypeForSourceMode(String sourceMode, String providerType) {
+        if (SOURCE_MODE_UPLOAD.equals(sourceMode)) {
+            VideoProviderType requestedUploadType = resolveUploadProviderType(providerType);
+            if (requestedUploadType != null) {
+                return requestedUploadType;
+            }
+        }
+
         if (SOURCE_MODE_EXTERNAL.equals(sourceMode)) {
             return VideoProviderType.EXTERNAL;
         }
@@ -1668,6 +1872,29 @@ public class VideoTrainingController {
             return VideoProviderType.RESOURCES;
         }
         return isHlsUploadEnabled() ? VideoProviderType.HLS_UPLOAD : VideoProviderType.NATIVE;
+    }
+
+    private VideoProviderType resolveUploadProviderType(String providerType) {
+        String normalizedProviderType = StringUtils.trimToEmpty(providerType).toUpperCase(Locale.ROOT);
+        if (StringUtils.equals(normalizedProviderType, VideoProviderType.YOUTUBE_UPLOAD.name())) {
+            return VideoProviderType.YOUTUBE_UPLOAD;
+        }
+        if (StringUtils.equals(normalizedProviderType, VideoProviderType.HLS_UPLOAD.name())) {
+            return VideoProviderType.HLS_UPLOAD;
+        }
+        if (StringUtils.equals(normalizedProviderType, VideoProviderType.NATIVE.name())) {
+            return VideoProviderType.NATIVE;
+        }
+        return null;
+    }
+
+    private boolean isManagedUploadProvider(VideoProviderType providerType) {
+        return providerType == VideoProviderType.HLS_UPLOAD
+                || providerType == VideoProviderType.YOUTUBE_UPLOAD;
+    }
+
+    private boolean isExternalUploadProvider(VideoProviderType providerType) {
+        return providerType == VideoProviderType.YOUTUBE_UPLOAD;
     }
 
     private boolean isHlsUploadEnabled() {
@@ -1927,11 +2154,6 @@ public class VideoTrainingController {
             return "https://img.youtube.com/vi/" + youtubeVideoId + "/hqdefault.jpg";
         }
 
-        String vimeoVideoId = ExternalMetadataFetcher.extractVimeoVideoId(source);
-        if (StringUtils.isNotBlank(vimeoVideoId)) {
-            return "https://vumbnail.com/" + vimeoVideoId + ".jpg";
-        }
-
         return "";
     }
 
@@ -1965,11 +2187,6 @@ public class VideoTrainingController {
             return "https://www.youtube.com/embed/" + youtubeVideoId;
         }
 
-        String vimeoVideoId = ExternalMetadataFetcher.extractVimeoVideoId(normalized);
-        if (StringUtils.isNotBlank(vimeoVideoId)) {
-            return "https://player.vimeo.com/video/" + vimeoVideoId;
-        }
-
         return "";
     }
 
@@ -1986,6 +2203,10 @@ public class VideoTrainingController {
             return SOURCE_MODE_RESOURCES;
         }
 
+        if (isManagedUploadProvider(video.getProviderType())) {
+            return SOURCE_MODE_UPLOAD;
+        }
+
         String sourceReference = StringUtils.trimToEmpty(video.getSourceReference());
         for (ExistingResourceOption option : existingResources) {
             if (StringUtils.equals(option.getReference(), sourceReference)) {
@@ -1994,6 +2215,28 @@ public class VideoTrainingController {
         }
 
         return SOURCE_MODE_UPLOAD;
+    }
+
+    private VideoTrainingOAuthCredentials loadCredentialsForForm(VideoProviderType providerType) {
+        return oauthCredentialsService.getCredentials(providerType).orElseGet(() -> {
+            VideoTrainingOAuthCredentials credentials = new VideoTrainingOAuthCredentials();
+            credentials.setProviderType(providerType);
+            return credentials;
+        });
+    }
+
+    private String defaultUploadProviderType(VideoTrainingVideo video) {
+        if (video != null && isManagedUploadProvider(video.getProviderType())) {
+            return video.getProviderType().name();
+        }
+
+        if (isHlsUploadEnabled()) {
+            return VideoProviderType.HLS_UPLOAD.name();
+        }
+        if (oauthCredentialsService.isConfigured(VideoProviderType.YOUTUBE_UPLOAD)) {
+            return VideoProviderType.YOUTUBE_UPLOAD.name();
+        }
+        return VideoProviderType.NATIVE.name();
     }
 
     private List<ExistingResourceOption> getExistingSiteVideoResources(String siteId) {

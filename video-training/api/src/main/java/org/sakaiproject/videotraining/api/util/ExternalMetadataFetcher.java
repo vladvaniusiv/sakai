@@ -11,7 +11,11 @@ import java.time.Duration;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.sakaiproject.component.cover.ComponentManager;
 import org.sakaiproject.component.cover.ServerConfigurationService;
+import org.sakaiproject.videotraining.api.model.VideoProviderType;
+import org.sakaiproject.videotraining.api.model.VideoTrainingOAuthCredentials;
+import org.sakaiproject.videotraining.api.service.VideoTrainingOAuthCredentialsService;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,17 +43,11 @@ public final class ExternalMetadataFetcher {
     private static final Pattern YOUTUBE_EMBED_PATTERN = Pattern.compile("/embed/([A-Za-z0-9_-]{11})");
     private static final Pattern YOUTUBE_SHORTS_PATTERN = Pattern.compile("/shorts/([A-Za-z0-9_-]{11})");
     private static final Pattern YOUTUBE_LIVE_PATTERN = Pattern.compile("/live/([A-Za-z0-9_-]{11})");
-    private static final Pattern VIMEO_PLAYER_PATTERN = Pattern.compile("player\\.vimeo\\.com/video/(\\d+)");
-    private static final Pattern VIMEO_PAGE_PATTERN = Pattern.compile("vimeo\\.com/(?:video/)?(\\d+)");
 
     public static MetadataFetchResult fetchExternalMetadata(String sourceReference) throws Exception {
         String youtubeId = extractYoutubeVideoId(sourceReference == null ? "" : sourceReference.trim());
         if (youtubeId != null && !youtubeId.isEmpty()) {
             return fetchYoutubeMetadata(youtubeId);
-        }
-        String vimeoId = extractVimeoVideoId(sourceReference == null ? "" : sourceReference.trim());
-        if (vimeoId != null && !vimeoId.isEmpty()) {
-            return fetchVimeoMetadata(vimeoId);
         }
         throw new IllegalArgumentException("Unsupported external video provider");
     }
@@ -58,10 +56,6 @@ public final class ExternalMetadataFetcher {
         String youtubeId = extractYoutubeVideoId(sourceReference == null ? "" : sourceReference.trim());
         if (youtubeId != null && !youtubeId.isEmpty()) {
             return "YouTube";
-        }
-        String vimeoId = extractVimeoVideoId(sourceReference == null ? "" : sourceReference.trim());
-        if (vimeoId != null && !vimeoId.isEmpty()) {
-            return "Vimeo";
         }
         return "Unsupported";
     }
@@ -105,36 +99,12 @@ public final class ExternalMetadataFetcher {
         return null;
     }
 
-    public static String extractVimeoVideoId(String sourceReference) {
-        if (sourceReference == null || sourceReference.isBlank()) {
-            return null;
-        }
-
-        Matcher playerMatcher = VIMEO_PLAYER_PATTERN.matcher(sourceReference);
-        if (playerMatcher.find()) {
-            return playerMatcher.group(1);
-        }
-
-        Matcher pageMatcher = VIMEO_PAGE_PATTERN.matcher(sourceReference);
-        if (pageMatcher.find()) {
-            return pageMatcher.group(1);
-        }
-
-        Matcher iframeMatcher = IFRAME_SRC_PATTERN.matcher(sourceReference);
-        if (iframeMatcher.find()) {
-            String src = iframeMatcher.group(1);
-            return extractVimeoVideoId(src);
-        }
-
-        return null;
-    }
-
     private static MetadataFetchResult fetchYoutubeMetadata(String youtubeId) throws Exception {
-        if (youtubeId == null || youtubeId.isBlank()) {
+        if (isBlank(youtubeId)) {
             throw new IllegalArgumentException("youtubeId required");
         }
-        String apiKey = ServerConfigurationService.getString("video.training.youtube.api.key", "");
-        if (apiKey == null || apiKey.isBlank()) {
+        String apiKey = resolveYoutubeApiKey();
+        if (isBlank(apiKey)) {
             throw new IllegalStateException("YouTube API key not configured");
         }
 
@@ -158,23 +128,36 @@ public final class ExternalMetadataFetcher {
         return new MetadataFetchResult(title, description);
     }
 
-    private static MetadataFetchResult fetchVimeoMetadata(String vimeoId) throws Exception {
-        if (vimeoId == null || vimeoId.isBlank()) {
-            throw new IllegalArgumentException("vimeoId required");
-        }
-        String videoUrl = "https://vimeo.com/" + vimeoId;
-        String apiUrl = "https://vimeo.com/api/oembed.json?url=" + URLEncoder.encode(videoUrl, StandardCharsets.UTF_8);
-
-        HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
-        HttpRequest request = HttpRequest.newBuilder().uri(URI.create(apiUrl)).GET().build();
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() != 200) {
-            throw new IOException("Vimeo oEmbed returned status " + response.statusCode());
+    private static String resolveYoutubeApiKey() {
+        String configuredKey = trimToEmpty(ServerConfigurationService.getString("video.training.youtube.api.key", ""));
+        if (isNotBlank(configuredKey)) {
+            return configuredKey;
         }
 
-        JsonNode root = new ObjectMapper().readTree(response.body());
-        String title = root.path("title").asText("");
-        String description = root.path("description").asText("");
-        return new MetadataFetchResult(title, description);
+        try {
+            VideoTrainingOAuthCredentialsService credentialsService = ComponentManager.get(VideoTrainingOAuthCredentialsService.class);
+            if (credentialsService == null) {
+                return "";
+            }
+
+            return credentialsService.getCredentials(VideoProviderType.YOUTUBE_UPLOAD)
+                    .map(VideoTrainingOAuthCredentials::getApiKey)
+                    .map(ExternalMetadataFetcher::trimToEmpty)
+                    .orElse("");
+        } catch (Exception ex) {
+            return "";
+        }
+    }
+
+    private static boolean isBlank(String value) {
+        return value == null || value.trim().isEmpty();
+    }
+
+    private static boolean isNotBlank(String value) {
+        return !isBlank(value);
+    }
+
+    private static String trimToEmpty(String value) {
+        return value == null ? "" : value.trim();
     }
 }

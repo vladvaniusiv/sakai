@@ -4,5 +4,6 @@ public enum VideoProviderType {
     RESOURCES,
     EXTERNAL,
     NATIVE,
-    HLS_UPLOAD
+    HLS_UPLOAD,
+    YOUTUBE_UPLOAD
 }
