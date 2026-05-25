@@ -39,6 +39,12 @@
                 <a th:unless="${current} == 'add'" th:href="@{/videos/new}" th:text="#{video.training.menu.add}">Add video</a>
             </span>
         </li>
+        <li th:if="${canManage}">
+            <span th:class="${current} == 'upload-jobs' ? 'current'">
+                <span th:if="${current} == 'upload-jobs'" th:text="#{video.training.menu.uploadJobs}">Upload jobs</span>
+                <a th:unless="${current} == 'upload-jobs'" th:href="@{/upload-jobs}" th:text="#{video.training.menu.uploadJobs}">Upload jobs</a>
+            </span>
+        </li>
         <li th:if="${canAnalytics}">
             <span th:class="${current} == 'analytics' ? 'current'">
                 <span th:if="${current} == 'analytics'" th:text="#{video.training.menu.analytics}">Analytics</span>

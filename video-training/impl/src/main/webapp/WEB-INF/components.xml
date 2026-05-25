@@ -8,6 +8,7 @@
         <property name="annotatedClasses">
             <list>
                 <value>org.sakaiproject.videotraining.api.model.VideoTrainingVideo</value>
+                                <value>org.sakaiproject.videotraining.api.model.VideoTrainingProcessJob</value>
                 <value>org.sakaiproject.videotraining.api.model.VideoTrainingCaption</value>
                 <value>org.sakaiproject.videotraining.api.model.VideoTrainingAnalyticsEvent</value>
                 <value>org.sakaiproject.videotraining.api.model.VideoTrainingCategory</value>
@@ -30,6 +31,11 @@
         <bean id="org.sakaiproject.videotraining.api.repository.VideoTrainingAnalyticsEventRepository"
                     class="org.sakaiproject.videotraining.impl.repository.VideoTrainingAnalyticsEventRepositoryImpl">
                 <property name="sessionFactory" ref="org.sakaiproject.springframework.orm.hibernate.GlobalSessionFactory"/>
+        </bean>
+
+        <bean id="org.sakaiproject.videotraining.api.repository.VideoTrainingProcessJobRepository"
+                class="org.sakaiproject.videotraining.impl.repository.VideoTrainingProcessJobRepositoryImpl">
+            <property name="sessionFactory" ref="org.sakaiproject.springframework.orm.hibernate.GlobalSessionFactory"/>
         </bean>
 
         <bean id="org.sakaiproject.videotraining.api.repository.VideoTrainingCategoryRepository"
@@ -74,6 +80,17 @@
         <property name="serverConfigurationService" ref="org.sakaiproject.component.api.ServerConfigurationService"/>
     </bean>
 
+    <bean id="HlsTranscodingJob" class="org.sakaiproject.videotraining.services.HlsTranscodingJob">
+        <property name="videoRepository" ref="org.sakaiproject.videotraining.api.repository.VideoTrainingVideoRepository"/>
+        <property name="processJobRepository" ref="org.sakaiproject.videotraining.api.repository.VideoTrainingProcessJobRepository"/>
+        <property name="videoTrainingService" ref="org.sakaiproject.videotraining.api.service.VideoTrainingService"/>
+        <property name="contentHostingService" ref="org.sakaiproject.content.api.ContentHostingService"/>
+        <property name="sessionManager" ref="org.sakaiproject.tool.api.SessionManager"/>
+        <property name="emailService" ref="org.sakaiproject.email.api.EmailService"/>
+        <property name="userDirectoryService" ref="org.sakaiproject.user.api.UserDirectoryService"/>
+        <property name="serverConfigurationService" ref="org.sakaiproject.component.api.ServerConfigurationService"/>
+    </bean>
+
     <bean id="org.sakaiproject.api.app.scheduler.JobBeanWrapper.ExternalLinkVideoJob"
                 class="org.sakaiproject.component.app.scheduler.jobs.SpringStatefulJobBeanWrapper"
                 init-method="init">
@@ -81,4 +98,5 @@
             <property name="jobName" value="External Link Video Job"/>
             <property name="schedulerManager" ref="org.sakaiproject.api.app.scheduler.SchedulerManager" />
     </bean>
+
 </beans>

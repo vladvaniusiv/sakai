@@ -12,13 +12,15 @@
     </div>
 
     <div class="vt-player-wrap">
-        <div th:if="${!isExternalVideo}">
+        <div class="sak-banner-info" role="status" th:if="${isProcessingUpload}" th:text="#{video.training.hls.processing}">The upload is still being processed.</div>
+
+        <div th:if="${!isExternalVideo && !isProcessingUpload}">
             <video id="vt-main-player"
                 class="vt-player"
                 playsinline
                 controls
                 preload="auto"
-                th:attr="data-playback-url=${nativePlaybackUrl},data-content-type=${nativeContentType},data-portal-url=${portalUrl}"
+                th:attr="data-playback-url=${nativePlaybackUrl},data-content-type=${nativeContentType},data-portal-url=${portalUrl},data-video-provider=${video.providerType != null ? video.providerType.name() : 'NATIVE'}"
                 th:src="${nativePlaybackUrl}">
             </video>
         </div>
@@ -147,6 +149,7 @@
 
 </div>
 <div th:replace="~{fragments/common :: jQuery}"></div>
+<script th:if="${video.providerType != null && video.providerType.name() == 'HLS_UPLOAD'}" src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
 <script th:src="@{/js/video-training-details.js}"></script>
 </body>
 </html>

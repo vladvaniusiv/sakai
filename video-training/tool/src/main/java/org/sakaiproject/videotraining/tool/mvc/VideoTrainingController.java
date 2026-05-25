@@ -1,9 +1,15 @@
 package org.sakaiproject.videotraining.tool.mvc;
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -13,6 +19,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,6 +42,7 @@ import org.sakaiproject.videotraining.api.util.ContentResourceHelper;
 
 import org.apache.commons.lang3.StringUtils;
 import org.sakaiproject.authz.api.SecurityService;
+import org.sakaiproject.api.app.scheduler.ScheduledInvocationManager;
 import org.sakaiproject.component.cover.ServerConfigurationService;
 import org.sakaiproject.content.api.ContentCollectionEdit;
 import org.sakaiproject.content.api.ContentEntity;
@@ -54,10 +62,13 @@ import org.sakaiproject.videotraining.api.VideoTrainingConstants;
 import org.sakaiproject.videotraining.api.model.PagedResponse;
 import org.sakaiproject.videotraining.api.model.VideoProviderType;
 import org.sakaiproject.videotraining.api.model.VideoPublicationStatus;
+import org.sakaiproject.videotraining.api.model.VideoTrainingProcessJob;
+import org.sakaiproject.videotraining.api.model.VideoTrainingProcessJobStatus;
 import org.sakaiproject.videotraining.api.model.VideoTrainingCaption;
 import org.sakaiproject.videotraining.api.model.VideoTrainingVideo;
 import org.sakaiproject.videotraining.api.model.VideoTrainingVideoView;
 import org.sakaiproject.videotraining.api.model.VideoVisibilityScope;
+import org.sakaiproject.videotraining.api.repository.VideoTrainingProcessJobRepository;
 import org.sakaiproject.videotraining.api.service.VideoTrainingService;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.MessageSource;
@@ -78,6 +89,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 @Controller
 @RequestMapping
+@Slf4j
 public class VideoTrainingController {
 
     private static final String SOURCE_MODE_EXTERNAL = "external";
@@ -130,6 +142,9 @@ public class VideoTrainingController {
     private final ToolManager toolManager;
     private final UserTimeService userTimeService;
     private final VideoTrainingService videoTrainingService;
+    private final VideoTrainingProcessJobRepository processJobRepository;
+    private final ScheduledInvocationManager scheduledInvocationManager;
+    private final org.sakaiproject.component.api.ServerConfigurationService serverConfigurationService;
     private final SecurityService securityService;
 
     public VideoTrainingController(MessageSource messageSource,
@@ -139,6 +154,9 @@ public class VideoTrainingController {
             ToolManager toolManager,
             @Qualifier("org.sakaiproject.time.api.UserTimeService") UserTimeService userTimeService,
             VideoTrainingService videoTrainingService,
+            VideoTrainingProcessJobRepository processJobRepository,
+            ScheduledInvocationManager scheduledInvocationManager,
+            org.sakaiproject.component.api.ServerConfigurationService serverConfigurationService,
             SecurityService securityService) {
         this.messageSource = messageSource;
         this.contentHostingService = contentHostingService;
@@ -148,6 +166,9 @@ public class VideoTrainingController {
         this.toolManager = toolManager;
         this.userTimeService = userTimeService;
         this.videoTrainingService = videoTrainingService;
+        this.processJobRepository = processJobRepository;
+        this.scheduledInvocationManager = scheduledInvocationManager;
+        this.serverConfigurationService = serverConfigurationService;
         this.securityService = securityService;
 
     }
@@ -387,6 +408,7 @@ public class VideoTrainingController {
         model.addAttribute("releaseDateInput", "");
         model.addAttribute("retractDateInput", "");
         model.addAttribute("timezoneId", getUserZoneId().getId());
+        model.addAttribute("hlsUploadEnabled", isHlsUploadEnabled());
         List<ExistingResourceOption> existingResources = getExistingSiteVideoResources(siteId);
         model.addAttribute("existingVideoResources", existingResources);
         model.addAttribute("sourceMode", SOURCE_MODE_UPLOAD);
@@ -426,6 +448,7 @@ public class VideoTrainingController {
         model.addAttribute("releaseDateInput", formatInstantForInput(video.getReleaseDate()));
         model.addAttribute("retractDateInput", formatInstantForInput(video.getRetractDate()));
         model.addAttribute("timezoneId", getUserZoneId().getId());
+        model.addAttribute("hlsUploadEnabled", isHlsUploadEnabled());
         List<ExistingResourceOption> existingResources = getExistingSiteVideoResources(siteId);
         model.addAttribute("existingVideoResources", existingResources);
         model.addAttribute("sourceMode", determineSourceMode(video, existingResources));
@@ -440,7 +463,7 @@ public class VideoTrainingController {
     }
 
     @PostMapping("/videos")
-        public String createVideo(
+    public String createVideo(
             @RequestParam("title") String title,
             @RequestParam("description") String description,
             @RequestParam("providerType") String providerType,
@@ -465,31 +488,29 @@ public class VideoTrainingController {
             parsedVisibilityScope = parseVisibilityScope(visibilityScope);
             parsedPublicationStatus = parsePublicationStatus(publicationStatus);
         } catch (IllegalArgumentException ex) {
-            redirectAttributes.addFlashAttribute("error",
-                    messageSource.getMessage("video.training.invalidInput", null, locale));
+            redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.invalidInput", null, locale));
             return "redirect:/videos/new";
         }
 
         String siteId = currentSiteId();
         String uploadedSourceReference = null;
+        String stagedTempFilePath = null;
         String resolvedSourceReference;
         Long resolvedFileSizeBytes = null;
 
         if (SOURCE_MODE_EXTERNAL.equals(effectiveSourceMode)) {
             resolvedSourceReference = normalizeExternalSourceReference(sourceReference);
             if (StringUtils.isBlank(resolvedSourceReference)) {
-                redirectAttributes.addFlashAttribute("error",
-                        messageSource.getMessage("video.training.invalidExternalSource", null, locale));
+                redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.invalidExternalSource", null, locale));
                 return "redirect:/videos/new";
             }
-            // If user requested inheriting metadata, fetch it (must succeed or return error)
-                boolean wantTitle = StringUtils.isNotBlank(inheritTitleMetadata);
-                boolean wantDescription = StringUtils.isNotBlank(inheritDescriptionMetadata);
-                if (wantTitle || wantDescription) {
-                    String videoProvider = ExternalMetadataFetcher.retrieveVideoProvider(resolvedSourceReference);
-                    try {
-                        ExternalMetadataFetcher.MetadataFetchResult meta = ExternalMetadataFetcher.fetchExternalMetadata(resolvedSourceReference);
 
+            boolean wantTitle = StringUtils.isNotBlank(inheritTitleMetadata);
+            boolean wantDescription = StringUtils.isNotBlank(inheritDescriptionMetadata);
+            if (wantTitle || wantDescription) {
+                String videoProvider = ExternalMetadataFetcher.retrieveVideoProvider(resolvedSourceReference);
+                try {
+                    ExternalMetadataFetcher.MetadataFetchResult meta = ExternalMetadataFetcher.fetchExternalMetadata(resolvedSourceReference);
                     if (wantTitle && StringUtils.isBlank(meta.title)) {
                         redirectAttributes.addFlashAttribute("error", "La API de " + videoProvider + " no devolvió título; introduce los datos manualmente.");
                         return "redirect:/videos/new";
@@ -504,65 +525,74 @@ public class VideoTrainingController {
                     if (wantDescription && StringUtils.isNotBlank(meta.description)) {
                         description = meta.description;
                     }
-                } catch (Exception e) {
+                } catch (Exception ex) {
                     redirectAttributes.addFlashAttribute("error", "La API de " + videoProvider + " no funciona; introduce los datos manualmente.");
                     return "redirect:/videos/new";
                 }
             }
         } else if (SOURCE_MODE_RESOURCES.equals(effectiveSourceMode)) {
             if (parsedVisibilityScope == VideoVisibilityScope.GLOBAL) {
-                redirectAttributes.addFlashAttribute("error",
-                        messageSource.getMessage("video.training.invalidGlobalResourceScope", null, locale));
+                redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.invalidGlobalResourceScope", null, locale));
                 return "redirect:/videos/new";
             }
             resolvedSourceReference = StringUtils.trimToEmpty(existingResourceReference);
-            if (StringUtils.isBlank(resolvedSourceReference)
-                    || !isExistingSiteVideoResourceReference(siteId, resolvedSourceReference)) {
-                redirectAttributes.addFlashAttribute("error",
-                        messageSource.getMessage("video.training.invalidResourceReference", null, locale));
+            if (StringUtils.isBlank(resolvedSourceReference) || !isExistingSiteVideoResourceReference(siteId, resolvedSourceReference)) {
+                redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.invalidResourceReference", null, locale));
                 return "redirect:/videos/new";
             }
             resolvedFileSizeBytes = resolveNativeResourceSizeBytes(resolvedSourceReference);
+            parsedProviderType = VideoProviderType.RESOURCES;
         } else {
             if (nativeFile == null || nativeFile.isEmpty()) {
-                redirectAttributes.addFlashAttribute("error",
-                        messageSource.getMessage("video.training.nativeUploadRequired", null, locale));
+                redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.nativeUploadRequired", null, locale));
                 return "redirect:/videos/new";
             }
             if (!isValidNativeUpload(nativeFile)) {
-                redirectAttributes.addFlashAttribute("error",
-                        messageSource.getMessage("video.training.nativeUploadInvalidType", null, locale));
+                redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.nativeUploadInvalidType", null, locale));
                 return "redirect:/videos/new";
             }
 
             Long maxNativeUploadBytes = getConfiguredMaxNativeUploadBytes();
-            Long margin = 64L * 1024L; // 64KB margin for multipart overhead
+            Long margin = 64L * 1024L;
             if (nativeFile.getSize() > (maxNativeUploadBytes + margin)) {
-                redirectAttributes.addFlashAttribute("error",
-                        messageSource.getMessage("video.training.nativeUploadTooLarge", null, locale));
+                redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.nativeUploadTooLarge", null, locale));
                 return "redirect:/videos/new";
             }
-            try {
-                uploadedSourceReference = uploadNativeVideo(siteId, currentUserId(), parsedVisibilityScope, nativeFile);
-                resolvedSourceReference = uploadedSourceReference;
-                resolvedFileSizeBytes = nativeFile.getSize();
-                } catch (OverQuotaException ex) {
-                    redirectAttributes.addFlashAttribute("error",
-                            messageSource.getMessage("video.training.nativeUploadOverQuota", null, locale));
+
+            if (isHlsUploadEnabled()) {
+                try {
+                    stagedTempFilePath = stageTemporaryHlsUpload(nativeFile);
+                    resolvedSourceReference = stagedTempFilePath;
+                    resolvedFileSizeBytes = nativeFile.getSize();
+                    parsedProviderType = VideoProviderType.HLS_UPLOAD;
+                    parsedPublicationStatus = VideoPublicationStatus.DRAFT;
+                } catch (Exception ex) {
+                    cleanupTemporaryUpload(stagedTempFilePath);
+                    redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.nativeUploadFailed", null, locale));
                     return "redirect:/videos/new";
-            } catch (Exception ex) {
-                redirectAttributes.addFlashAttribute("error",
-                        messageSource.getMessage("video.training.nativeUploadFailed", null, locale));
-                return "redirect:/videos/new";
+                }
+            } else {
+                try {
+                    uploadedSourceReference = uploadNativeVideo(siteId, currentUserId(), parsedVisibilityScope, nativeFile);
+                    resolvedSourceReference = uploadedSourceReference;
+                    resolvedFileSizeBytes = nativeFile.getSize();
+                    parsedProviderType = VideoProviderType.NATIVE;
+                } catch (OverQuotaException ex) {
+                    redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.nativeUploadOverQuota", null, locale));
+                    return "redirect:/videos/new";
+                } catch (Exception ex) {
+                    redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.nativeUploadFailed", null, locale));
+                    return "redirect:/videos/new";
+                }
             }
         }
 
         if (StringUtils.isBlank(title)
                 || (parsedProviderType == VideoProviderType.EXTERNAL && StringUtils.isBlank(resolvedSourceReference))
-                || (parsedProviderType == VideoProviderType.NATIVE && StringUtils.isBlank(resolvedSourceReference))) {
+                || (parsedProviderType != VideoProviderType.EXTERNAL && StringUtils.isBlank(resolvedSourceReference))) {
             cleanupManagedNativeResource(uploadedSourceReference);
-            redirectAttributes.addFlashAttribute("error",
-                    messageSource.getMessage("video.training.invalidInput", null, locale));
+            cleanupTemporaryUpload(stagedTempFilePath);
+            redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.invalidInput", null, locale));
             return "redirect:/videos/new";
         }
 
@@ -572,50 +602,76 @@ public class VideoTrainingController {
             parsedReleaseDate = parseInputDateTime(releaseDate);
             parsedRetractDate = parseInputDateTime(retractDate);
         } catch (IllegalArgumentException ex) {
-            redirectAttributes.addFlashAttribute("error",
-                    messageSource.getMessage("video.training.invalidDateTime", null, locale));
+            cleanupManagedNativeResource(uploadedSourceReference);
+            cleanupTemporaryUpload(stagedTempFilePath);
+            redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.invalidDateTime", null, locale));
             return "redirect:/videos/new";
         }
 
         if (!isValidVisibilityWindow(parsedReleaseDate, parsedRetractDate)) {
-            redirectAttributes.addFlashAttribute("error",
-                    messageSource.getMessage("video.training.invalidVisibilityWindow", null, locale));
+            cleanupManagedNativeResource(uploadedSourceReference);
+            cleanupTemporaryUpload(stagedTempFilePath);
+            redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.invalidVisibilityWindow", null, locale));
             return "redirect:/videos/new";
         }
 
         VideoTrainingVideo video = new VideoTrainingVideo(
-            siteId,
-            currentUserId(),
-            StringUtils.trimToEmpty(title),
-            StringUtils.isNotBlank(inheritTitleMetadata),
-            StringUtils.isNotBlank(inheritDescriptionMetadata),
-            StringUtils.trimToEmpty(description),
-            parsedProviderType,
-            resolvedSourceReference,
-            parsedProviderType == VideoProviderType.NATIVE ? resolvedFileSizeBytes : null,
-            parsedVisibilityScope,
-            parsedPublicationStatus,
-            parsedReleaseDate,
-            parsedRetractDate,
-            VideoTrainingConstants.PERMISSION_VIEW
-        );
+                siteId,
+                currentUserId(),
+                StringUtils.trimToEmpty(title),
+                StringUtils.isNotBlank(inheritTitleMetadata),
+                StringUtils.isNotBlank(inheritDescriptionMetadata),
+                StringUtils.trimToEmpty(description),
+                parsedProviderType,
+                resolvedSourceReference,
+                resolvedFileSizeBytes,
+                parsedVisibilityScope,
+                parsedPublicationStatus,
+                parsedReleaseDate,
+                parsedRetractDate,
+                VideoTrainingConstants.PERMISSION_VIEW);
 
         try {
-            videoTrainingService.saveVideo(video);
+            VideoTrainingVideo savedVideo = videoTrainingService.saveVideo(video);
+            if (savedVideo.getProviderType() == VideoProviderType.HLS_UPLOAD) {
+                VideoTrainingProcessJob processJob = new VideoTrainingProcessJob();
+                processJob.setVideoId(savedVideo.getId());
+                processJob.setSubmitterUserId(savedVideo.getOwnerId());
+                processJob.setStatus(VideoTrainingProcessJobStatus.PENDING);
+                processJob.setTempFilePath(stagedTempFilePath);
+                processJob.setErrorMessage(null);
+                processJob.setCreatedOn(Instant.now());
+                processJob.setModifiedOn(Instant.now());
+                processJobRepository.save(processJob);
+                log.info("Created HLS process job {} for video {} (submitter={})", processJob.getId(), processJob.getVideoId(), processJob.getSubmitterUserId());
+                scheduleHlsProcessing(savedVideo.getId());
+                redirectAttributes.addFlashAttribute("success", messageSource.getMessage("video.training.createdProcessing", null, locale));
+            } else {
+                redirectAttributes.addFlashAttribute("success", messageSource.getMessage("video.training.created", null, locale));
+            }
         } catch (SecurityException ex) {
             cleanupManagedNativeResource(uploadedSourceReference);
-            redirectAttributes.addFlashAttribute("error",
-                    messageSource.getMessage("video.training.accessDenied", null, locale));
+            cleanupTemporaryUpload(stagedTempFilePath);
+            redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.accessDenied", null, locale));
             return "redirect:/videos";
         } catch (IllegalArgumentException ex) {
             cleanupManagedNativeResource(uploadedSourceReference);
-            redirectAttributes.addFlashAttribute("error",
-                    messageSource.getMessage("video.training.invalidInput", null, locale));
+            cleanupTemporaryUpload(stagedTempFilePath);
+            redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.invalidInput", null, locale));
+            return "redirect:/videos/new";
+        } catch (RuntimeException ex) {
+            cleanupManagedNativeResource(uploadedSourceReference);
+            cleanupTemporaryUpload(stagedTempFilePath);
+            if (StringUtils.isNotBlank(video.getId())) {
+                try {
+                    videoTrainingService.deleteVideo(video.getId());
+                } catch (Exception ignored) {
+                }
+            }
+            redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.invalidInput", null, locale));
             return "redirect:/videos/new";
         }
 
-        redirectAttributes.addFlashAttribute("success",
-                messageSource.getMessage("video.training.created", null, locale));
         return "redirect:/videos";
     }
 
@@ -643,6 +699,7 @@ public class VideoTrainingController {
                     messageSource.getMessage("video.training.notFound", null, locale));
             return "redirect:/videos";
         }
+        VideoTrainingVideo originalVideo = copyVideo(existing);
 
         String effectiveSourceMode = resolveSourceMode(sourceMode, providerType);
         VideoProviderType parsedProviderType = providerTypeForSourceMode(effectiveSourceMode);
@@ -660,6 +717,7 @@ public class VideoTrainingController {
         VideoProviderType previousProviderType = existing.getProviderType();
 
         String uploadedSourceReference = null;
+        String stagedTempFilePath = null;
         String resolvedSourceReference;
         Long resolvedFileSizeBytes = existing.getFileSizeBytes();
         if (SOURCE_MODE_EXTERNAL.equals(effectiveSourceMode)) {
@@ -726,9 +784,19 @@ public class VideoTrainingController {
                     return "redirect:/videos/" + videoId + "/edit";
                 }
                 try {
-                    uploadedSourceReference = uploadNativeVideo(existing.getSiteId(), currentUserId(), parsedVisibilityScope, nativeFile);
-                    resolvedSourceReference = uploadedSourceReference;
-                    resolvedFileSizeBytes = nativeFile.getSize();
+                    if (isHlsUploadEnabled()) {
+                        stagedTempFilePath = stageTemporaryHlsUpload(nativeFile);
+                        uploadedSourceReference = stagedTempFilePath;
+                        resolvedSourceReference = stagedTempFilePath;
+                        resolvedFileSizeBytes = nativeFile.getSize();
+                        parsedProviderType = VideoProviderType.HLS_UPLOAD;
+                        parsedPublicationStatus = VideoPublicationStatus.DRAFT;
+                    } else {
+                        uploadedSourceReference = uploadNativeVideo(existing.getSiteId(), currentUserId(), parsedVisibilityScope, nativeFile);
+                        resolvedSourceReference = uploadedSourceReference;
+                        resolvedFileSizeBytes = nativeFile.getSize();
+                        parsedProviderType = VideoProviderType.NATIVE;
+                    }
                 } catch (OverQuotaException ex) {
                     redirectAttributes.addFlashAttribute("error",
                             messageSource.getMessage("video.training.nativeUploadOverQuota", null, locale));
@@ -738,6 +806,12 @@ public class VideoTrainingController {
                             messageSource.getMessage("video.training.nativeUploadFailed", null, locale));
                     return "redirect:/videos/" + videoId + "/edit";
                 }
+            } else if (existing.getProviderType() == VideoProviderType.HLS_UPLOAD) {
+                resolvedSourceReference = previousSourceReference;
+                if (resolvedFileSizeBytes == null) {
+                    resolvedFileSizeBytes = existing.getFileSizeBytes();
+                }
+                parsedProviderType = VideoProviderType.HLS_UPLOAD;
             } else if (existing.getProviderType() == VideoProviderType.NATIVE) {
                 resolvedSourceReference = previousSourceReference;
                 if (resolvedFileSizeBytes == null) {
@@ -765,8 +839,9 @@ public class VideoTrainingController {
 
         if (StringUtils.isBlank(title)
                 || (parsedProviderType == VideoProviderType.EXTERNAL && StringUtils.isBlank(resolvedSourceReference))
-                || (parsedProviderType == VideoProviderType.NATIVE && StringUtils.isBlank(resolvedSourceReference))) {
+                || (parsedProviderType != VideoProviderType.EXTERNAL && StringUtils.isBlank(resolvedSourceReference))) {
             cleanupManagedNativeResource(uploadedSourceReference);
+            cleanupTemporaryUpload(stagedTempFilePath);
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage("video.training.invalidInput", null, locale));
             return "redirect:/videos/" + videoId + "/edit";
@@ -822,7 +897,7 @@ public class VideoTrainingController {
         existing.setDescription(StringUtils.trimToEmpty(description));
         existing.setProviderType(parsedProviderType);
         existing.setSourceReference(resolvedSourceReference);
-        existing.setFileSizeBytes(parsedProviderType == VideoProviderType.NATIVE ? resolvedFileSizeBytes : null);
+        existing.setFileSizeBytes(parsedProviderType == VideoProviderType.EXTERNAL ? null : resolvedFileSizeBytes);
         existing.setVisibilityScope(parsedVisibilityScope);
         existing.setPublicationStatus(parsedPublicationStatus);
         existing.setRequiredViewPermission(VideoTrainingConstants.PERMISSION_VIEW);
@@ -830,16 +905,41 @@ public class VideoTrainingController {
         existing.setRetractDate(parsedRetractDate);
 
         try {
-            videoTrainingService.saveVideo(existing);
+            VideoTrainingVideo savedVideo = videoTrainingService.saveVideo(existing);
+            if (savedVideo.getProviderType() == VideoProviderType.HLS_UPLOAD && StringUtils.isNotBlank(stagedTempFilePath)) {
+                VideoTrainingProcessJob processJob = new VideoTrainingProcessJob();
+                processJob.setVideoId(savedVideo.getId());
+                processJob.setSubmitterUserId(savedVideo.getOwnerId());
+                processJob.setStatus(VideoTrainingProcessJobStatus.PENDING);
+                processJob.setTempFilePath(stagedTempFilePath);
+                processJob.setErrorMessage(null);
+                processJob.setCreatedOn(Instant.now());
+                processJob.setModifiedOn(Instant.now());
+                processJobRepository.save(processJob);
+                log.info("Queued HLS process job {} for video {} (submitter={})", processJob.getId(), processJob.getVideoId(), processJob.getSubmitterUserId());
+                scheduleHlsProcessing(savedVideo.getId());
+            }
         } catch (SecurityException ex) {
             cleanupManagedNativeResource(uploadedSourceReference);
+            cleanupTemporaryUpload(stagedTempFilePath);
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage("video.training.accessDenied", null, locale));
             return "redirect:/videos";
         } catch (IllegalArgumentException ex) {
             cleanupManagedNativeResource(uploadedSourceReference);
+            cleanupTemporaryUpload(stagedTempFilePath);
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage("video.training.invalidInput", null, locale));
+            return "redirect:/videos/" + videoId + "/edit";
+        } catch (RuntimeException ex) {
+            cleanupManagedNativeResource(uploadedSourceReference);
+            cleanupTemporaryUpload(stagedTempFilePath);
+            try {
+                videoTrainingService.saveVideo(originalVideo);
+            } catch (Exception ignored) {
+            }
+            redirectAttributes.addFlashAttribute("error",
+                messageSource.getMessage("video.training.invalidInput", null, locale));
             return "redirect:/videos/" + videoId + "/edit";
         }
 
@@ -964,6 +1064,8 @@ public class VideoTrainingController {
         model.addAttribute("canManage", canManage);
         model.addAttribute("canManageCaptions", videoTrainingService.canManageCaptions(video.getSiteId(), userId));
         model.addAttribute("isExternalVideo", video.getProviderType() == VideoProviderType.EXTERNAL);
+        model.addAttribute("isProcessingUpload", video.getProviderType() == VideoProviderType.HLS_UPLOAD
+            && video.getPublicationStatus() != VideoPublicationStatus.PUBLISHED);
         model.addAttribute("externalEmbedUrl", externalEmbedUrl);
         model.addAttribute("nativePlaybackUrl", resolveNativePlaybackUrl(video));
         model.addAttribute("nativeContentType", resolveNativeContentType(video));
@@ -1143,6 +1245,21 @@ public class VideoTrainingController {
         return "redirect:/videos/" + videoId;
     }
 
+    @GetMapping("/upload-jobs")
+    public String uploadJobs(RedirectAttributes redirectAttributes, Locale locale, Model model) {
+        String siteId = currentSiteId();
+        String userId = currentUserId();
+
+        if (!(videoTrainingService.canManageLibrary(siteId, userId) || videoTrainingService.hasManagePermission(siteId, userId))) {
+            redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.accessDenied", null, locale));
+            return "redirect:/videos";
+        }
+
+        populateNavigationFlags(model, siteId, userId);
+        model.addAttribute("jobs", buildUploadJobViews(siteId, userId, locale));
+        return "video-training/upload-jobs";
+    }
+
     private void populateNavigationFlags(Model model, String siteId, String userId) {
         boolean canManageAll = videoTrainingService.canManageLibrary(siteId, userId);
         boolean canManageOwn = videoTrainingService.hasManagePermission(siteId, userId);
@@ -1151,6 +1268,62 @@ public class VideoTrainingController {
         model.addAttribute("canView", videoTrainingService.hasViewPermission(siteId, userId)
                 || canManageAll
                 || canManageOwn);
+    }
+
+    private void scheduleHlsProcessing(String videoId) {
+        try {
+            Instant fireTime = Instant.now().plusSeconds(5L);
+            String invocationId = scheduledInvocationManager.createDelayedInvocation(fireTime, "HlsTranscodingJob", videoId);
+            log.info("Scheduled HLS trigger {} for video {} at {}", invocationId, videoId, fireTime);
+        } catch (RuntimeException ex) {
+            cleanupProcessJobs(videoId);
+            throw ex;
+        }
+    }
+
+    private void cleanupProcessJobs(String videoId) {
+        if (StringUtils.isBlank(videoId)) {
+            return;
+        }
+
+        try {
+            List<VideoTrainingProcessJob> jobs = processJobRepository.findByVideoIdOrderByModifiedOnDesc(videoId);
+            for (VideoTrainingProcessJob job : jobs) {
+                processJobRepository.delete(job);
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to cleanup process jobs for video {}", videoId, ex);
+        }
+    }
+
+    private List<UploadJobView> buildUploadJobViews(String siteId, String userId, Locale locale) {
+        List<UploadJobView> jobViews = new ArrayList<>();
+        for (VideoTrainingProcessJob job : processJobRepository.findBySubmitterUserIdOrderByModifiedOnDesc(userId)) {
+            VideoTrainingVideo video = videoTrainingService.getVideoById(job.getVideoId()).orElse(null);
+            if (video == null || !Objects.equals(video.getSiteId(), siteId)) {
+                continue;
+            }
+
+            jobViews.add(new UploadJobView(
+                    job,
+                    video,
+                    formatInstantForDisplay(job.getCreatedOn(), locale),
+                    formatInstantForDisplay(job.getModifiedOn(), locale),
+                    localizeJobStatus(job.getStatus(), locale)));
+        }
+        return jobViews;
+    }
+
+    private String localizeJobStatus(VideoTrainingProcessJobStatus status, Locale locale) {
+        if (status == null) {
+            return "";
+        }
+        String key = "video.training.job.status." + status.name();
+        try {
+            return messageSource.getMessage(key, null, locale);
+        } catch (Exception ex) {
+            return status.name();
+        }
     }
 
     private String renderPreferredVideosList(boolean favoritesOnly, String listPath, String menuCurrent,
@@ -1419,6 +1592,9 @@ public class VideoTrainingController {
         if ("EXTERNAL".equals(normalizedProviderType)) {
             return SOURCE_MODE_EXTERNAL;
         }
+        if ("RESOURCES".equals(normalizedProviderType)) {
+            return SOURCE_MODE_RESOURCES;
+        }
 
         return SOURCE_MODE_UPLOAD;
     }
@@ -1481,11 +1657,21 @@ public class VideoTrainingController {
     }
 
     private boolean isModerationEnabled() {
-        return ServerConfigurationService.getBoolean(MODERATION_ENABLED_PROPERTY, false);
+        return serverConfigurationService.getBoolean(MODERATION_ENABLED_PROPERTY, false);
     }
 
     private VideoProviderType providerTypeForSourceMode(String sourceMode) {
-        return SOURCE_MODE_EXTERNAL.equals(sourceMode) ? VideoProviderType.EXTERNAL : VideoProviderType.NATIVE;
+        if (SOURCE_MODE_EXTERNAL.equals(sourceMode)) {
+            return VideoProviderType.EXTERNAL;
+        }
+        if (SOURCE_MODE_RESOURCES.equals(sourceMode)) {
+            return VideoProviderType.RESOURCES;
+        }
+        return isHlsUploadEnabled() ? VideoProviderType.HLS_UPLOAD : VideoProviderType.NATIVE;
+    }
+
+    private boolean isHlsUploadEnabled() {
+        return serverConfigurationService.getBoolean("video.training.hls.enabled", true);
     }
 
     private boolean isValidNativeUpload(MultipartFile nativeFile) {
@@ -1526,7 +1712,7 @@ public class VideoTrainingController {
     }
 
     private String resolveNativeContentType(VideoTrainingVideo video) {
-        if (video == null || video.getProviderType() != VideoProviderType.NATIVE) {
+        if (video == null || video.getProviderType() == VideoProviderType.EXTERNAL) {
             return "video/mp4";
         }
 
@@ -1539,7 +1725,7 @@ public class VideoTrainingController {
     }
 
     private String resolveNativePlaybackUrl(VideoTrainingVideo video) {
-        if (video == null || video.getProviderType() != VideoProviderType.NATIVE) {
+        if (video == null || video.getProviderType() == VideoProviderType.EXTERNAL) {
             return "";
         }
 
@@ -1706,7 +1892,7 @@ public class VideoTrainingController {
     }
 
     private long getConfiguredMaxNativeUploadBytes() {
-        String configuredValue = StringUtils.trimToEmpty(ServerConfigurationService.getString(
+        String configuredValue = StringUtils.trimToEmpty(serverConfigurationService.getString(
                 MAX_NATIVE_UPLOAD_SIZE_PROPERTY,
                 String.valueOf(DEFAULT_MAX_NATIVE_UPLOAD_MB)));
         try {
@@ -1727,7 +1913,7 @@ public class VideoTrainingController {
             return "";
         }
 
-        if (video.getProviderType() == VideoProviderType.NATIVE) {
+        if (video.getProviderType() == VideoProviderType.NATIVE || video.getProviderType() == VideoProviderType.RESOURCES) {
             return resolveContentReferenceFromSourceId(video.getSourceReference());
         }
 
@@ -1763,7 +1949,7 @@ public class VideoTrainingController {
 
     private boolean isNativeVideoThumbnail(VideoTrainingVideo video) {
         return video != null
-                && video.getProviderType() == VideoProviderType.NATIVE
+                && (video.getProviderType() == VideoProviderType.NATIVE || video.getProviderType() == VideoProviderType.RESOURCES)
                 && StringUtils.isNotBlank(video.getSourceReference());
     }
 
@@ -1794,6 +1980,10 @@ public class VideoTrainingController {
 
         if (video.getProviderType() == VideoProviderType.EXTERNAL) {
             return SOURCE_MODE_EXTERNAL;
+        }
+
+        if (video.getProviderType() == VideoProviderType.RESOURCES) {
+            return SOURCE_MODE_RESOURCES;
         }
 
         String sourceReference = StringUtils.trimToEmpty(video.getSourceReference());
@@ -1857,6 +2047,82 @@ public class VideoTrainingController {
         }
     }
 
+    private static class UploadJobView {
+
+        private final VideoTrainingProcessJob job;
+        private final VideoTrainingVideo video;
+        private final String createdOnDisplay;
+        private final String modifiedOnDisplay;
+        private final String statusLabel;
+
+        private UploadJobView(VideoTrainingProcessJob job,
+                VideoTrainingVideo video,
+                String createdOnDisplay,
+                String modifiedOnDisplay,
+                String statusLabel) {
+            this.job = job;
+            this.video = video;
+            this.createdOnDisplay = createdOnDisplay;
+            this.modifiedOnDisplay = modifiedOnDisplay;
+            this.statusLabel = statusLabel;
+        }
+
+        public VideoTrainingProcessJob getJob() {
+            return job;
+        }
+
+        public VideoTrainingVideo getVideo() {
+            return video;
+        }
+
+        public String getCreatedOnDisplay() {
+            return createdOnDisplay;
+        }
+
+        public String getModifiedOnDisplay() {
+            return modifiedOnDisplay;
+        }
+
+        public String getStatusLabel() {
+            return statusLabel;
+        }
+
+        public String getErrorMessage() {
+            return job.getErrorMessage();
+        }
+
+        public String getStatus() {
+            return job.getStatus() != null ? job.getStatus().name() : "";
+        }
+
+        public String getJobId() {
+            return job.getId();
+        }
+    }
+
+    private VideoTrainingVideo copyVideo(VideoTrainingVideo source) {
+        VideoTrainingVideo copy = new VideoTrainingVideo();
+        copy.setId(source.getId());
+        copy.setSiteId(source.getSiteId());
+        copy.setOwnerId(source.getOwnerId());
+        copy.setTitle(source.getTitle());
+        copy.setInheritTitleMetadata(source.isInheritTitleMetadata());
+        copy.setInheritDescriptionMetadata(source.isInheritDescriptionMetadata());
+        copy.setDescription(source.getDescription());
+        copy.setProviderType(source.getProviderType());
+        copy.setSourceReference(source.getSourceReference());
+        copy.setFileSizeBytes(source.getFileSizeBytes());
+        copy.setVisibilityScope(source.getVisibilityScope());
+        copy.setPublicationStatus(source.getPublicationStatus());
+        copy.setReleaseDate(source.getReleaseDate());
+        copy.setRetractDate(source.getRetractDate());
+        copy.setRequiredViewPermission(source.getRequiredViewPermission());
+        copy.setCreatedOn(source.getCreatedOn());
+        copy.setModifiedOn(source.getModifiedOn());
+        copy.setCategories(new HashSet<>(source.getCategories()));
+        return copy;
+    }
+
     private String uploadNativeVideo(String siteId,
             String ownerId,
             VideoVisibilityScope visibilityScope,
@@ -1898,6 +2164,41 @@ public class VideoTrainingController {
                 } catch (Exception ignored) {
                 }
             }
+        }
+    }
+
+    private String stageTemporaryHlsUpload(MultipartFile nativeFile) throws Exception {
+        Path baseDirectory = Paths.get(System.getProperty("java.io.tmpdir"), "video-training");
+        Files.createDirectories(baseDirectory);
+        Path workingDirectory = Files.createTempDirectory(baseDirectory, "hls-");
+        Path tempFile = Files.createTempFile(workingDirectory, "upload-", ".mp4");
+        try (java.io.InputStream inputStream = nativeFile.getInputStream()) {
+            Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
+        }
+        return tempFile.toAbsolutePath().toString();
+    }
+
+    private void cleanupTemporaryUpload(String tempFilePath) {
+        if (StringUtils.isBlank(tempFilePath)) {
+            return;
+        }
+
+        try {
+            Path tempFile = Paths.get(tempFilePath);
+            Path workingDirectory = tempFile.getParent();
+            if (workingDirectory != null && Files.exists(workingDirectory)) {
+                Files.walk(workingDirectory)
+                        .sorted(Comparator.reverseOrder())
+                        .forEach(path -> {
+                            try {
+                                Files.deleteIfExists(path);
+                            } catch (IOException ignored) {
+                            }
+                        });
+            } else {
+                Files.deleteIfExists(tempFile);
+            }
+        } catch (Exception ignored) {
         }
     }
 

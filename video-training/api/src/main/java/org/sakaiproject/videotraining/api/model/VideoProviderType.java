@@ -1,6 +1,8 @@
 package org.sakaiproject.videotraining.api.model;
 
 public enum VideoProviderType {
+    RESOURCES,
+    EXTERNAL,
     NATIVE,
-    EXTERNAL
+    HLS_UPLOAD
 }

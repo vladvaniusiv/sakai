@@ -12,6 +12,7 @@
     const uploadTooLargeMessage = form?.dataset.nativeUploadTooLargeMessage || '';
     const maxNativeUploadBytes = Number.parseInt(form?.dataset.nativeUploadMaxBytes || '', 10);
     const visibilityReductionConfirmMessage = form?.dataset.visibilityReductionConfirmMessage || '';
+    const hlsUploadEnabled = form?.dataset.hlsUploadEnabled === 'true';
     const isEdit = form?.dataset.isEdit === 'true';
     const videoId = form?.dataset.videoId || '';
     let currentVisibilityScope = form?.dataset.initialVisibilityScope || visibilityScopeSelect?.value || 'COURSE';
@@ -78,6 +79,7 @@
     function applyMode(mode) {
         const isExternal = mode === 'external';
         const isResources = mode === 'resources';
+        const isUpload = mode === 'upload';
 
         if (externalSection) {
             externalSection.hidden = !isExternal;
@@ -103,7 +105,13 @@
             }
         }
 
-        providerTypeInput.value = isExternal ? 'EXTERNAL' : 'NATIVE';
+        if (isExternal) {
+            providerTypeInput.value = 'EXTERNAL';
+        } else if (isResources) {
+            providerTypeInput.value = 'RESOURCES';
+        } else if (isUpload) {
+            providerTypeInput.value = hlsUploadEnabled ? 'HLS_UPLOAD' : 'NATIVE';
+        }
     }
 
     sourceModeInputs.forEach((input) => {

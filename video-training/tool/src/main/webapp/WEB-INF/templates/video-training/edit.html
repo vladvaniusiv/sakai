@@ -7,7 +7,7 @@
     <div th:replace="~{fragments/common :: messages(${success}, ${error})}"></div>
 
     <h1 class="h3 vt-form-title" th:text="${isEdit} ? #{video.training.edit} : #{video.training.add}">Add video</h1>
-    <form method="post" enctype="multipart/form-data" class="vt-video-form" th:action="${isEdit} ? @{/videos/{id}(id=${video.id})} : @{/videos}" th:attr="data-native-upload-max-bytes=${nativeUploadMaxBytes},data-native-upload-too-large-message=#{video.training.nativeUploadTooLarge},data-visibility-reduction-confirm-message=#{video.training.visibility.reduce.confirm},data-initial-visibility-scope=${video.visibilityScope != null ? video.visibilityScope.name() : 'COURSE'},data-video-id=${video.id},data-is-edit=${isEdit}">
+    <form method="post" enctype="multipart/form-data" class="vt-video-form" th:action="${isEdit} ? @{/videos/{id}(id=${video.id})} : @{/videos}" th:attr="data-native-upload-max-bytes=${nativeUploadMaxBytes},data-native-upload-too-large-message=#{video.training.nativeUploadTooLarge},data-visibility-reduction-confirm-message=#{video.training.visibility.reduce.confirm},data-initial-visibility-scope=${video.visibilityScope != null ? video.visibilityScope.name() : 'COURSE'},data-video-id=${video.id},data-is-edit=${isEdit},data-hls-upload-enabled=${hlsUploadEnabled}">
         <div class="vt-form-section">
             <label class="form-label" for="title" th:text="#{video.training.form.title}">Title</label>
             <input class="form-control" id="title" name="title" type="text" th:value="${video.title}" required>
@@ -33,7 +33,7 @@
                 </div>
             </div>
         </div>
-        <input id="providerType" name="providerType" type="hidden" th:value="${video.providerType != null ? video.providerType : 'NATIVE'}">
+        <input id="providerType" name="providerType" type="hidden" th:value="${video.providerType != null ? video.providerType : (hlsUploadEnabled ? 'HLS_UPLOAD' : 'NATIVE')}">
 
         <div class="vt-form-section" id="externalSourceSection">
             <label class="form-label" for="sourceReference" th:text="#{video.training.form.source}">Source</label>
