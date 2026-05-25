@@ -1,12 +1,6 @@
 (function () {
     const tableElement = document.getElementById('vt-video-table');
-    const grid = document.getElementById('vt-video-grid');
-    const tableBody = document.getElementById('vt-video-table-body');
-    const pagination = document.getElementById('vt-pagination');
-    const loadMoreLink = document.getElementById('vt-load-more');
-    let loading = false;
     let dataTable = null;
-    let suppressOrderReload = false;
 
     function initializeTooltips(root) {
         if (!window.bootstrap || !window.bootstrap.Tooltip) {
@@ -93,13 +87,39 @@
         6: 'retract'
     };
 
-    function buildSortedReloadUrl(sortBy, sortDir, loadedCount, batchSize) {
+    function getPageSize() {
+        const currentSearch = new URLSearchParams(window.location.search);
+        const fromSearch = Number(currentSearch.get('size'));
+        if (Number.isFinite(fromSearch) && fromSearch > 0) {
+            return fromSearch;
+        }
+
+        const sizeInput = document.querySelector('input[name="size"]');
+        if (sizeInput) {
+            const fromInput = Number(sizeInput.value);
+            if (Number.isFinite(fromInput) && fromInput > 0) {
+                return fromInput;
+            }
+        }
+
+        if (tableElement) {
+            const fromDataset = Number(tableElement.dataset.size || '0');
+            if (Number.isFinite(fromDataset) && fromDataset > 0) {
+                return fromDataset;
+            }
+        }
+
+        return 15;
+    }
+
+    function buildSortedReloadUrl(sortBy, sortDir) {
         const params = new URLSearchParams(window.location.search);
         params.set('viewMode', tableElement.dataset.viewMode || 'table');
         params.set('q', tableElement.dataset.query || '');
-        params.set('size', String(loadedCount));
-        params.set('batchSize', String(batchSize));
-        params.delete('offset');
+        params.set('size', String(getPageSize()));
+        params.set('offset', '0');
+        params.delete('batchSize');
+        params.delete('page');
         params.set('sortBy', sortBy);
         params.set('sortDir', sortDir);
         return window.location.pathname + '?' + params.toString();
@@ -120,10 +140,6 @@
         });
 
         window.jQuery(tableElement).on('order.dt', function () {
-            if (suppressOrderReload) {
-                return;
-            }
-
             const order = dataTable.order();
             if (!order || !order.length) {
                 return;
@@ -142,100 +158,10 @@
                 return;
             }
 
-            const loadedCount = dataTable.rows().count();
-            const batchSize = Number(tableElement.dataset.batchSize || tableElement.dataset.size || loadedCount || 15);
-            window.location.href = buildSortedReloadUrl(sortBy, orderDir, loadedCount, batchSize);
+            window.location.href = buildSortedReloadUrl(sortBy, orderDir);
         });
     }
 
     initializeTooltips(document);
     initializeThumbnailRetry(document);
-
-    if (!loadMoreLink) {
-        return;
-    }
-
-    function setLoadingState(isLoading) {
-        loading = isLoading;
-        loadMoreLink.classList.toggle('disabled', isLoading);
-        loadMoreLink.setAttribute('aria-disabled', isLoading ? 'true' : 'false');
-        if (isLoading) {
-            loadMoreLink.dataset.originalText = loadMoreLink.textContent;
-            loadMoreLink.textContent = '...';
-        } else if (loadMoreLink.dataset.originalText) {
-            loadMoreLink.textContent = loadMoreLink.dataset.originalText;
-        }
-    }
-
-    loadMoreLink.addEventListener('click', async function (event) {
-        event.preventDefault();
-        if (loading) {
-            return;
-        }
-
-        setLoadingState(true);
-        try {
-            const response = await fetch(loadMoreLink.href, {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' },
-                credentials: 'same-origin'
-            });
-            if (!response.ok) {
-                throw new Error('Failed to load next page');
-            }
-
-            const html = await response.text();
-            const doc = new DOMParser().parseFromString(html, 'text/html');
-
-            if (grid) {
-                const incomingGrid = doc.getElementById('vt-video-grid');
-                if (incomingGrid) {
-                    incomingGrid.querySelectorAll('.vt-video-card').forEach(function (card) {
-                        grid.appendChild(card);
-                        initializeTooltips(card);
-                        initializeThumbnailRetry(card);
-                    });
-                }
-            }
-
-            if (tableBody) {
-                const incomingBody = doc.getElementById('vt-video-table-body');
-                if (incomingBody) {
-                    const incomingRows = incomingBody.querySelectorAll('tr');
-                    if (dataTable) {
-                        suppressOrderReload = true;
-                        incomingRows.forEach(function (row) {
-                            dataTable.row.add(row);
-                            initializeTooltips(row);
-                            initializeThumbnailRetry(row);
-                        });
-                        dataTable.draw(false);
-                        suppressOrderReload = false;
-                    } else {
-                        incomingRows.forEach(function (row) {
-                            tableBody.appendChild(row);
-                            initializeTooltips(row);
-                            initializeThumbnailRetry(row);
-                        });
-                    }
-                }
-            }
-
-            const incomingLoadMore = doc.getElementById('vt-load-more');
-            const incomingEnd = doc.getElementById('vt-pagination-end');
-            if (incomingLoadMore) {
-                loadMoreLink.href = incomingLoadMore.href;
-            } else {
-                loadMoreLink.remove();
-                if (incomingEnd) {
-                    pagination.appendChild(incomingEnd);
-                }
-            }
-        } catch (error) {
-            window.location.href = loadMoreLink.href;
-        } finally {
-            if (document.body.contains(loadMoreLink)) {
-                setLoadingState(false);
-            }
-        }
-    });
 })();

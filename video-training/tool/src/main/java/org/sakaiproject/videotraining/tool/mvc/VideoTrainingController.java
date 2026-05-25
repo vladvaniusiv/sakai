@@ -114,16 +114,15 @@ public class VideoTrainingController {
     private static final long BYTES_PER_MB = 1024L * 1024L;
     private static final long DEFAULT_MAX_NATIVE_UPLOAD_MB = 512L;
     private static final Set<String> ALLOWED_NATIVE_VIDEO_EXTENSIONS = Set.of("mp4", "webm", "ogg", "mov", "m4v", "avi", "mkv");
-    
+
     private static final String CONTENT_REFERENCE_ROOT = ContentHostingService.REFERENCE_ROOT;
-        private static final Map<String, String> SORT_FIELD_BY_COLUMN = Map.of(
+    private static final Map<String, String> SORT_FIELD_BY_COLUMN = Map.of(
             "title", "title",
             "scope", "visibilityScope",
             "status", "publicationStatus",
             "release", "releaseDate",
             "retract", "retractDate",
             "modified", "modifiedOn");
-
     private final MessageSource messageSource;
     private final ContentHostingService contentHostingService;
     private final SessionManager sessionManager;
@@ -262,7 +261,7 @@ public class VideoTrainingController {
     public String list(@RequestParam(name = "viewMode", required = false) String viewMode,
             @RequestParam(name = "q", required = false) String query,
             @RequestParam(name = "size", required = false, defaultValue = "15") int size,
-            @RequestParam(name = "batchSize", required = false) Integer batchSize,
+            @RequestParam(name = "page", required = false) Integer page,
             @RequestParam(name = "offset", required = false) Integer offset,
             @RequestParam(name = "sortBy", required = false) String sortBy,
             @RequestParam(name = "sortDir", required = false) String sortDir,
@@ -281,36 +280,37 @@ public class VideoTrainingController {
         String normalizedQuery = StringUtils.trimToEmpty(query);
         boolean isUserSite = siteService.isUserSite(siteId);
         int safeSize = normalizePageSize(size);
-        int safeBatchSize = normalizePageSize(batchSize != null ? batchSize : safeSize);
         int safeOffset = Math.max(0, offset != null ? offset : 0);
         String normalizedSortBy = normalizeSortBy(sortBy);
         String normalizedSortDir = normalizeSortDir(sortDir);
-        List<VideoTrainingVideo> videos;
-        boolean hasMore = false;
-        int nextOffset = safeOffset;
+        long totalCount;
+        if (isUserSite) {
+            totalCount = videoTrainingService.countGlobalVideosForUser(userId, normalizedQuery);
+        } else if (manageableList && canManageAll) {
+            totalCount = videoTrainingService.countSiteLibrary(siteId, normalizedQuery);
+        } else if (manageableList && canManageOwn) {
+            totalCount = videoTrainingService.countSiteLibraryForOwner(siteId, userId, normalizedQuery);
+        } else {
+            totalCount = videoTrainingService.countVisibleVideosForUser(siteId, userId, Instant.now(), normalizedQuery);
+        }
 
-        List<VideoTrainingVideo> fetched;
-        int fetchSize = safeOffset > 0 ? safeBatchSize : safeSize;
+        int requestedPage = page != null ? page : ((safeOffset / safeSize) + 1);
+        int safePage = normalizePage(requestedPage, safeSize, totalCount);
+        int pageOffset = (safePage - 1) * safeSize;
+        int totalPages = (int) Math.max(1, Math.ceil((double) totalCount / safeSize));
+
+        List<VideoTrainingVideo> videos;
         String sortField = mapSortField(normalizedSortBy, isUserSite);
         boolean ascending = "asc".equals(normalizedSortDir);
-        int requested = fetchSize + 1;
         if (isUserSite) {
-            fetched = videoTrainingService.getGlobalVideosSorted(normalizedQuery, safeOffset, requested, sortField, ascending);
+            videos = videoTrainingService.getGlobalVideosSorted(normalizedQuery, pageOffset, safeSize, sortField, ascending);
         } else if (manageableList && canManageAll) {
-            fetched = videoTrainingService.getSiteLibrarySorted(siteId, normalizedQuery, safeOffset, requested, sortField, ascending);
+            videos = videoTrainingService.getSiteLibrarySorted(siteId, normalizedQuery, pageOffset, safeSize, sortField, ascending);
         } else if (manageableList && canManageOwn) {
-            fetched = videoTrainingService.getSiteLibrarySortedForOwner(siteId, userId, normalizedQuery, safeOffset, requested, sortField, ascending);
+            videos = videoTrainingService.getSiteLibrarySortedForOwner(siteId, userId, normalizedQuery, pageOffset, safeSize, sortField, ascending);
         } else {
-            fetched = videoTrainingService.getVisibleVideosForUserSorted(siteId, userId, Instant.now(), normalizedQuery, safeOffset, requested, sortField, ascending);
+            videos = videoTrainingService.getVisibleVideosForUserSorted(siteId, userId, Instant.now(), normalizedQuery, pageOffset, safeSize, sortField, ascending);
         }
-
-        if (fetched.size() > fetchSize) {
-            hasMore = true;
-            videos = new ArrayList<>(fetched.subList(0, fetchSize));
-        } else {
-            videos = fetched;
-        }
-        nextOffset = safeOffset + videos.size();
 
         populateNavigationFlags(model, siteId, userId);
 
@@ -321,12 +321,11 @@ public class VideoTrainingController {
         model.addAttribute("isTableView", VIEW_MODE_TABLE.equals(effectiveViewMode));
         model.addAttribute("q", normalizedQuery);
         model.addAttribute("size", safeSize);
-        model.addAttribute("batchSize", safeBatchSize);
-        model.addAttribute("offset", safeOffset);
-        model.addAttribute("nextOffset", nextOffset);
+        model.addAttribute("page", safePage);
+        model.addAttribute("totalPages", totalPages);
+        model.addAttribute("offset", pageOffset);
         model.addAttribute("sortBy", normalizedSortBy);
         model.addAttribute("sortDir", normalizedSortDir);
-        model.addAttribute("hasMore", hasMore);
         model.addAttribute("siteId", siteId);
         model.addAttribute("siteRef", siteService.siteReference(siteId));
         model.addAttribute("currentPath", "/videos");
@@ -335,6 +334,7 @@ public class VideoTrainingController {
         model.addAttribute("accessMode", effectiveAccessMode);
         model.addAttribute("showAccessModeSwitch", canManageOwn && !canManageAll);
         model.addAttribute("moderationEnabled", isModerationEnabled());
+        populatePagerModel(model, safePage, safeSize, totalCount);
         model.addAttribute("title", messageSource.getMessage("video.training.title", null, locale));
         return "video-training/list";
     }
@@ -1037,7 +1037,7 @@ public class VideoTrainingController {
     public String favorites(@RequestParam(name = "viewMode", required = false) String viewMode,
             @RequestParam(name = "q", required = false) String query,
             @RequestParam(name = "size", required = false, defaultValue = "15") int size,
-            @RequestParam(name = "batchSize", required = false) Integer batchSize,
+            @RequestParam(name = "page", required = false) Integer page,
             @RequestParam(name = "offset", required = false) Integer offset,
             @RequestParam(name = "sortBy", required = false) String sortBy,
             @RequestParam(name = "sortDir", required = false) String sortDir,
@@ -1045,7 +1045,7 @@ public class VideoTrainingController {
             RedirectAttributes redirectAttributes,
             Model model) {
         return renderPreferredVideosList(true, FAVORITES_PATH, "favorites", "video.training.favorites.title",
-                "video.training.favorites.empty", viewMode, query, size, batchSize, offset, sortBy, sortDir,
+                "video.training.favorites.empty", viewMode, query, size, page, offset, sortBy, sortDir,
                 locale, redirectAttributes, model);
     }
 
@@ -1053,7 +1053,7 @@ public class VideoTrainingController {
     public String watchLater(@RequestParam(name = "viewMode", required = false) String viewMode,
             @RequestParam(name = "q", required = false) String query,
             @RequestParam(name = "size", required = false, defaultValue = "15") int size,
-            @RequestParam(name = "batchSize", required = false) Integer batchSize,
+            @RequestParam(name = "page", required = false) Integer page,
             @RequestParam(name = "offset", required = false) Integer offset,
             @RequestParam(name = "sortBy", required = false) String sortBy,
             @RequestParam(name = "sortDir", required = false) String sortDir,
@@ -1061,7 +1061,7 @@ public class VideoTrainingController {
             RedirectAttributes redirectAttributes,
             Model model) {
         return renderPreferredVideosList(false, WATCH_LATER_PATH, "watch-later", "video.training.watchLater.title",
-                "video.training.watchLater.empty", viewMode, query, size, batchSize, offset, sortBy, sortDir,
+            "video.training.watchLater.empty", viewMode, query, size, page, offset, sortBy, sortDir,
                 locale, redirectAttributes, model);
     }
 
@@ -1155,7 +1155,7 @@ public class VideoTrainingController {
 
     private String renderPreferredVideosList(boolean favoritesOnly, String listPath, String menuCurrent,
             String titleMessageKey, String emptyMessageKey,
-            String viewMode, String query, int size, Integer batchSize, Integer offset, String sortBy, String sortDir,
+            String viewMode, String query, int size, Integer page, Integer offset, String sortBy, String sortDir,
             Locale locale, RedirectAttributes redirectAttributes, Model model) {
         String siteId = currentSiteId();
         String userId = currentUserId();
@@ -1173,8 +1173,6 @@ public class VideoTrainingController {
                 || videoTrainingService.hasManagePermission(siteId, userId);
         String normalizedQuery = StringUtils.trimToEmpty(query);
         int safeSize = normalizePageSize(size);
-        int safeBatchSize = normalizePageSize(batchSize != null ? batchSize : safeSize);
-        int safeOffset = Math.max(0, offset != null ? offset : 0);
         String normalizedSortBy = normalizeSortBy(sortBy);
         String normalizedSortDir = normalizeSortDir(sortDir);
         String sortField = mapSortField(normalizedSortBy, isUserSite);
@@ -1192,13 +1190,15 @@ public class VideoTrainingController {
         }
         filteredVideos.sort((left, right) -> comparePreferredVideos(left, right, sortField, ascending));
 
-        int fetchSize = safeOffset > 0 ? safeBatchSize : safeSize;
-        int endIndex = Math.min(filteredVideos.size(), safeOffset + fetchSize);
-        boolean hasMore = endIndex < filteredVideos.size();
-        List<VideoTrainingVideo> videos = safeOffset >= filteredVideos.size()
+        long totalCount = filteredVideos.size();
+        int requestedPage = page != null ? page : ((offset != null ? offset : 0) / safeSize) + 1;
+        int safePage = normalizePage(requestedPage, safeSize, totalCount);
+        int pageOffset = (safePage - 1) * safeSize;
+        int endIndex = Math.min(filteredVideos.size(), pageOffset + safeSize);
+        List<VideoTrainingVideo> videos = pageOffset >= filteredVideos.size()
                 ? new ArrayList<>()
-                : new ArrayList<>(filteredVideos.subList(safeOffset, endIndex));
-        int nextOffset = safeOffset + videos.size();
+                : new ArrayList<>(filteredVideos.subList(pageOffset, endIndex));
+        int totalPages = (int) Math.max(1, Math.ceil((double) totalCount / safeSize));
 
         populateNavigationFlags(model, siteId, userId);
         populateVideoPresentationModel(model, videos, siteId, userId, effectiveLocale, isUserSite);
@@ -1209,12 +1209,11 @@ public class VideoTrainingController {
         model.addAttribute("isTableView", VIEW_MODE_TABLE.equals(effectiveViewMode));
         model.addAttribute("q", normalizedQuery);
         model.addAttribute("size", safeSize);
-        model.addAttribute("batchSize", safeBatchSize);
-        model.addAttribute("offset", safeOffset);
-        model.addAttribute("nextOffset", nextOffset);
+        model.addAttribute("page", safePage);
+        model.addAttribute("totalPages", totalPages);
+        model.addAttribute("offset", pageOffset);
         model.addAttribute("sortBy", normalizedSortBy);
         model.addAttribute("sortDir", normalizedSortDir);
-        model.addAttribute("hasMore", hasMore);
         model.addAttribute("siteId", siteId);
         model.addAttribute("siteRef", siteService.siteReference(siteId));
         model.addAttribute("currentPath", listPath);
@@ -1226,6 +1225,7 @@ public class VideoTrainingController {
         model.addAttribute("isManageableList", false);
         model.addAttribute("isViewableList", false);
         model.addAttribute("accessMode", menuCurrent);
+        populatePagerModel(model, safePage, safeSize, totalCount);
         model.addAttribute("title", messageSource.getMessage(titleMessageKey, null, effectiveLocale));
         model.addAttribute("emptyMessage", messageSource.getMessage(emptyMessageKey, null, effectiveLocale));
         return favoritesOnly ? "video-training/favorites" : "video-training/watch-later";
@@ -1679,6 +1679,30 @@ public class VideoTrainingController {
 
         int totalPages = (int) Math.max(1, Math.ceil((double) totalCount / pageSize));
         return Math.min(safePage, totalPages);
+    }
+
+    private void populatePagerModel(Model model, int page, int pageSize, long totalCount) {
+        int totalPages = (int) Math.max(1, Math.ceil((double) totalCount / pageSize));
+        int safePage = Math.max(1, Math.min(page, totalPages));
+        long topMsgPos = totalCount == 0 ? 0 : ((long) (safePage - 1) * pageSize) + 1;
+        long btmMsgPos = totalCount == 0 ? 0 : Math.min(totalCount, (long) safePage * pageSize);
+
+        List<Integer> pageSizes = new ArrayList<>(List.of(5, 10, 15, 20, 24, 50, 100));
+        if (!pageSizes.contains(pageSize)) {
+            pageSizes.add(pageSize);
+            Collections.sort(pageSizes);
+        }
+
+        model.addAttribute("allMsgNumber", totalCount);
+        model.addAttribute("topMsgPos", topMsgPos);
+        model.addAttribute("btmMsgPos", btmMsgPos);
+        model.addAttribute("goFPButton", safePage > 1);
+        model.addAttribute("goPPButton", safePage > 1);
+        model.addAttribute("goNPButton", safePage < totalPages);
+        model.addAttribute("goLPButton", safePage < totalPages);
+        model.addAttribute("pagesizes", pageSizes);
+        model.addAttribute("pagesize", pageSize);
+        model.addAttribute("totalPages", totalPages);
     }
 
     private long getConfiguredMaxNativeUploadBytes() {

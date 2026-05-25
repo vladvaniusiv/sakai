@@ -2,7 +2,7 @@
 <html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head th:replace="~{fragments/common :: head(${title})}"></head>
 <body class="Mrphs-toolBody sakai-video-training">
-<div class="Mrphs-sakai-video-training portletBody container-fluid sakai-video-training">
+<div class="Mrphs-sakai-video-training portletBody sakai-video-training vt-page-shell">
     <div th:replace="~{fragments/common :: menu('list', ${canManage}, ${canAnalytics}, ${canView})}"></div>
     <div th:replace="~{fragments/common :: messages(${success}, ${error})}"></div>
 
@@ -10,36 +10,35 @@
         <h1 class="h3" th:text="#{video.training.title}">Video Training</h1>
     </div>
 
-    <form class="vt-search-view-toolbar row g-2 align-items-end mb-3" method="get">
-        <div class="col-12 col-md-8 col-lg-6">
+    <form class="vt-search-view-toolbar" method="get">
+        <div class="vt-search-field">
             <label class="form-label" for="q" th:text="#{video.training.search.label}">Search</label>
             <input class="form-control" id="q" name="q" type="search" th:value="${q}" th:placeholder="#{video.training.search.placeholder}">
         </div>
-        <div class="col-12 col-md-auto d-flex gap-2 align-items-end">
+        <div class="vt-search-actions">
             <button class="btn btn-outline-primary" type="submit" th:text="#{video.training.search.submit}">Search</button>
-            <a class="btn btn-outline-secondary" th:if="${!#strings.isEmpty(q)}" th:href="@{/videos(viewMode=${viewMode},accessMode=${accessMode},size=${size},batchSize=${batchSize},sortBy=${sortBy},sortDir=${sortDir})}" th:text="#{video.training.search.clear}">Clear</a>
+            <a class="btn btn-outline-secondary" th:if="${!#strings.isEmpty(q)}" th:href="@{/videos(viewMode=${viewMode},accessMode=${accessMode},size=${size},sortBy=${sortBy},sortDir=${sortDir})}" th:text="#{video.training.search.clear}">Clear</a>
         </div>
         <input type="hidden" name="accessMode" th:value="${accessMode}">
         <input type="hidden" name="viewMode" th:value="${viewMode}">
         <input type="hidden" name="size" th:value="${size}">
-        <input type="hidden" name="batchSize" th:value="${batchSize}">
         <input type="hidden" name="sortBy" th:value="${sortBy}">
         <input type="hidden" name="sortDir" th:value="${sortDir}">
     </form>
 
-    <div class="vt-toolbar-secondary d-flex justify-content-between align-items-center mb-3" th:if="${!#lists.isEmpty(videos) || canManage || showAccessModeSwitch}">
-        <div class="d-flex flex-wrap gap-2 align-items-center">
-            <div class="vt-view-switch me-3" th:if="${showAccessModeSwitch}">
-                <a class="btn btn-sm"
+    <div class="vt-toolbar-secondary" th:if="${!#lists.isEmpty(videos) || canManage || showAccessModeSwitch}">
+        <div class="vt-toolbar-secondary-content">
+            <div class="vt-view-switch vt-access-switch" th:if="${showAccessModeSwitch}">
+                <a class="btn vt-icon-toggle"
                    th:classappend="${isViewableList} ? 'btn-primary' : 'btn-outline-secondary'"
-                   th:href="@{/videos(viewMode=${viewMode},q=${q},accessMode='viewable',size=${size},batchSize=${batchSize},sortBy=${sortBy},sortDir=${sortDir})}"
+                   th:href="@{/videos(viewMode=${viewMode},q=${q},accessMode='viewable',size=${size},sortBy=${sortBy},sortDir=${sortDir})}"
                    th:title="#{video.training.access.mode.viewable}"
                    th:attr="aria-label=#{video.training.access.mode.viewable}">
                     <span class="bi bi-eye" aria-hidden="true"></span>
                 </a>
-                <a class="btn btn-sm"
+                <a class="btn vt-icon-toggle"
                    th:classappend="${isManageableList} ? 'btn-primary' : 'btn-outline-secondary'"
-                   th:href="@{/videos(viewMode=${viewMode},q=${q},accessMode='manageable',size=${size},batchSize=${batchSize},sortBy=${sortBy},sortDir=${sortDir})}"
+                   th:href="@{/videos(viewMode=${viewMode},q=${q},accessMode='manageable',size=${size},sortBy=${sortBy},sortDir=${sortDir})}"
                    th:title="#{video.training.access.mode.manageable}"
                    th:attr="aria-label=#{video.training.access.mode.manageable}">
                     <span class="bi bi-pencil" aria-hidden="true"></span>
@@ -47,17 +46,16 @@
             </div>
 
             <div class="vt-view-switch" th:if="${!#lists.isEmpty(videos)}">
-                <form method="get" class="d-inline-flex gap-1" th:action="@{/videos}">
+                <form method="get" class="vt-view-toggle-form" th:action="@{/videos}">
                     <input type="hidden" name="q" th:value="${q}">
                     <input type="hidden" name="accessMode" th:value="${accessMode}">
                     <input type="hidden" name="size" th:value="${size}">
-                    <input type="hidden" name="batchSize" th:value="${batchSize}">
                     <input type="hidden" name="sortBy" th:value="${sortBy}">
                     <input type="hidden" name="sortDir" th:value="${sortDir}">
-                    <button type="submit" name="viewMode" value="cards" class="btn btn-sm" th:classappend="${isCardsView} ? 'btn-primary' : 'btn-outline-secondary'" title="Cards view" aria-label="Cards view">
+                    <button type="submit" name="viewMode" value="cards" class="btn vt-icon-toggle" th:classappend="${isCardsView} ? 'btn-primary' : 'btn-outline-secondary'" title="Cards view" aria-label="Cards view">
                         <span class="bi bi-grid"></span>
                     </button>
-                    <button type="submit" name="viewMode" value="table" class="btn btn-sm" th:classappend="${isTableView} ? 'btn-primary' : 'btn-outline-secondary'" title="Table view" aria-label="Table view">
+                    <button type="submit" name="viewMode" value="table" class="btn vt-icon-toggle" th:classappend="${isTableView} ? 'btn-primary' : 'btn-outline-secondary'" title="Table view" aria-label="Table view">
                         <span class="bi bi-view-list"></span>
                     </button>
                 </form>
@@ -69,26 +67,33 @@
     </div>
 
     <div class="vt-status-legend sak-banner-info" th:if="${canManage && isManageableList}">
-        <h5 class="alert-heading" th:text="#{video.training.status.legend.title}">Publication Status</h5>
-        <div>
+        <h5 class="vt-status-legend-title" 
+            data-bs-toggle="collapse" 
+            data-bs-target="#vtmStatusLegend" 
+            aria-expanded="false" 
+            aria-controls="vtmStatusLegend"
+            style="cursor: pointer;">
+            <span th:text="#{video.training.status.legend.title}">Publication Status</span>
+            <br>
+            <small class="text-muted" th:text="#{video.training.status.legend.toggle}"> Click to show/hide</small>
+        </h5>
+        <div class="collapse" id="vtmStatusLegend">
             <strong th:text="#{video.training.status.DRAFT}">Draft</strong>
-            <p class="small text-muted mb-2">Editing in progress, not visible to students</p>
-        </div>
-        <div>
+            <p class="vt-status-legend-detail" th:text="#{video.training.status.DRAFT.detail}">Editing in progress, not visible to students</p>
             <strong th:text="#{video.training.status.PUBLISHED}">Published</strong>
-            <p class="small text-muted mb-2">Active and visible to students per scope settings</p>
-        </div>
-        <div>
+            <p class="vt-status-legend-detail" th:text="#{video.training.status.PUBLISHED.detail}">Active and visible to students per scope settings</p>
             <strong th:text="#{video.training.status.WITHDRAWN}">Withdrawn</strong>
-            <p class="small text-muted mb-2">Hidden from catalog; can be republished</p>
-        </div>
-        <div th:if="${moderationEnabled}">
-            <strong th:text="#{video.training.status.PENDING_APPROVAL}">Pending Approval</strong>
-            <p class="small text-muted mb-2">Awaiting admin approval to publish</p>
-        </div>
-        <div>
+            <p class="vt-status-legend-detail" th:text="#{video.training.status.WITHDRAWN.detail}">Hidden from catalog; can be republished</p>
+            <strong th:if="${moderationEnabled}" th:text="#{video.training.status.PENDING_APPROVAL}">Pending Approval</strong>
+            <p class="vt-status-legend-detail" th:if="${moderationEnabled}" th:text="#{video.training.status.PENDING_APPROVAL.detail}">Awaiting admin approval to publish</p>
             <strong th:text="#{video.training.status.ARCHIVED}">Archived</strong>
-            <p class="small text-muted mb-2">Preserved for records; can be restored to draft</p>
+            <p class="vt-status-legend-detail" th:text="#{video.training.status.ARCHIVED.detail}">Preserved for records; can be restored to draft</p>
+        </div>
+    </div>
+
+    <div class="vt-pagination" id="vt-pagination">
+        <div class="vt-pagination-inner">
+            <div th:insert="~{fragments/pager-controls :: pagerControls}"></div>
         </div>
     </div>
 
@@ -97,18 +102,9 @@
     <div th:replace="~{fragments/video-library :: videoTable}"></div>
 
     <div class="sak-banner-info" role="status" th:if="${#lists.isEmpty(videos)}" th:text="#{video.training.empty}">No videos available.</div>
-
-    <div id="vt-pagination" class="mt-3">
-        <a class="btn btn-outline-primary"
-            id="vt-load-more"
-            th:if="${hasMore}"
-            th:href="@{/videos(viewMode=${viewMode},q=${q},accessMode=${accessMode},size=${size},batchSize=${batchSize},offset=${nextOffset},sortBy=${sortBy},sortDir=${sortDir})}"
-            th:text="#{video.training.pagination.loadMore}">Load more</a>
-            <span id="vt-pagination-end" class="text-muted" th:if="${!hasMore && !#lists.isEmpty(videos)}" th:text="#{video.training.pagination.end}">No more videos</span>
-    </div>
 </div>
 <div th:replace="~{fragments/common :: jQuery}"></div>
 <script>includeWebjarLibrary('datatables');</script>
-<script th:src="@{/js/video-training-list.js}"></script>
+<script type="module" th:src="@{/js/video-training-list.js}"></script>
 </body>
 </html>

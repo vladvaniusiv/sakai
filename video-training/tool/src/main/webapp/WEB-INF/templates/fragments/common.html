@@ -15,13 +15,13 @@
 
 <div th:fragment="jQuery">
     <script>includeLatestJQuery('sakai.video.training');</script>
-    <script th:inline="javascript">
-        $(document).ready(function () {
-            var toolId = /*[[${#httpServletRequest.getAttribute('sakai.tool.placement.id')}]]*/'toolId';
-            if (toolId) {
-                setMainFrameHeight('Main' + toolId.replace(/-/g, 'x'));
+    <script>
+        (function() {
+            const toolFrameId = window.name || (window.frameElement && window.frameElement.id);
+            if (toolFrameId) {
+                setMainFrameHeight(toolFrameId);
             }
-        });
+        })();
     </script>
 </div>
 

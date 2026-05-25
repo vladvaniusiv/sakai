@@ -37,7 +37,6 @@ import org.sakaiproject.videotraining.api.repository.VideoTrainingCaptionReposit
 import org.sakaiproject.videotraining.api.repository.VideoTrainingCategoryRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingLessonLinkRepository;
 import org.sakaiproject.videotraining.api.repository.VideoTrainingVideoRepository;
-import org.sakaiproject.videotraining.impl.service.VideoTrainingServiceImpl;
 
 public class VideoTrainingServiceImplTest {
 
@@ -122,7 +121,7 @@ public class VideoTrainingServiceImplTest {
     @Test
     public void canViewVideoShouldReturnTrueForSuperUser() {
         VideoTrainingVideo video = baseVideo();
-        when(securityService.isSuperUser()).thenReturn(true);
+        when(securityService.isSuperUser(USER_ID)).thenReturn(true);
 
         boolean result = service.canViewVideo(video, USER_ID, Instant.now());
 
@@ -259,7 +258,7 @@ public class VideoTrainingServiceImplTest {
         VideoTrainingVideo update = baseVideo();
         update.setPublicationStatus(VideoPublicationStatus.DRAFT);
 
-        when(securityService.unlock(USER_ID, VideoTrainingConstants.PERMISSION_MANAGE, SITE_REF)).thenReturn(true);
+        when(securityService.unlock(USER_ID, VideoTrainingConstants.PERMISSION_MANAGE_ALL, SITE_REF)).thenReturn(true);
         when(videoRepository.findById(VIDEO_ID)).thenReturn(Optional.of(existing));
 
         org.junit.Assert.assertThrows(IllegalArgumentException.class, () -> service.saveVideo(update));
@@ -288,7 +287,8 @@ public class VideoTrainingServiceImplTest {
         VideoTrainingVideo video = baseVideo();
         video.setProviderType(VideoProviderType.EXTERNAL);
         video.setSourceReference("https://example.org/video/123");
-        when(securityService.unlock(USER_ID, VideoTrainingConstants.PERMISSION_MANAGE, SITE_REF)).thenReturn(true);
+        video.setPublicationStatus(VideoPublicationStatus.DRAFT);
+        when(securityService.unlock(USER_ID, VideoTrainingConstants.PERMISSION_MANAGE_ALL, SITE_REF)).thenReturn(true);
         when(videoRepository.save(video)).thenReturn(video);
 
         VideoTrainingVideo saved = service.saveVideo(video);
@@ -306,7 +306,7 @@ public class VideoTrainingServiceImplTest {
         event.setId("e1");
 
         when(videoRepository.findById(VIDEO_ID)).thenReturn(Optional.of(video));
-        when(securityService.unlock(USER_ID, VideoTrainingConstants.PERMISSION_MANAGE, SITE_REF)).thenReturn(true);
+        when(securityService.unlock(USER_ID, VideoTrainingConstants.PERMISSION_MANAGE_ALL, SITE_REF)).thenReturn(true);
         when(captionRepository.findByVideoIdOrderByLanguageTagAsc(VIDEO_ID)).thenReturn(List.of(caption));
         when(analyticsEventRepository.findByVideoIdOrderByEventTimeDesc(VIDEO_ID)).thenReturn(List.of(event));
 
@@ -384,6 +384,33 @@ public class VideoTrainingServiceImplTest {
     }
 
     @Test
+    public void getGlobalVideosForUserShouldDelegateToRepositoryWithOffsetAndLimit() {
+        VideoTrainingVideo video = baseVideo();
+        when(securityService.isSuperUser(USER_ID)).thenReturn(false);
+        when(videoRepository.findVisibleByGlobal("video", 24, 24)).thenReturn(List.of(video));
+
+        List<VideoTrainingVideo> result = service.getGlobalVideosForUser(USER_ID, "video", 2, 24);
+
+        assertEquals(1, result.size());
+        verify(videoRepository).findVisibleByGlobal("video", 24, 24);
+    }
+
+    @Test
+    public void getSiteViewableVideosForUserPageShouldUseOwnerVisibilityAndOffset() {
+        VideoTrainingVideo video = baseVideo();
+        video.setOwnerId(USER_ID);
+        when(securityService.unlock(USER_ID, VideoTrainingConstants.PERMISSION_MANAGE_ALL, SITE_REF)).thenReturn(false);
+        when(securityService.unlock(USER_ID, VideoTrainingConstants.PERMISSION_MANAGE, SITE_REF)).thenReturn(true);
+        when(videoRepository.findVisibleBySiteIdAt(Mockito.eq(SITE_ID), Mockito.any(Instant.class), Mockito.eq("video"), Mockito.eq(24), Mockito.eq(24)))
+            .thenReturn(List.of(video));
+
+        List<VideoTrainingVideo> result = service.getSiteViewableVideosForUserPage(SITE_ID, USER_ID, "video", 2, 24);
+
+        assertEquals(1, result.size());
+        verify(videoRepository).findVisibleBySiteIdAt(Mockito.eq(SITE_ID), Mockito.any(Instant.class), Mockito.eq("video"), Mockito.eq(24), Mockito.eq(24));
+    }
+
+    @Test
     public void countVisibleVideosForUserShouldReturnZeroWhenUserCannotViewSite() {
         when(securityService.unlock(USER_ID, VideoTrainingConstants.PERMISSION_MANAGE, SITE_REF)).thenReturn(false);
         when(securityService.unlock(USER_ID, VideoTrainingConstants.PERMISSION_VIEW, SITE_REF)).thenReturn(false);
@@ -426,7 +453,7 @@ public class VideoTrainingServiceImplTest {
         assertEquals(4L, beforeSave);
 
         VideoTrainingVideo video = baseVideo();
-        when(securityService.unlock(USER_ID, VideoTrainingConstants.PERMISSION_MANAGE, SITE_REF)).thenReturn(true);
+        when(securityService.unlock(USER_ID, VideoTrainingConstants.PERMISSION_MANAGE_ALL, SITE_REF)).thenReturn(true);
         when(videoRepository.findById(VIDEO_ID)).thenReturn(Optional.of(video));
         when(videoRepository.save(video)).thenReturn(video);
         service.saveVideo(video);
@@ -445,7 +472,7 @@ public class VideoTrainingServiceImplTest {
         update.setVisibilityScope(VideoVisibilityScope.COURSE);
 
         Event mockEvent = Mockito.mock(Event.class);
-        when(securityService.unlock(USER_ID, VideoTrainingConstants.PERMISSION_MANAGE, SITE_REF)).thenReturn(true);
+        when(securityService.unlock(USER_ID, VideoTrainingConstants.PERMISSION_MANAGE_ALL, SITE_REF)).thenReturn(true);
         when(videoRepository.findById(VIDEO_ID)).thenReturn(Optional.of(existing));
         when(videoRepository.save(update)).thenReturn(update);
         when(eventTrackingService.newEvent(Mockito.eq("video.training.visibility.scope.changed"),
