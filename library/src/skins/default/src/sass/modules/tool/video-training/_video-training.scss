@@ -407,6 +407,14 @@
 
   .vt-player-wrap {
     margin-bottom: calc(#{$standard-spacing} + #{$standard-space});
+    max-height: 24rem;
+    height: 24rem;
+
+    .plyr--video,
+    iframe {
+      max-height: 24rem;
+      height: 24rem;
+    }
   }
 
   .vt-player {
