@@ -150,6 +150,11 @@ public class HlsTranscodingJob implements ScheduledInvocationCommand {
         try {
             Files.createDirectories(outputDir);
             renderVariants(inputFile, outputDir);
+            try {
+                extractThumbnail(inputFile, outputDir);
+            } catch (Exception e) {
+                log.warn("HlsTranscodingJob - The thumbnail for the video {}, could not be extracted, continuing...", video.getId(), e);
+            }
             long outputBytes = calculateDirectorySize(outputDir);
             Long quotaBytes = videoTrainingService.getSiteStorageQuotaBytes(video.getSiteId());
             long usageBytes = videoTrainingService.getSiteStorageUsageBytes(video.getSiteId());
@@ -179,6 +184,32 @@ public class HlsTranscodingJob implements ScheduledInvocationCommand {
         } catch (Exception ex) {
             failJob(job, video, "HLS processing failed.");
         }
+    }
+
+    private void extractThumbnail(Path inputFile, Path outputDir) throws IOException, InterruptedException {
+        Path thumbnail = outputDir.resolve("thumbnail.jpg");
+        List<String> command = new ArrayList<>();
+
+        command.add(resolveFfmpegCommand());
+        command.add("-y");
+        command.add("-i");
+        command.add(inputFile.toString());
+        command.add("-ss");
+        command.add("00:00:01.000");
+        command.add("-vframes");
+        command.add("1");
+        command.add("-f");
+        command.add("image2");
+        command.add("-update");
+        command.add("1");
+        command.add("-vf");
+        command.add("scale=640:-1");
+        command.add("-q:v");
+        command.add("4");
+        command.add(thumbnail.toString());
+
+        log.info("HlsTranscodingJob - Running FFmpeg for thumbnail: {}", String.join(" ", command));
+        runProcess(command, outputDir);
     }
 
     private void renderVariants(Path inputFile, Path outputDir) throws IOException, InterruptedException {
@@ -479,6 +510,9 @@ public class HlsTranscodingJob implements ScheduledInvocationCommand {
         }
         if (".ts".equals(extension)) {
             return "video/mp2t";
+        }
+        if (".jpg".equals(extension) || ".jpeg".equals(extension)) {
+            return "image/jpeg";
         }
         return "application/octet-stream";
     }

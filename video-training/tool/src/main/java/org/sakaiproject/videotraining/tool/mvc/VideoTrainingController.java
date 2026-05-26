@@ -131,7 +131,7 @@ public class VideoTrainingController {
     private static final String MAX_NATIVE_UPLOAD_SIZE_PROPERTY = "video.training.max.upload.size";
     private static final long BYTES_PER_MB = 1024L * 1024L;
     private static final long DEFAULT_MAX_NATIVE_UPLOAD_MB = 512L;
-    private static final Set<String> ALLOWED_NATIVE_VIDEO_EXTENSIONS = Set.of("mp4", "webm", "ogg", "mov", "m4v", "avi", "mkv");
+    private static final Set<String> ALLOWED_NATIVE_VIDEO_EXTENSIONS = Set.of("mp4", "webm", "ogg", "mov", "m4v", "mkv");
 
     private static final String CONTENT_REFERENCE_ROOT = ContentHostingService.REFERENCE_ROOT;
     private static final Map<String, String> SORT_FIELD_BY_COLUMN = Map.of(
@@ -1710,8 +1710,23 @@ public class VideoTrainingController {
         for (VideoTrainingVideo video : videos) {
             releaseDisplayById.put(video.getId(), formatInstantForDisplay(video.getReleaseDate(), locale));
             retractDisplayById.put(video.getId(), formatInstantForDisplay(video.getRetractDate(), locale));
-            thumbnailUrlById.put(video.getId(), buildThumbnailUrl(video));
-            thumbnailIsVideoById.put(video.getId(), isNativeVideoThumbnail(video));
+            String thumbUrl = buildThumbnailUrl(video);
+            boolean isVideoFormat = isNativeVideoThumbnail(video);
+            if (!isVideoFormat && StringUtils.isNotBlank(thumbUrl)) {
+                int lastDot = thumbUrl.lastIndexOf('.');
+                if (lastDot != -1 && lastDot < thumbUrl.length() - 1) {
+                    String extension = thumbUrl.substring(lastDot + 1).toLowerCase();
+                    if (ALLOWED_NATIVE_VIDEO_EXTENSIONS.contains(extension)) {
+                        isVideoFormat = true;
+                    }
+                }
+            }
+            if (video.getProviderType() == VideoProviderType.HLS_UPLOAD && thumbUrl != null && thumbUrl.contains("master.m3u8")) {
+                thumbUrl = thumbUrl.replace("master.m3u8", "thumbnail.jpg");
+                isVideoFormat = false;
+            }
+            thumbnailUrlById.put(video.getId(), thumbUrl);
+            thumbnailIsVideoById.put(video.getId(), isVideoFormat);
             if (isUserSite && !siteNameBySiteId.containsKey(video.getSiteId())) {
                 siteNameBySiteId.put(video.getSiteId(), getSiteName(video.getSiteId()));
             }
@@ -2141,7 +2156,9 @@ public class VideoTrainingController {
             return "";
         }
 
-        if (video.getProviderType() == VideoProviderType.NATIVE || video.getProviderType() == VideoProviderType.RESOURCES) {
+        if (video.getProviderType() == VideoProviderType.NATIVE
+                || video.getProviderType() == VideoProviderType.RESOURCES
+                || video.getProviderType() == VideoProviderType.HLS_UPLOAD) {
             return resolveContentReferenceFromSourceId(video.getSourceReference());
         }
 

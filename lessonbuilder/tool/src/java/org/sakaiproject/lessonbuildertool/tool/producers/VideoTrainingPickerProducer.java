@@ -42,6 +42,7 @@ import uk.org.ponder.rsf.viewstate.SimpleViewParameters;
 import uk.org.ponder.rsf.viewstate.ViewParameters;
 import uk.org.ponder.rsf.viewstate.ViewParamsReporter;
 
+import org.sakaiproject.component.api.ServerConfigurationService;
 import org.sakaiproject.lessonbuildertool.SimplePage;
 import org.sakaiproject.lessonbuildertool.SimplePageItem;
 import org.sakaiproject.lessonbuildertool.service.LessonEntity;
@@ -60,12 +61,15 @@ import org.sakaiproject.tool.cover.SessionManager;
 public class VideoTrainingPickerProducer implements ViewComponentProducer, NavigationCaseReporter, ViewParamsReporter {
 	
 	public static final String VIEW_ID = "VideoTrainingPicker";
+	private static final String MANAGED_BASE_FOLDER_PROPERTY = "video.training.basefolder";
+	private static final String DEFAULT_MANAGED_BASE_FOLDER = "Video Training";
 
 	private SimplePageBean simplePageBean;
 	private SimplePageToolDao simplePageToolDao;
 	private VideoTrainingEntity videoTrainingEntity;
 	public MessageLocator messageLocator;
 	public LocaleGetter localeGetter;
+	private ServerConfigurationService serverConfigurationService;
 
 	public void setSimplePageBean(SimplePageBean simplePageBean) {
 		this.simplePageBean = simplePageBean;
@@ -182,18 +186,27 @@ public class VideoTrainingPickerProducer implements ViewComponentProducer, Navig
 				if (video instanceof VideoTrainingEntity) {
 					VideoTrainingEntity videoTraining = (VideoTrainingEntity) video;
 					finalUrl = videoTraining.getPortalUrl();
-					String thumbnailUrl = videoTraining.getThumbnailUrl();
-					if (thumbnailUrl != null && !thumbnailUrl.isEmpty()) {
-						if (videoTraining.isThumbnailVideo()) {
-							UIOutput.make(row, "thumbnail-video", "").decorate(new UIFreeAttributeDecorator("src", thumbnailUrl))
-								.decorate(new UIFreeAttributeDecorator("style", "display:block;"));
-						} else {
-							UIOutput.make(row, "thumbnail-image", "").decorate(new UIFreeAttributeDecorator("src", thumbnailUrl))
-								.decorate(new UIFreeAttributeDecorator("alt", video.getTitle()))
-								.decorate(new UIFreeAttributeDecorator("style", "display:block;"));
-						}
-						UIOutput.make(row, "thumbnail-placeholder", "").decorate(new UIFreeAttributeDecorator("style", "display:none;"));
-					}
+					String thumbnailUrl = buildThumbnailUrl(videoTraining);
+                    if (thumbnailUrl != null && !thumbnailUrl.isEmpty()) {
+                        boolean isHlsJpg = thumbnailUrl.contains("thumbnail.jpg");
+                        boolean isVideoThumb = videoTraining.isThumbnailVideo() && !isHlsJpg;
+
+                        if (isVideoThumb) {
+                            UIOutput.make(row, "thumbnail-video", "").decorate(new UIFreeAttributeDecorator("src", thumbnailUrl))
+                                .decorate(new UIFreeAttributeDecorator("style", "display:block;"));
+                            UIOutput.make(row, "thumbnail-image", "").decorate(new UIFreeAttributeDecorator("style", "display:none;"));
+                        } else {
+                            UIOutput.make(row, "thumbnail-image", "").decorate(new UIFreeAttributeDecorator("src", thumbnailUrl))
+                                .decorate(new UIFreeAttributeDecorator("alt", video.getTitle()))
+                                .decorate(new UIFreeAttributeDecorator("style", "display:block;"));
+                            UIOutput.make(row, "thumbnail-video", "").decorate(new UIFreeAttributeDecorator("style", "display:none;"));
+                        }
+                        UIOutput.make(row, "thumbnail-placeholder", "").decorate(new UIFreeAttributeDecorator("style", "display:none;"));
+                    } else {
+                        UIOutput.make(row, "thumbnail-placeholder", "").decorate(new UIFreeAttributeDecorator("style", "display:flex;"));
+                        UIOutput.make(row, "thumbnail-video", "").decorate(new UIFreeAttributeDecorator("style", "display:none;"));
+                        UIOutput.make(row, "thumbnail-image", "").decorate(new UIFreeAttributeDecorator("style", "display:none;"));
+                    }
 				}
 
 				UILink.make(row, "link", video.getTitle(), finalUrl);
@@ -212,6 +225,44 @@ public class VideoTrainingPickerProducer implements ViewComponentProducer, Navig
 		}
 	}
 
+	private String buildThumbnailUrl(VideoTrainingEntity videoTraining) {
+        if (videoTraining == null) {
+            return "";
+        }
+
+		String baseFolder = serverConfigurationService != null 
+            ? serverConfigurationService.getString(MANAGED_BASE_FOLDER_PROPERTY, DEFAULT_MANAGED_BASE_FOLDER)
+            : DEFAULT_MANAGED_BASE_FOLDER;
+
+        String entityThumb = videoTraining.getThumbnailUrl();
+        if (entityThumb != null && !entityThumb.isEmpty() && !entityThumb.contains("/portal/site/")) {
+            if (entityThumb.contains("master.m3u8")) {
+                return entityThumb.replace("master.m3u8", "thumbnail.jpg");
+            }
+            return entityThumb;
+        }
+
+        String reference = videoTraining.getReference();
+        if (reference != null && !reference.isEmpty()) {
+            if (reference.startsWith("/video-training/")) {
+                reference = reference.substring("/video-training/".length());
+            } else if (reference.startsWith("/")) {
+                reference = reference.substring(1);
+            }
+			return "/access/content/group/" + simplePageBean.getCurrentSiteId() + "/" + baseFolder + "/" + reference + "/thumbnail.jpg";
+        }
+
+        String fallbackUrl = videoTraining.getPortalUrl() != null ? videoTraining.getPortalUrl() : videoTraining.getUrl();
+        if (fallbackUrl != null && !fallbackUrl.isEmpty() && !fallbackUrl.contains("/portal/site/")) {
+            if (fallbackUrl.contains("master.m3u8")) {
+                return fallbackUrl.replace("master.m3u8", "thumbnail.jpg");
+            }
+            return fallbackUrl;
+        }
+
+        return "";
+    }
+
 	public List<NavigationCase> reportNavigationCases() {
 		List<NavigationCase> nav = new ArrayList<NavigationCase>();
 		nav.add(new NavigationCase(null, new SimpleViewParameters(ShowPageProducer.VIEW_ID)));
@@ -224,4 +275,8 @@ public class VideoTrainingPickerProducer implements ViewComponentProducer, Navig
 	public ViewParameters getViewParameters() {
 		return new GeneralViewParameters();
 	}
+
+	public void setServerConfigurationService(ServerConfigurationService serverConfigurationService) {
+        this.serverConfigurationService = serverConfigurationService;
+    }
 }
