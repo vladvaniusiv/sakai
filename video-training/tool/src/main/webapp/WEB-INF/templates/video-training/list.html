@@ -61,12 +61,12 @@
                 </form>
             </div>
         </div>
-        <div class="vt-toolbar" th:if="${canManage && isManageableList}">
+        <div class="vt-toolbar" th:if="${canManage && isManageableList && !isGlobalSite}">
             <a class="btn btn-primary" th:href="@{/videos/new}" th:text="#{video.training.add}">Add video</a>
         </div>
     </div>
 
-    <div class="vt-status-legend sak-banner-info" th:if="${canManage && isManageableList}">
+    <div class="vt-status-legend sak-banner-info" th:if="${canManage && isManageableList && !isGlobalSite}">
         <h5 class="vt-status-legend-title" 
             data-bs-toggle="collapse" 
             data-bs-target="#vtmStatusLegend" 

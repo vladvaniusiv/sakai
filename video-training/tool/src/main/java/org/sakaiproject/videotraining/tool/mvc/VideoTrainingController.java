@@ -367,6 +367,7 @@ public class VideoTrainingController {
         model.addAttribute("moderationEnabled", isModerationEnabled());
         populatePagerModel(model, safePage, safeSize, totalCount);
         model.addAttribute("title", messageSource.getMessage("video.training.title", null, locale));
+        model.addAttribute("isGlobalSite", isGlobalSiteId(siteId));
         return "video-training/list";
     }
 
@@ -406,6 +407,10 @@ public class VideoTrainingController {
     public String newVideo(RedirectAttributes redirectAttributes, Locale locale, Model model) {
         String siteId = currentSiteId();
         String userId = currentUserId();
+        if (siteId != null && (siteId.startsWith("~") || siteId.startsWith("!"))) {
+            redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.global.uploadNotAllowed", null, locale));
+            return "redirect:/videos";
+        }
         if (!(videoTrainingService.canManageLibrary(siteId, userId) || videoTrainingService.hasManagePermission(siteId, userId))) {
             redirectAttributes.addFlashAttribute("error",
                     messageSource.getMessage("video.training.accessDenied", null, locale));
@@ -428,6 +433,7 @@ public class VideoTrainingController {
         model.addAttribute("defaultUploadProviderType", defaultUploadProviderType(null));
         model.addAttribute("visibilityScopes", VideoVisibilityScope.values());
         model.addAttribute("publicationStatuses", publicationStatusesForForm());
+        model.addAttribute("isGlobalSite", isGlobalSiteId(siteId));
         return "video-training/edit";
     }
 
@@ -570,6 +576,7 @@ public class VideoTrainingController {
         VideoPublicationStatus[] validTransitions = videoTrainingService.getValidPublicationStatusTransitions(video.getPublicationStatus(), scope);
         model.addAttribute("publicationStatuses", validTransitions);
         model.addAttribute("currentPublicationStatus", video.getPublicationStatus());
+        model.addAttribute("isGlobalSite", isGlobalSiteId(siteId));
         return "video-training/edit";
     }
 
@@ -604,6 +611,10 @@ public class VideoTrainingController {
         }
 
         String siteId = currentSiteId();
+        if (isGlobalSiteId(siteId)) {
+            redirectAttributes.addFlashAttribute("error", messageSource.getMessage("video.training.global.uploadNotAllowed", null, locale));
+            return "redirect:/videos";
+        }
         String uploadedSourceReference = null;
         String stagedTempFilePath = null;
         String resolvedSourceReference;
@@ -792,6 +803,13 @@ public class VideoTrainingController {
         }
 
         return "redirect:/videos";
+    }
+
+    private boolean isGlobalSiteId(String siteId) {
+        if (StringUtils.isBlank(siteId)) {
+            return true;
+        }
+        return siteId.startsWith("~") || siteId.startsWith("!");
     }
 
     @PostMapping("/videos/{videoId}")
@@ -1211,6 +1229,7 @@ public class VideoTrainingController {
                 .map(pref -> pref.isWatchLater())
                 .orElse(false));
         model.addAttribute("currentPath", "/videos/" + videoId);
+        model.addAttribute("isGlobalSite", isGlobalSiteId(video.getSiteId()));
         return "video-training/details";
     }
 
@@ -1305,6 +1324,7 @@ public class VideoTrainingController {
             return "redirect:/videos";
         }
         model.addAttribute("analytics", videoTrainingService.getSiteAnalyticsSummary(siteId));
+        model.addAttribute("isGlobalSite", isGlobalSiteId(siteId));
         return "video-training/analytics";
     }
 
@@ -1384,6 +1404,7 @@ public class VideoTrainingController {
 
         populateNavigationFlags(model, siteId, userId);
         model.addAttribute("jobs", buildUploadJobViews(siteId, userId, locale));
+        model.addAttribute("isGlobalSite", isGlobalSiteId(siteId));
         return "video-training/upload-jobs";
     }
 
@@ -1599,6 +1620,7 @@ public class VideoTrainingController {
         populatePagerModel(model, safePage, safeSize, totalCount);
         model.addAttribute("title", messageSource.getMessage(titleMessageKey, null, effectiveLocale));
         model.addAttribute("emptyMessage", messageSource.getMessage(emptyMessageKey, null, effectiveLocale));
+        model.addAttribute("isGlobalSite", isGlobalSiteId(siteId));
         return favoritesOnly ? "video-training/favorites" : "video-training/watch-later";
     }
 

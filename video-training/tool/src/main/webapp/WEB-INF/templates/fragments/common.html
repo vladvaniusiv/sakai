@@ -33,7 +33,7 @@
                 <a th:unless="${current} == 'list'" th:href="@{/videos}" th:text="#{video.training.menu.library}">Library</a>
             </span>
         </li>
-        <li th:if="${canManage}">
+        <li th:if="${canManage && !isGlobalSite}">
             <span th:class="${current} == 'add' ? 'current'">
                 <span th:if="${current} == 'add'" th:text="#{video.training.menu.add}">Add video</span>
                 <a th:unless="${current} == 'add'" th:href="@{/videos/new}" th:text="#{video.training.menu.add}">Add video</a>
