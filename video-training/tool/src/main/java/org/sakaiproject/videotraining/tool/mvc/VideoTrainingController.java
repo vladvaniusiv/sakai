@@ -64,6 +64,7 @@ import org.sakaiproject.videotraining.api.VideoTrainingConstants;
 import org.sakaiproject.videotraining.api.model.PagedResponse;
 import org.sakaiproject.videotraining.api.model.VideoProviderType;
 import org.sakaiproject.videotraining.api.model.VideoPublicationStatus;
+import org.sakaiproject.videotraining.api.model.VideoTrainingAnalyticsSummary;
 import org.sakaiproject.videotraining.api.model.VideoTrainingProcessJob;
 import org.sakaiproject.videotraining.api.model.VideoTrainingProcessJobStatus;
 import org.sakaiproject.videotraining.api.model.VideoTrainingCaption;
@@ -1323,7 +1324,28 @@ public class VideoTrainingController {
                     messageSource.getMessage("video.training.accessDenied", null, locale));
             return "redirect:/videos";
         }
-        model.addAttribute("analytics", videoTrainingService.getSiteAnalyticsSummary(siteId));
+        List<VideoTrainingAnalyticsSummary> rawAnalyticsList = videoTrainingService.getSiteAnalyticsSummary(siteId);
+        List<VideoTrainingAnalyticsSummary> filteredAnalyticsList = new ArrayList<>();
+        List<VideoTrainingVideo> videosForAnalytics = new ArrayList<>();
+        Map<String, VideoTrainingVideo> videoById = new HashMap<>();
+        if (rawAnalyticsList != null) {
+            for (VideoTrainingAnalyticsSummary summary : rawAnalyticsList) {
+                if (summary != null && StringUtils.isNotBlank(summary.getVideoId())) {
+                    Optional<VideoTrainingVideo> videoOpt = videoTrainingService.getVideoById(summary.getVideoId());
+                    if (videoOpt.isPresent()) {
+                        VideoTrainingVideo video = videoOpt.get();
+                        videoById.put(video.getId(), video);
+                        videosForAnalytics.add(video);
+                        filteredAnalyticsList.add(summary);
+                    }
+                }
+            }
+        }
+        model.addAttribute("analytics", filteredAnalyticsList);
+        model.addAttribute("videoById", videoById);
+        boolean isUserSite = siteService.isUserSite(siteId);
+        Locale effectiveLocale = locale != null ? locale : Locale.getDefault();
+        populateVideoPresentationModel(model, videosForAnalytics, siteId, userId, effectiveLocale, isUserSite);
         model.addAttribute("isGlobalSite", isGlobalSiteId(siteId));
         return "video-training/analytics";
     }
