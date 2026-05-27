@@ -225,8 +225,12 @@ public class HlsTranscodingJob implements ScheduledInvocationCommand {
             command.add("-y");
             command.add("-i");
             command.add(inputFile.toString());
+            String videoFilter = String.format(
+                "scale=w=%d:h=%d:force_original_aspect_ratio=decrease,pad=%d:%d:(ow-iw)/2:(oh-ih)/2",
+                variant.width, variant.height, variant.width, variant.height
+            );
             command.add("-vf");
-            command.add("scale=w=" + variant.width + ":h=" + variant.height);
+            command.add(videoFilter);
             command.add("-c:v");
             command.add("libx264");
             command.add("-profile:v");
